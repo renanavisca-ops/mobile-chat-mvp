@@ -54,7 +54,7 @@ Workflow en `.github/workflows/ci.yml` ejecuta lint, typecheck, tests y build.
 1. Push a GitHub.
 2. Importar repo en Vercel.
 3. Configurar `NEXT_PUBLIC_SUPABASE_URL` y `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
-4. Deploy.
+4. Deploy trigger.
 
 ## Limitaciones MVP
 - UI de envío aún muestra canal cifrado y suscripción realtime; integrar encrypt/decrypt por chat en siguiente iteración.
