@@ -17,7 +17,12 @@ export default function LoginPage() {
       return;
     }
     const supabase = browserSupabase();
-    const { error } = await supabase.auth.signInWithOtp({ email: parsed.data });
+    const { error } = await supabase.auth.signInWithOtp({
+  email: parsed.data,
+  options: {
+    emailRedirectTo: `${window.location.origin}/auth/callback`,
+  },
+});
     setStatus(error ? error.message : 'Enlace de acceso enviado.');
   }
 
