@@ -8,23 +8,19 @@ export default function AuthCallback() {
   const router = useRouter();
 
   useEffect(() => {
-    const handleAuth = async () => {
-      const { data, error } = await browserSupabase.auth.getSession();
+    const supabase = browserSupabase();
 
-      if (error) {
-        console.error(error);
-        router.push('/');
-        return;
-      }
+    const handle = async () => {
+      const { data } = await supabase.auth.getSession();
 
       if (data.session) {
-        router.push('/chats');
+        router.replace('/chats');
       } else {
-        router.push('/');
+        router.replace('/');
       }
     };
 
-    handleAuth();
+    handle();
   }, [router]);
 
   return <p>Procesando login...</p>;
