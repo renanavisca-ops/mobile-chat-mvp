@@ -1,15 +1,29 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { RealtimePostgresInsertPayload } from '@supabase/supabase-js';
 import { browserSupabase } from '@/lib/supabase/client';
+import { listMessages } from '@/lib/db/chats';
 import type { MessageRow } from '@/types/chat';
-
-const MAX_BACKOFF_MS = 10_000;
 
 export function useChatRealtime(chatId: string) {
   const [messages, setMessages] = useState<MessageRow[]>([]);
-  const retryMs = useRef(500);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let alive = true;
+    setLoading(true);
+    listMessages(chatId, 200)
+      .then((rows) => {
+        if (!alive) return;
+        setMessages(rows);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+    return () => {
+      alive = false;
+    };
+  }, [chatId]);
 
   useEffect(() => {
     const supabase = browserSupabase();
@@ -26,30 +40,17 @@ export function useChatRealtime(chatId: string) {
         },
         (payload: RealtimePostgresInsertPayload<MessageRow>) => {
           setMessages((current) => {
-            if (current.some((item) => item.id === payload.new.id)) {
-              return current;
-            }
+            if (current.some((item) => item.id === payload.new.id)) return current;
             return [...current, payload.new];
           });
         }
       )
-      .subscribe((status) => {
-        if (status === 'SUBSCRIBED') {
-          retryMs.current = 500;
-        }
-      });
+      .subscribe();
 
     return () => {
       void supabase.removeChannel(channel);
     };
   }, [chatId]);
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      retryMs.current = Math.min(MAX_BACKOFF_MS, retryMs.current * 2);
-    }, retryMs.current);
-    return () => clearInterval(interval);
-  }, []);
-
-  return messages;
+  return { messages, loading };
 }
