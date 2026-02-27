@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { PageShell } from '@/components/page-shell';
 import { createLocalDeviceBundle } from '@/lib/crypto/device';
 import { browserSupabase } from '@/lib/supabase/client';
@@ -8,7 +8,18 @@ import { browserSupabase } from '@/lib/supabase/client';
 export default function OnboardingPage() {
   const [status, setStatus] = useState<string>('');
   const [busy, setBusy] = useState(false);
-  const [username, setUsername] = useState<string>(() => localStorage.getItem('username') || '');
+
+  // IMPORTANT: do not touch localStorage during prerender
+  const [username, setUsername] = useState<string>('');
+
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem('username');
+      if (saved) setUsername(saved);
+    } catch {
+      // ignore
+    }
+  }, []);
 
   async function runOnboarding() {
     setBusy(true);
@@ -22,17 +33,17 @@ export default function OnboardingPage() {
       if (!userData.user) throw new Error('No estás autenticado. Ve a /login.');
 
       const bundle = await createLocalDeviceBundle();
-      localStorage.setItem('device_bundle', JSON.stringify(bundle));
-      if (username.trim()) localStorage.setItem('username', username.trim());
+      window.localStorage.setItem('device_bundle', JSON.stringify(bundle));
+
+      const uname = username.trim();
+      if (uname) window.localStorage.setItem('username', uname);
 
       setStatus('Guardando perfil…');
-      await supabase.from('profiles').upsert(
-        {
-          id: userData.user.id,
-          username: username.trim() || null
-        },
+      const { error: profErr } = await supabase.from('profiles').upsert(
+        { id: userData.user.id, username: uname || null },
         { onConflict: 'id' }
       );
+      if (profErr) throw profErr;
 
       setStatus('Registrando device…');
       const deviceLabel = `Web-${new Date().toISOString().slice(0, 10)}`;
@@ -53,7 +64,7 @@ export default function OnboardingPage() {
 
       if (devErr) throw devErr;
 
-      localStorage.setItem('active_device_id', deviceRow.id);
+      window.localStorage.setItem('active_device_id', deviceRow.id);
 
       setStatus(`✅ Listo. Device registrado: ${deviceRow.id}`);
     } catch (e: any) {
