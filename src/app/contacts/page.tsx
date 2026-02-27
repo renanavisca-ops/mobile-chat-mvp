@@ -1,15 +1,17 @@
 'use client';
 
-import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { PageShell } from '@/components/page-shell';
 import { useRequireAuth } from '@/lib/auth/use-require-auth';
-import { addContact, listMyContacts, searchUsers } from '@/lib/db/contacts';
+import { browserSupabase } from '@/lib/supabase/client';
 import { createDirectChatWith } from '@/lib/db/chats';
+import { addContact, listMyContacts, searchUsers } from '@/lib/db/contacts';
 import type { ProfileLite } from '@/lib/db/types';
 
 export default function ContactsPage() {
   const { loading } = useRequireAuth();
+  const supabase = browserSupabase();
+
   const [q, setQ] = useState('');
   const [results, setResults] = useState<ProfileLite[]>([]);
   const [contacts, setContacts] = useState<ProfileLite[]>([]);
@@ -34,10 +36,10 @@ export default function ContactsPage() {
       .catch((e) => setErr(e?.message ?? String(e)));
   }, [q, canSearch]);
 
-  async function onAdd(id: string) {
+  async function onAdd(userId: string) {
     setErr('');
     try {
-      await addContact(id);
+      await addContact(userId);
       const list = await listMyContacts();
       setContacts(list);
     } catch (e: any) {
@@ -45,10 +47,14 @@ export default function ContactsPage() {
     }
   }
 
-  async function onChat(id: string) {
+  async function onChat(userId: string) {
     setErr('');
     try {
-      const chatId = await createDirectChatWith(id);
+      // ensure authenticated
+      const { data } = await supabase.auth.getUser();
+      if (!data.user) throw new Error('Not authenticated');
+
+      const chatId = await createDirectChatWith(userId);
       window.location.href = `/chats/${chatId}`;
     } catch (e: any) {
       setErr(e?.message ?? String(e));
@@ -56,8 +62,8 @@ export default function ContactsPage() {
   }
 
   return (
-    <PageShell title="Contacts" right={<Link className="text-sm text-slate-200 hover:text-white" href="/groups/new">New group</Link>}>
-      {err ? <p className="text-sm text-red-300">{err}</p> : null}
+    <PageShell title="Contacts">
+      {err ? <p className="mb-3 text-sm text-red-300">{err}</p> : null}
 
       <div className="space-y-4">
         <div className="rounded-xl border border-slate-900 bg-slate-950/40 p-3">
@@ -68,7 +74,9 @@ export default function ContactsPage() {
             onChange={(e) => setQ(e.target.value)}
             placeholder="type at least 2 chars…"
           />
-          <div className="mt-2 text-xs text-slate-500">Tip: each user should set username in /onboarding</div>
+          <div className="mt-2 text-xs text-slate-500">
+            Tip: each user should set username in <b>/onboarding</b>.
+          </div>
 
           {results.length > 0 ? (
             <ul className="mt-3 divide-y divide-slate-900 rounded-lg border border-slate-900">
@@ -76,10 +84,16 @@ export default function ContactsPage() {
                 <li key={r.id} className="flex items-center justify-between gap-3 p-2">
                   <div className="text-sm">{r.username ?? r.id}</div>
                   <div className="flex gap-2">
-                    <button className="rounded bg-slate-800 px-3 py-1.5 text-sm hover:bg-slate-700" onClick={() => onAdd(r.id)}>
+                    <button
+                      className="rounded bg-slate-800 px-3 py-1.5 text-sm hover:bg-slate-700"
+                      onClick={() => onAdd(r.id)}
+                    >
                       Add
                     </button>
-                    <button className="rounded bg-blue-600 px-3 py-1.5 text-sm hover:bg-blue-500" onClick={() => onChat(r.id)}>
+                    <button
+                      className="rounded bg-blue-600 px-3 py-1.5 text-sm hover:bg-blue-500"
+                      onClick={() => onChat(r.id)}
+                    >
                       Chat
                     </button>
                   </div>
@@ -93,6 +107,7 @@ export default function ContactsPage() {
 
         <div className="rounded-xl border border-slate-900 bg-slate-950/40 p-3">
           <div className="text-sm text-slate-300">My contacts</div>
+
           {contacts.length === 0 ? (
             <p className="mt-2 text-sm text-slate-400">No contacts yet.</p>
           ) : (
@@ -100,7 +115,10 @@ export default function ContactsPage() {
               {contacts.map((c) => (
                 <li key={c.id} className="flex items-center justify-between gap-3 p-2">
                   <div className="text-sm">{c.username ?? c.id}</div>
-                  <button className="rounded bg-blue-600 px-3 py-1.5 text-sm hover:bg-blue-500" onClick={() => onChat(c.id)}>
+                  <button
+                    className="rounded bg-blue-600 px-3 py-1.5 text-sm hover:bg-blue-500"
+                    onClick={() => onChat(c.id)}
+                  >
                     Chat
                   </button>
                 </li>
