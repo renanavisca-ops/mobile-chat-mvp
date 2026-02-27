@@ -15,44 +15,33 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
 
   const [busy, setBusy] = useState(false);
-  const [status, setStatus] = useState<string>('');
+  const [status, setStatus] = useState('');
 
-  async function onSubmit() {
+  async function submit() {
     setBusy(true);
     setStatus('');
 
     try {
       const supabase = browserSupabase();
 
-      if (!email.includes('@')) throw new Error('Email inválido.');
-      if (password.length < 8) throw new Error('Password mínimo 8 caracteres.');
+      const e = email.trim();
+      if (!e.includes('@')) throw new Error('Email inválido.');
+      if (password.length < 6) throw new Error('Password mínimo 6 caracteres (mejor 8+).');
 
       if (mode === 'signup') {
-        const { error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            // si tienes confirmación por email activada, esto define a dónde redirige el link
-            emailRedirectTo: `${window.location.origin}/auth/callback`,
-          },
-        });
+        const { error } = await supabase.auth.signUp({ email: e, password });
         if (error) throw error;
 
-        setStatus('✅ Cuenta creada. Si tu proyecto requiere confirmación por email, revisa tu correo. Luego haz Sign in.');
+        setStatus('✅ Cuenta creada. Ahora haz Sign in con tu email y password.');
         return;
       }
 
-      // mode === 'signin'
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+      const { error } = await supabase.auth.signInWithPassword({ email: e, password });
       if (error) throw error;
 
-      setStatus('✅ Sesión iniciada. Redirigiendo…');
       router.replace('/onboarding');
-    } catch (e: any) {
-      setStatus(`❌ ${e?.message ?? String(e)}`);
+    } catch (err: any) {
+      setStatus(`❌ ${err?.message ?? String(err)}`);
     } finally {
       setBusy(false);
     }
@@ -63,20 +52,16 @@ export default function LoginPage() {
       <div className="mx-auto max-w-md space-y-4">
         <div className="flex gap-2">
           <button
-            className={[
-              'rounded px-3 py-2 text-sm',
-              mode === 'signin' ? 'bg-slate-800' : 'bg-slate-950/40 border border-slate-900'
-            ].join(' ')}
+            className={`rounded px-3 py-2 text-sm ${mode === 'signin' ? 'bg-slate-800' : 'border border-slate-900 bg-slate-950/40'}`}
             onClick={() => setMode('signin')}
+            disabled={busy}
           >
             Sign in
           </button>
           <button
-            className={[
-              'rounded px-3 py-2 text-sm',
-              mode === 'signup' ? 'bg-slate-800' : 'bg-slate-950/40 border border-slate-900'
-            ].join(' ')}
+            className={`rounded px-3 py-2 text-sm ${mode === 'signup' ? 'bg-slate-800' : 'border border-slate-900 bg-slate-950/40'}`}
             onClick={() => setMode('signup')}
+            disabled={busy}
           >
             Sign up
           </button>
@@ -88,8 +73,8 @@ export default function LoginPage() {
             className="w-full rounded border border-slate-800 bg-slate-950 px-3 py-2 text-slate-100"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="you@example.com"
             autoComplete="email"
+            placeholder="you@example.com"
           />
         </div>
 
@@ -99,25 +84,21 @@ export default function LoginPage() {
             className="w-full rounded border border-slate-800 bg-slate-950 px-3 py-2 text-slate-100"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            placeholder="min 8 characters"
             type="password"
             autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
+            placeholder="mínimo 6 (recomendado 8+)"
           />
         </div>
 
         <button
           className="rounded bg-blue-600 px-3 py-2 text-sm hover:bg-blue-500 disabled:opacity-60"
-          onClick={onSubmit}
+          onClick={submit}
           disabled={busy}
         >
           {busy ? 'Working…' : mode === 'signin' ? 'Sign in' : 'Create account'}
         </button>
 
-        <p className="text-sm whitespace-pre-wrap">{status}</p>
-
-        <p className="text-xs text-slate-500">
-          Después de entrar, ve a <b>/onboarding</b> para setear username (esto es lo que se busca en Contacts).
-        </p>
+        {status ? <p className="whitespace-pre-wrap text-sm">{status}</p> : null}
       </div>
     </PageShell>
   );
