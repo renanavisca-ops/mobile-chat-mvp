@@ -52,7 +52,7 @@ export function PageShell({
         </section>
 
         <footer className="pb-6 text-center text-xs text-slate-500">
-          Signal-like Chat MVP • built on Next.js + Supabase
+         Toky Chat • built on Next.js + Supabase
         </footer>
       </div>
     </main>
