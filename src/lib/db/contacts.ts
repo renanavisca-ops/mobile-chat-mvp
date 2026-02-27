@@ -3,6 +3,9 @@
 import { browserSupabase } from '@/lib/supabase/client';
 import type { ProfileLite } from '@/lib/db/types';
 
+/**
+ * Search users by username (public profile lookup).
+ */
 export async function searchUsers(query: string): Promise<ProfileLite[]> {
   const supabase = browserSupabase();
   const q = query.trim();
@@ -15,15 +18,23 @@ export async function searchUsers(query: string): Promise<ProfileLite[]> {
     .limit(20);
 
   if (error) throw error;
-  return (data ?? []) as ProfileLite[];
+
+  return (data ?? []).map((row: any) => ({
+    id: row.id,
+    username: row.username ?? null
+  }));
 }
 
+/**
+ * List my saved contacts.
+ */
 export async function listMyContacts(): Promise<ProfileLite[]> {
   const supabase = browserSupabase();
-  const { data: me } = await supabase.auth.getUser();
+
+  const { data: me, error: authError } = await supabase.auth.getUser();
+  if (authError) throw authError;
   if (!me.user) throw new Error('Not authenticated');
 
-  // Join: contacts.contact_id -> profiles(id, username)
   const { data, error } = await supabase
     .from('contacts')
     .select('contact_id, profiles:contact_id (id, username)')
@@ -32,35 +43,61 @@ export async function listMyContacts(): Promise<ProfileLite[]> {
 
   if (error) throw error;
 
-  // Supabase typings sometimes represent the joined "profiles" as object or array.
-  const rows = (data ?? []) as any[];
+  const rows = data ?? [];
 
-  const out: ProfileLite[] = [];
-  for (const r of rows) {
-    const p = r.profiles;
-    if (!p) continue;
+  const result: ProfileLite[] = [];
 
-    if (Array.isArray(p)) {
-      // take first if array
-      const first = p[0];
-      if (first?.id) out.push({ id: first.id, username: first.username ?? null });
+  for (const row of rows as any[]) {
+    const profile = row.profiles;
+
+    if (!profile) continue;
+
+    if (Array.isArray(profile)) {
+      const first = profile[0];
+      if (first?.id) {
+        result.push({
+          id: first.id,
+          username: first.username ?? null
+        });
+      }
     } else {
-      if (p?.id) out.push({ id: p.id, username: p.username ?? null });
+      if (profile?.id) {
+        result.push({
+          id: profile.id,
+          username: profile.username ?? null
+        });
+      }
     }
   }
 
-  return out;
+  return result;
 }
 
-export async function addContact(contactId: string) {
+/**
+ * Add a contact (idempotent).
+ */
+export async function addContact(contactId: string): Promise<void> {
   const supabase = browserSupabase();
-  const { data: me } = await supabase.auth.getUser();
+
+  const { data: me, error: authError } = await supabase.auth.getUser();
+  if (authError) throw authError;
   if (!me.user) throw new Error('Not authenticated');
+
   if (contactId === me.user.id) return;
 
-  const { error } = await supabase.from('contacts').insert({ owner_id: me.user.id, contact_id: contactId });
+  const { error } = await supabase
+    .from('contacts')
+    .insert({
+      owner_id: me.user.id,
+      contact_id: contactId
+    });
 
-  // Duplicate key is fine (already added)
-  if (error && !String(error.message).toLowerCase().includes('duplicate')) throw error;
-}
+  if (error) {
+    const msg = String((error as any).message ?? '').toLowerCase();
+
+    // Ignore duplicate key errors
+    if (!msg.includes('duplicate')) {
+      throw error;
+    }
+  }
 }
