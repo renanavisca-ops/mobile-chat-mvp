@@ -9,7 +9,7 @@ export default function HomePage() {
 
   return (
     <PageShell
-      title="Signal-like MVP"
+      title="Toky Chat"
       right={
         user ? (
           <span className="text-xs text-slate-400">Signed in</span>
