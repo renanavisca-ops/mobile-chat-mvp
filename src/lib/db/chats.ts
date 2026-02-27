@@ -12,11 +12,12 @@ export async function listChats(): Promise<ChatSummary[]> {
     .order('created_at', { ascending: false });
 
   if (error) throw error;
-  const chatList = (chats ?? []) as Array<Pick<ChatSummary, 'id' | 'kind' | 'title' | 'created_at'>>;
 
+  const chatList = (chats ?? []) as Array<Pick<ChatSummary, 'id' | 'kind' | 'title' | 'created_at'>>;
   if (chatList.length === 0) return [];
 
   const chatIds = chatList.map((c) => c.id);
+
   const { data: lastMsgs, error: msgErr } = await supabase
     .from('messages')
     .select('id, chat_id, ciphertext, created_at')
@@ -44,18 +45,16 @@ export async function createDirectChatWith(userId: string): Promise<string> {
   const { data: me } = await supabase.auth.getUser();
   if (!me.user) throw new Error('Not authenticated');
 
-  const { data: myDirectChats, error } = await supabase
-    .from('chats')
-    .select('id, kind')
-    .eq('kind', 'direct');
-
+  const { data: myDirectChats, error } = await supabase.from('chats').select('id, kind').eq('kind', 'direct');
   if (error) throw error;
 
   for (const c of myDirectChats ?? []) {
     const { data: members, error: memErr } = await supabase.from('chat_members').select('user_id').eq('chat_id', c.id);
     if (memErr) throw memErr;
+
     const ids = (members ?? []).map((m) => m.user_id).sort();
     const want = [me.user.id, userId].sort();
+
     if (ids.length === 2 && ids[0] === want[0] && ids[1] === want[1]) {
       return c.id as string;
     }
@@ -70,6 +69,7 @@ export async function createDirectChatWith(userId: string): Promise<string> {
   if (cErr) throw cErr;
 
   const chatId = chat.id as string;
+
   const { error: mErr } = await supabase.from('chat_members').insert([
     { chat_id: chatId, user_id: me.user.id },
     { chat_id: chatId, user_id: userId }
@@ -107,6 +107,7 @@ export async function createGroupChat(title: string, memberIds: string[]): Promi
 
 export async function listMessages(chatId: string, limit = 200): Promise<MessageRow[]> {
   const supabase = browserSupabase();
+
   const { data, error } = await supabase
     .from('messages')
     .select('id, chat_id, sender_device_id, ciphertext, nonce, message_type, created_at')
@@ -118,7 +119,17 @@ export async function listMessages(chatId: string, limit = 200): Promise<Message
   return (data ?? []) as MessageRow[];
 }
 
-export async function sendMessage(chatId: string, payload: { text?: string; imageUrl?: string }) {
+/**
+ * Message payload schema (MVP)
+ * - text: string
+ * - imagePath: storage path in private bucket (chat-media), e.g. "chats/<chatId>/<file>"
+ */
+export type MessagePayload = {
+  text?: string;
+  imagePath?: string;
+};
+
+export async function sendMessage(chatId: string, payload: MessagePayload) {
   const supabase = browserSupabase();
   const { data: me } = await supabase.auth.getUser();
   if (!me.user) throw new Error('Not authenticated');
@@ -141,18 +152,21 @@ export async function sendMessage(chatId: string, payload: { text?: string; imag
 
 async function ensureLocalDevice(userId: string): Promise<string> {
   const supabase = browserSupabase();
-  const cached = localStorage.getItem('active_device_id');
+
+  const cached = window.localStorage.getItem('active_device_id');
   if (cached) return cached;
 
   const { data: devices, error } = await supabase.from('devices').select('id').limit(1);
   if (error) throw error;
 
   if (devices && devices.length > 0) {
-    localStorage.setItem('active_device_id', devices[0].id);
+    window.localStorage.setItem('active_device_id', devices[0].id);
     return devices[0].id as string;
   }
 
+  // Fallback MVP: create a minimal device if missing
   const label = `Web-${new Date().toISOString().slice(0, 10)}`;
+
   const { data: created, error: cErr } = await supabase
     .from('devices')
     .insert({
@@ -168,6 +182,7 @@ async function ensureLocalDevice(userId: string): Promise<string> {
     .single();
 
   if (cErr) throw cErr;
-  localStorage.setItem('active_device_id', created.id);
+
+  window.localStorage.setItem('active_device_id', created.id);
   return created.id as string;
 }
