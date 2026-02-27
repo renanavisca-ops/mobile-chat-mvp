@@ -4,7 +4,7 @@ import { browserSupabase } from '@/lib/supabase/client';
 import type { ProfileLite } from '@/lib/db/types';
 
 /**
- * Search users by username (public profile lookup).
+ * Search users by username
  */
 export async function searchUsers(query: string): Promise<ProfileLite[]> {
   const supabase = browserSupabase();
@@ -26,7 +26,8 @@ export async function searchUsers(query: string): Promise<ProfileLite[]> {
 }
 
 /**
- * List my saved contacts.
+ * List my contacts WITHOUT using embed/join
+ * (avoids PostgREST relationship cache issues)
  */
 export async function listMyContacts(): Promise<ProfileLite[]> {
   const supabase = browserSupabase();
@@ -35,46 +36,51 @@ export async function listMyContacts(): Promise<ProfileLite[]> {
   if (authError) throw authError;
   if (!me.user) throw new Error('Not authenticated');
 
-  const { data, error } = await supabase
+  // 1) Get contact IDs only
+  const { data: contactRows, error } = await supabase
     .from('contacts')
-    .select('contact_id, profiles:contact_id (id, username)')
+    .select('contact_id')
     .eq('owner_id', me.user.id)
     .order('created_at', { ascending: false });
 
   if (error) throw error;
 
-  const rows = data ?? [];
+  const ids = (contactRows ?? [])
+    .map((r: any) => r.contact_id)
+    .filter(Boolean);
 
+  if (ids.length === 0) return [];
+
+  // 2) Fetch profiles separately
+  const { data: profiles, error: pErr } = await supabase
+    .from('profiles')
+    .select('id, username')
+    .in('id', ids);
+
+  if (pErr) throw pErr;
+
+  const map = new Map<string, ProfileLite>();
+
+  for (const p of profiles ?? []) {
+    map.set((p as any).id, {
+      id: (p as any).id,
+      username: (p as any).username ?? null
+    });
+  }
+
+  // Preserve order
   const result: ProfileLite[] = [];
 
-  for (const row of rows as any[]) {
-    const profile = row.profiles;
-
-    if (!profile) continue;
-
-    if (Array.isArray(profile)) {
-      const first = profile[0];
-      if (first?.id) {
-        result.push({
-          id: first.id,
-          username: first.username ?? null
-        });
-      }
-    } else {
-      if (profile?.id) {
-        result.push({
-          id: profile.id,
-          username: profile.username ?? null
-        });
-      }
-    }
+  for (const id of ids) {
+    const profile = map.get(id);
+    if (profile) result.push(profile);
   }
 
   return result;
 }
 
 /**
- * Add a contact (idempotent).
+ * Add a contact
  */
 export async function addContact(contactId: string): Promise<void> {
   const supabase = browserSupabase();
@@ -95,7 +101,7 @@ export async function addContact(contactId: string): Promise<void> {
   if (error) {
     const msg = String((error as any).message ?? '').toLowerCase();
 
-    // Ignore duplicate key errors
+    // Ignore duplicate insert
     if (!msg.includes('duplicate')) {
       throw error;
     }
