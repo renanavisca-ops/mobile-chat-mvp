@@ -2,7 +2,7 @@ import './globals.css';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Mobile Chat MVP',
+  title: 'Toky Chat',
   description: 'Signal-like E2EE MVP on Next.js + Supabase'
 };
 
