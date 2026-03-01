@@ -84,6 +84,9 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
   const videoInputRef = useRef<HTMLInputElement | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
+  // Long-press support
+  const longPressTimer = useRef<number | null>(null);
+
   // Load chats for forward (once)
   useEffect(() => {
     let alive = true;
@@ -225,13 +228,27 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
     setActionsOpen(true);
   }
 
+  function clearLongPress() {
+    if (longPressTimer.current) {
+      window.clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  }
+
+  function startLongPress(messageId: string, body: Payload) {
+    clearLongPress();
+    longPressTimer.current = window.setTimeout(() => {
+      openActions(messageId, body);
+      clearLongPress();
+    }, 450);
+  }
+
   async function doCopy(body: Payload) {
     const text = body.text?.trim();
     if (text) {
       await navigator.clipboard.writeText(text);
       return;
     }
-    // media: copy path(s) (MVP)
     const parts: string[] = [];
     if (body.videoPath) parts.push(body.videoPath);
     if (body.imagePath) parts.push(body.imagePath);
@@ -239,7 +256,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
     if (parts.length) await navigator.clipboard.writeText(parts.join('\n'));
   }
 
-  function todo(msg: string) {
+  function toast(msg: string) {
     setErr(msg);
     setTimeout(() => setErr(''), 2500);
   }
@@ -287,7 +304,6 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
       }
     }
 
-    // MVP: no mezclar con video
     if (pendingVideo) clearPendingVideo();
 
     const normalized = picked.map((f) => new File([f], sanitizeFilename(f.name), { type: f.type }));
@@ -331,7 +347,6 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
       return;
     }
 
-    // MVP: no mezclar con imágenes
     if (pendingImages.length) clearPendingImages();
 
     const normalized = new File([file], safeName, { type: file.type });
@@ -362,11 +377,9 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
     setBusy(true);
 
     try {
-      // VIDEO
       if (pendingVideo) {
         const { path } = await uploadChatMedia({ chatId, file: pendingVideo, kind: 'video' });
 
-        // Prefetch signed url for instant render
         try {
           const url = await createSignedChatMediaUrl(path, 300);
           setSignedUrls((prev) => ({ ...prev, [path]: url }));
@@ -381,7 +394,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
           ciphertext: JSON.stringify({ v: 1, ...payload }),
           nonce: `local-${crypto.randomUUID()}`,
           message_type: 'whisper',
-          created_at: new Date().toISOString()
+          created_at: new Date().toISOString(),
         };
         appendLocal(temp);
 
@@ -392,12 +405,10 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
         return;
       }
 
-      // IMAGES (multi)
       if (pendingImages.length > 0) {
         const results = await Promise.all(pendingImages.map((file) => uploadChatImage(chatId, file)));
         const paths = results.map((r) => r.path);
 
-        // Prefetch signed urls
         try {
           const pairs = await Promise.all(paths.map(async (p) => [p, await createSignedChatMediaUrl(p, 300)] as const));
           setSignedUrls((prev) => {
@@ -416,7 +427,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
           ciphertext: JSON.stringify({ v: 1, ...payload }),
           nonce: `local-${crypto.randomUUID()}`,
           message_type: 'whisper',
-          created_at: new Date().toISOString()
+          created_at: new Date().toISOString(),
         };
         appendLocal(temp);
 
@@ -427,7 +438,6 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
         return;
       }
 
-      // TEXT
       const temp: MessageRow = {
         id: `local-${crypto.randomUUID()}`,
         chat_id: chatId,
@@ -435,7 +445,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
         ciphertext: JSON.stringify({ v: 1, text: t }),
         nonce: `local-${crypto.randomUUID()}`,
         message_type: 'whisper',
-        created_at: new Date().toISOString()
+        created_at: new Date().toISOString(),
       };
       appendLocal(temp);
 
@@ -465,12 +475,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
         onClose={() => setActionsOpen(false)}
         title={actionsMsg?.id}
         actions={[
-          {
-            key: 'reply',
-            label: 'Reply',
-            icon: '↩️',
-            onClick: () => todo('Reply: pendiente (siguiente paso).'),
-          },
+          { key: 'reply', label: 'Reply', icon: '↩️', onClick: () => toast('Reply: pendiente (siguiente paso).') },
           {
             key: 'forward',
             label: 'Forward',
@@ -488,36 +493,15 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
             onClick: async () => {
               if (!actionsMsg) return;
               await doCopy(actionsMsg.body);
-              todo('Copiado.');
+              toast('Copiado.');
             },
           },
-          {
-            key: 'save',
-            label: 'Save',
-            icon: '💾',
-            onClick: () => todo('Save: pendiente (siguiente paso).'),
-          },
-          {
-            key: 'delete',
-            label: 'Delete',
-            icon: '🗑️',
-            tone: 'danger',
-            onClick: () => todo('Delete: pendiente (siguiente paso).'),
-          },
+          { key: 'save', label: 'Save', icon: '💾', onClick: () => toast('Save: pendiente (siguiente paso).') },
+          { key: 'delete', label: 'Delete', icon: '🗑️', tone: 'danger', onClick: () => toast('Delete: pendiente (siguiente paso).') },
         ]}
         moreActions={[
-          {
-            key: 'pin',
-            label: 'Pin',
-            icon: '📌',
-            onClick: () => todo('Pin: pendiente (siguiente paso).'),
-          },
-          {
-            key: 'report',
-            label: 'Report',
-            icon: '🚩',
-            onClick: () => todo('Report: pendiente (siguiente paso).'),
-          },
+          { key: 'pin', label: 'Pin', icon: '📌', onClick: () => toast('Pin: pendiente (siguiente paso).') },
+          { key: 'report', label: 'Report', icon: '🚩', onClick: () => toast('Report: pendiente (siguiente paso).') },
         ]}
       />
 
@@ -531,7 +515,10 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
 
           {err ? <p className="text-sm text-red-300">{err}</p> : null}
 
-          <div ref={scrollRef} className="h-[55vh] overflow-auto rounded-xl border border-slate-900 bg-slate-950/40 p-3">
+          <div
+            ref={scrollRef}
+            className="h-[55vh] overflow-auto rounded-xl border border-slate-900 bg-slate-950/40 p-3"
+          >
             {items.length === 0 ? (
               <p className="text-sm text-slate-400">No messages yet.</p>
             ) : (
@@ -540,38 +527,36 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
                   const imgPaths: string[] = [];
                   if (m.body.imagePath) imgPaths.push(m.body.imagePath);
                   if (Array.isArray(m.body.imagePaths)) imgPaths.push(...m.body.imagePaths.filter(Boolean));
-
                   const videoPath = m.body.videoPath;
 
                   return (
-                    <li key={m.id} className="relative rounded-lg border border-slate-900 bg-slate-950/60 p-2">
-                      {/* Actions button */}
-                      <button
-                        type="button"
-                        title="Actions"
-                        className="absolute right-2 top-2 rounded bg-slate-800 px-2 py-1 text-xs hover:bg-slate-700"
-                        onClick={() => openActions(m.id, m.body)}
-                      >
-                        ⋯
-                      </button>
-
+                    <li
+                      key={m.id}
+                      className="rounded-lg border border-slate-900 bg-slate-950/60 p-2"
+                      // Desktop right-click
+                      onContextMenu={(e) => {
+                        e.preventDefault();
+                        openActions(m.id, m.body);
+                      }}
+                      // Mobile long-press
+                      onPointerDown={() => startLongPress(m.id, m.body)}
+                      onPointerUp={clearLongPress}
+                      onPointerCancel={clearLongPress}
+                      onPointerMove={clearLongPress}
+                      // Desktop single-click (optional). If you prefer not to open on click, delete this.
+                      onDoubleClick={() => openActions(m.id, m.body)}
+                    >
                       <div className="text-xs text-slate-500">{new Date(m.created_at).toLocaleString()}</div>
 
-                      {m.body.text ? <div className="text-sm pr-10">{m.body.text}</div> : null}
+                      {m.body.text ? <div className="text-sm">{m.body.text}</div> : null}
 
-                      {/* Images */}
                       {imgPaths.length ? (
                         <div className="mt-2 grid grid-cols-2 gap-2">
                           {Array.from(new Set(imgPaths)).map((path) => {
                             const url = signedUrls[path] || '';
                             return url ? (
                               // eslint-disable-next-line @next/next/no-img-element
-                              <img
-                                key={path}
-                                src={url}
-                                alt="chat image"
-                                className="max-h-80 w-auto rounded-lg border border-slate-900"
-                              />
+                              <img key={path} src={url} alt="chat image" className="max-h-80 w-auto rounded-lg border border-slate-900" />
                             ) : (
                               <div key={path} className="h-28 w-full animate-pulse rounded-lg border border-slate-900 bg-slate-800" />
                             );
@@ -579,7 +564,6 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
                         </div>
                       ) : null}
 
-                      {/* Video */}
                       {videoPath ? (
                         <div className="mt-2">
                           {signedUrls[videoPath] ? (
