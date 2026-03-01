@@ -41,15 +41,12 @@ export async function listChats(): Promise<ChatSummary[]> {
 
 export async function createDirectChatWith(userId: string): Promise<string> {
   const supabase = browserSupabase();
-
   const { data: me } = await supabase.auth.getUser();
   if (!me.user) throw new Error('Not authenticated');
 
-  // ✅ Create via RPC to avoid RLS insert failures on chats
   const { data, error } = await supabase.rpc('create_direct_chat', { other_user: userId });
   if (error) throw error;
 
-  // RPC returns uuid
   return data as string;
 }
 
@@ -58,26 +55,14 @@ export async function createGroupChat(title: string, memberIds: string[]): Promi
   const { data: me } = await supabase.auth.getUser();
   if (!me.user) throw new Error('Not authenticated');
 
-  // Mantengo el flujo original, pero OJO: si tu RLS de chats insert está bloqueando,
-  // aquí también fallará. Si te falla, el siguiente paso será crear otro RPC para group.
-  const { data: chat, error: cErr } = await supabase
-    .from('chats')
-    .insert({ kind: 'group', created_by: me.user.id, title })
-    .select('id')
-    .single();
+  const { data, error } = await supabase.rpc('create_group_chat', {
+    title,
+    member_ids: memberIds
+  });
 
-  if (cErr) throw cErr;
+  if (error) throw error;
 
-  const chatId = chat.id as string;
-  const uniqueMembers = Array.from(new Set([me.user.id, ...memberIds]));
-
-  const { error: mErr } = await supabase
-    .from('chat_members')
-    .insert(uniqueMembers.map((uid) => ({ chat_id: chatId, user_id: uid })));
-
-  if (mErr) throw mErr;
-
-  return chatId;
+  return data as string;
 }
 
 export async function listMessages(chatId: string, limit = 200): Promise<MessageRow[]> {
@@ -94,11 +79,6 @@ export async function listMessages(chatId: string, limit = 200): Promise<Message
   return (data ?? []) as MessageRow[];
 }
 
-/**
- * Message payload schema (MVP)
- * - text: string
- * - imagePath: storage path in private bucket (chat-media), e.g. "chats/<chatId>/<file>"
- */
 export type MessagePayload = {
   text?: string;
   imagePath?: string;
@@ -139,7 +119,6 @@ async function ensureLocalDevice(userId: string): Promise<string> {
     return devices[0].id as string;
   }
 
-  // Fallback MVP: create a minimal device if missing
   const label = `Web-${new Date().toISOString().slice(0, 10)}`;
 
   const { data: created, error: cErr } = await supabase
