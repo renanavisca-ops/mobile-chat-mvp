@@ -45,39 +45,12 @@ export async function createDirectChatWith(userId: string): Promise<string> {
   const { data: me } = await supabase.auth.getUser();
   if (!me.user) throw new Error('Not authenticated');
 
-  const { data: myDirectChats, error } = await supabase.from('chats').select('id, kind').eq('kind', 'direct');
+  // ✅ Create via RPC to avoid RLS insert failures on chats
+  const { data, error } = await supabase.rpc('create_direct_chat', { other_user: userId });
   if (error) throw error;
 
-  for (const c of myDirectChats ?? []) {
-    const { data: members, error: memErr } = await supabase.from('chat_members').select('user_id').eq('chat_id', c.id);
-    if (memErr) throw memErr;
-
-    const ids = (members ?? []).map((m) => m.user_id).sort();
-    const want = [me.user.id, userId].sort();
-
-    if (ids.length === 2 && ids[0] === want[0] && ids[1] === want[1]) {
-      return c.id as string;
-    }
-  }
-
-  const { data: chat, error: cErr } = await supabase
-    .from('chats')
-    .insert({ kind: 'direct', created_by: me.user.id, title: null })
-    .select('id')
-    .single();
-
-  if (cErr) throw cErr;
-
-  const chatId = chat.id as string;
-
-  const { error: mErr } = await supabase.from('chat_members').insert([
-    { chat_id: chatId, user_id: me.user.id },
-    { chat_id: chatId, user_id: userId }
-  ]);
-
-  if (mErr) throw mErr;
-
-  return chatId;
+  // RPC returns uuid
+  return data as string;
 }
 
 export async function createGroupChat(title: string, memberIds: string[]): Promise<string> {
@@ -85,6 +58,8 @@ export async function createGroupChat(title: string, memberIds: string[]): Promi
   const { data: me } = await supabase.auth.getUser();
   if (!me.user) throw new Error('Not authenticated');
 
+  // Mantengo el flujo original, pero OJO: si tu RLS de chats insert está bloqueando,
+  // aquí también fallará. Si te falla, el siguiente paso será crear otro RPC para group.
   const { data: chat, error: cErr } = await supabase
     .from('chats')
     .insert({ kind: 'group', created_by: me.user.id, title })
