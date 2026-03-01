@@ -5,6 +5,7 @@ import { PageShell } from '@/components/page-shell';
 import { useRequireAuth } from '@/lib/auth/use-require-auth';
 import { sendMessage } from '@/lib/db/chats';
 import { useChatRealtime } from '@/lib/realtime/use-chat-realtime';
+import { browserSupabase } from '@/lib/supabase/client';
 import type { MessageRow } from '@/lib/db/types';
 
 function parseCipher(ciphertext: string): { text?: string; imageUrl?: string; imagePath?: string } {
@@ -18,20 +19,40 @@ function parseCipher(ciphertext: string): { text?: string; imageUrl?: string; im
 export default function ChatPage({ params }: { params: { chatId: string } }) {
   const { loading: authLoading } = useRequireAuth();
   const chatId = params.chatId;
+  const supabase = browserSupabase();
 
   const { messages, loading: msgLoading, appendLocal } = useChatRealtime(chatId);
 
+  const [members, setMembers] = useState<string[]>([]);
   const [text, setText] = useState('');
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
+  // 🔹 Cargar miembros del chat
+  useEffect(() => {
+    async function loadMembers() {
+      const { data, error } = await supabase
+        .from('chat_members')
+        .select('profiles(username)')
+        .eq('chat_id', chatId);
+
+      if (!error && data) {
+        const names = data
+          .map((row: any) => row.profiles?.username)
+          .filter(Boolean);
+        setMembers(names);
+      }
+    }
+
+    loadMembers();
+  }, [chatId]);
+
   const items = useMemo(() => {
     return messages.map((m) => ({ ...m, body: parseCipher(m.ciphertext) }));
   }, [messages]);
 
-  // auto-scroll al final cuando llegan mensajes
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
@@ -45,7 +66,6 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
 
     setBusy(true);
 
-    // 1) pintar optimista (sin esperar realtime)
     const temp: MessageRow = {
       id: `local-${crypto.randomUUID()}`,
       chat_id: chatId,
@@ -60,7 +80,6 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
     setText('');
 
     try {
-      // 2) enviar real a DB
       await sendMessage(chatId, { text: t });
     } catch (e: any) {
       setErr(e?.message ?? String(e));
@@ -77,6 +96,12 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
         <p className="text-sm text-slate-300">Loading…</p>
       ) : (
         <div className="flex flex-col gap-3">
+
+          {/* 🔹 Mostrar miembros */}
+          <div className="text-xs text-slate-400">
+            Members: {members.length > 0 ? members.join(', ') : 'Loading...'}
+          </div>
+
           {err ? <p className="text-sm text-red-300">{err}</p> : null}
 
           <div
@@ -89,13 +114,10 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
               <ul className="space-y-2">
                 {items.map((m) => (
                   <li key={m.id} className="rounded-lg border border-slate-900 bg-slate-950/60 p-2">
-                    <div className="text-xs text-slate-500">{new Date(m.created_at).toLocaleString()}</div>
+                    <div className="text-xs text-slate-500">
+                      {new Date(m.created_at).toLocaleString()}
+                    </div>
                     {m.body.text ? <div className="text-sm">{m.body.text}</div> : null}
-
-                    {/* imageUrl queda temporal; luego lo cambiaremos a Signed URL usando imagePath */}
-                    {m.body.imageUrl ? (
-                      <img src={m.body.imageUrl} className="mt-2 max-h-64 rounded" alt="image" />
-                    ) : null}
                   </li>
                 ))}
               </ul>
@@ -120,6 +142,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
               Send
             </button>
           </div>
+
         </div>
       )}
     </PageShell>
