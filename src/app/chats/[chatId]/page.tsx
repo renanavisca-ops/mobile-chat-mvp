@@ -9,7 +9,7 @@ import { useChatRealtime } from '@/lib/realtime/use-chat-realtime';
 import { browserSupabase } from '@/lib/supabase/client';
 import type { MessageRow } from '@/lib/db/types';
 
-type Payload = { v?: number; text?: string; imagePath?: string };
+type Payload = { v?: number; text?: string; imagePath?: string; imagePaths?: string[] };
 
 function parseCipher(ciphertext: string): Payload {
   try {
@@ -40,7 +40,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
 
   // compose
   const [text, setText] = useState('');
-  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
 
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
@@ -116,15 +116,27 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
     el.scrollTop = el.scrollHeight;
   }, [items.length]);
 
-  // Fetch signed URLs for any imagePath we haven't resolved yet
+  function extractAllImagePaths(body: Payload): string[] {
+    const arr: string[] = [];
+    if (body.imagePath) arr.push(body.imagePath);
+    if (Array.isArray(body.imagePaths)) {
+      for (const p of body.imagePaths) if (typeof p === 'string' && p) arr.push(p);
+    }
+    // dedupe
+    return Array.from(new Set(arr));
+  }
+
+  // Fetch signed URLs for any image paths we haven't resolved yet
   useEffect(() => {
     let cancelled = false;
 
     async function resolveAll() {
-      const paths = Array.from(
-        new Set(items.map((m) => m.body.imagePath).filter((p): p is string => !!p))
-      );
+      const allPaths = new Set<string>();
+      for (const m of items) {
+        for (const p of extractAllImagePaths(m.body)) allPaths.add(p);
+      }
 
+      const paths = Array.from(allPaths);
       const missing = paths.filter((p) => !signedUrls[p]);
       if (missing.length === 0) return;
 
@@ -155,64 +167,75 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
     };
   }, [items, signedUrls]);
 
-  function onPickFile() {
+  function onPickFiles() {
     setErr('');
     fileInputRef.current?.click();
   }
 
-  function clearPendingFile() {
-    setPendingFile(null);
+  function clearPendingFiles() {
+    setPendingFiles([]);
     if (fileInputRef.current) fileInputRef.current.value = '';
   }
 
-  async function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+  async function onFilesChange(e: React.ChangeEvent<HTMLInputElement>) {
     setErr('');
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = Array.from(e.target.files ?? []);
+    if (files.length === 0) return;
 
     const allowed = new Set(['image/jpeg', 'image/png', 'image/webp']);
     const maxSize = 5 * 1024 * 1024;
 
-    if (!allowed.has(file.type)) {
-      setErr('Solo JPG, PNG o WEBP.');
-      e.target.value = '';
-      return;
+    // hard cap to keep MVP sane
+    const MAX_FILES = 6;
+    const picked = files.slice(0, MAX_FILES);
+
+    for (const f of picked) {
+      if (!allowed.has(f.type)) {
+        setErr('Solo JPG, PNG o WEBP.');
+        e.target.value = '';
+        return;
+      }
+      if (f.size > maxSize) {
+        setErr('Máximo 5MB por imagen.');
+        e.target.value = '';
+        return;
+      }
+      const safeName = sanitizeFilename(f.name);
+      if (!safeName || safeName.length < 3) {
+        setErr('Nombre de archivo inválido.');
+        e.target.value = '';
+        return;
+      }
     }
 
-    if (file.size > maxSize) {
-      setErr('Máximo 5MB.');
-      e.target.value = '';
-      return;
-    }
+    // normalize filenames
+    const normalized = picked.map((f) => new File([f], sanitizeFilename(f.name), { type: f.type }));
 
-    const safeName = sanitizeFilename(file.name);
-    if (!safeName || safeName.length < 3) {
-      setErr('Nombre de archivo inválido.');
-      e.target.value = '';
-      return;
-    }
-
-    setPendingFile(new File([file], safeName, { type: file.type }));
+    // Append (so you can attach multiple times)
+    setPendingFiles((prev) => [...prev, ...normalized].slice(0, MAX_FILES));
+    e.target.value = '';
   }
 
   async function onSend() {
     setErr('');
     const t = text.trim();
 
-    if (!t && !pendingFile) return;
+    if (!t && pendingFiles.length === 0) return;
 
     setBusy(true);
 
     try {
-      // image flow: upload first -> store only imagePath
-      if (pendingFile) {
-        const file = pendingFile;
-        const { path } = await uploadChatImage(chatId, file);
+      // multi-image flow
+      if (pendingFiles.length > 0) {
+        const files = pendingFiles;
 
-        const payload: { text?: string; imagePath: string } = t
-          ? { text: t, imagePath: path }
-          : { imagePath: path };
+        // upload all (parallel)
+        const results = await Promise.all(files.map((file) => uploadChatImage(chatId, file)));
+        const paths = results.map((r) => r.path);
 
+        const payload: { text?: string; imagePaths: string[] } = t ? { text: t, imagePaths: paths } : { imagePaths: paths };
+
+        // optimistic append
         const temp: MessageRow = {
           id: `local-${crypto.randomUUID()}`,
           chat_id: chatId,
@@ -225,7 +248,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
         appendLocal(temp);
 
         setText('');
-        clearPendingFile();
+        clearPendingFiles();
 
         await sendMessage(chatId, payload);
         return;
@@ -275,8 +298,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
             ) : (
               <ul className="space-y-2">
                 {items.map((m) => {
-                  const path = m.body.imagePath;
-                  const url = path ? signedUrls[path] : '';
+                  const paths = extractAllImagePaths(m.body);
 
                   return (
                     <li key={m.id} className="rounded-lg border border-slate-900 bg-slate-950/60 p-2">
@@ -284,19 +306,25 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
 
                       {m.body.text ? <div className="text-sm">{m.body.text}</div> : null}
 
-                      {path ? (
-                        <div className="mt-2">
-                          {url ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img
-                              src={url}
-                              alt="chat image"
-                              className="max-h-80 w-auto rounded-lg border border-slate-900"
-                            />
-                          ) : (
-                            // ✅ Skeleton mientras llega la signed URL / descarga
-                            <div className="max-h-80 w-48 animate-pulse rounded-lg border border-slate-900 bg-slate-800" />
-                          )}
+                      {paths.length ? (
+                        <div className="mt-2 grid grid-cols-2 gap-2">
+                          {paths.map((path) => {
+                            const url = signedUrls[path] || '';
+                            return url ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                key={path}
+                                src={url}
+                                alt="chat image"
+                                className="max-h-80 w-auto rounded-lg border border-slate-900"
+                              />
+                            ) : (
+                              <div
+                                key={path}
+                                className="h-28 w-full animate-pulse rounded-lg border border-slate-900 bg-slate-800"
+                              />
+                            );
+                          })}
                         </div>
                       ) : null}
                     </li>
@@ -309,9 +337,9 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
           <div className="flex items-center gap-2">
             <button
               className="rounded bg-slate-800 px-3 py-2 text-sm hover:bg-slate-700"
-              onClick={onPickFile}
+              onClick={onPickFiles}
               type="button"
-              title="Attach image"
+              title="Attach images"
             >
               📎
             </button>
@@ -320,8 +348,9 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
               ref={fileInputRef}
               type="file"
               hidden
+              multiple
               accept="image/jpeg,image/png,image/webp"
-              onChange={onFileChange}
+              onChange={onFilesChange}
             />
 
             <input
@@ -343,16 +372,16 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
             </button>
           </div>
 
-          {pendingFile ? (
+          {pendingFiles.length ? (
             <div className="flex items-center justify-between rounded border border-slate-900 bg-slate-950/40 p-2 text-sm">
               <div className="text-slate-200">
-                Imagen lista: <span className="font-mono">{pendingFile.name}</span> ({Math.round(pendingFile.size / 1024)} KB)
+                Imágenes listas: <span className="font-mono">{pendingFiles.length}</span> (máx 6)
               </div>
               <button
                 className="rounded bg-slate-800 px-3 py-1.5 text-xs hover:bg-slate-700"
-                onClick={clearPendingFile}
+                onClick={clearPendingFiles}
               >
-                Remove
+                Remove all
               </button>
             </div>
           ) : null}
