@@ -33,6 +33,43 @@ function assertFilenameOk(fileName: string) {
   return safe;
 }
 
+function contentTypeFromExt(ext: string): string | '' {
+  switch (ext) {
+    // images
+    case 'jpg':
+    case 'jpeg':
+      return 'image/jpeg';
+    case 'png':
+      return 'image/png';
+    case 'webp':
+      return 'image/webp';
+
+    // videos
+    case 'mp4':
+      return 'video/mp4';
+    case 'webm':
+      return 'video/webm';
+    case 'mov':
+      return 'video/quicktime';
+    case 'ogv':
+      return 'video/ogg';
+    case 'avi':
+      return 'video/x-msvideo';
+    case 'mkv':
+      return 'video/x-matroska';
+    case 'mpeg':
+    case 'mpg':
+      return 'video/mpeg';
+    case '3gp':
+      return 'video/3gpp';
+    case '3g2':
+      return 'video/3gpp2';
+
+    default:
+      return '';
+  }
+}
+
 function pickExt(kind: 'image' | 'video', file: File) {
   const extFromName = getExtFromName(file.name);
   if (extFromName) return extFromName;
@@ -45,7 +82,6 @@ function pickExt(kind: 'image' | 'video', file: File) {
     return 'bin';
   }
 
-  // video
   if (t === 'video/mp4') return 'mp4';
   if (t === 'video/webm') return 'webm';
   if (t === 'video/quicktime') return 'mov';
@@ -53,13 +89,13 @@ function pickExt(kind: 'image' | 'video', file: File) {
 }
 
 /**
- * Upload universal para chat-media (bucket privado)
+ * Upload universal a bucket privado chat-media
  * Path: chats/<chatId>/<timestamp>_<uuid>_<safeName>.<ext>
  *
- * VIDEO RULE (MVP robusto):
- * - Acepta CUALQUIER archivo cuyo mime empiece con "video/".
- * - Si el navegador manda mime vacío, no bloqueamos: solo aplicamos size limit.
- *   (Esto evita el “mp4 not supported” por variaciones de user agent.)
+ * - Images: allowlist por mime o ext + 5MB
+ * - Videos: aceptamos cualquier mime video/* (o mime vacío), + 200MB
+ *
+ * CLAVE: fijamos contentType por extensión si el navegador no lo trae bien.
  */
 export async function uploadChatMedia(input: {
   chatId: string;
@@ -68,21 +104,19 @@ export async function uploadChatMedia(input: {
 }): Promise<{ path: string }> {
   const { chatId, file, kind } = input;
 
-  const mime = (file.type || '').toLowerCase();
+  const mimeRaw = (file.type || '').toLowerCase();
   const safeName = assertFilenameOk(file.name);
   const ext = pickExt(kind, file).toLowerCase();
 
   if (kind === 'image') {
-    const okByMime = IMAGE_MIME.has(mime);
+    const okByMime = IMAGE_MIME.has(mimeRaw);
     const okByExt = IMAGE_EXT.has(ext);
-    if (!okByMime && !okByExt) {
-      throw new Error(`Mime type ${mime || '(unknown)'} not supported`);
-    }
+    if (!okByMime && !okByExt) throw new Error(`Mime type ${mimeRaw || '(unknown)'} is not supported`);
     if (file.size > MAX_IMAGE_BYTES) throw new Error('Máximo 5MB por imagen.');
   } else {
-    // ✅ FIX: no allowlist estricta para video
-    if (mime && !mime.startsWith('video/')) {
-      throw new Error(`Mime type ${mime || '(unknown)'} not supported`);
+    // Video: NO allowlist estricta (codec no se puede validar aquí)
+    if (mimeRaw && !mimeRaw.startsWith('video/')) {
+      throw new Error(`Mime type ${mimeRaw || '(unknown)'} is not supported`);
     }
     if (file.size > MAX_VIDEO_BYTES) throw new Error('Máximo 200MB por video.');
   }
@@ -91,13 +125,16 @@ export async function uploadChatMedia(input: {
   const id = crypto.randomUUID();
   const base = sanitizeFilename(safeName).replace(/\.[^.]+$/, '');
   const finalName = `${ts}_${id}_${base}.${ext || 'bin'}`;
-
   const path = `chats/${chatId}/${finalName}`;
+
+  // ✅ Forzamos contentType estable:
+  const byExt = contentTypeFromExt(ext);
+  const contentType = mimeRaw || byExt || 'application/octet-stream';
 
   const supabase = browserSupabase();
   const { error } = await supabase.storage.from('chat-media').upload(path, file, {
     upsert: false,
-    contentType: mime || 'application/octet-stream',
+    contentType,
     cacheControl: '3600',
   });
 
