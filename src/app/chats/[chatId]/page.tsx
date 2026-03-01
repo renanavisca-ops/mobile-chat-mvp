@@ -9,7 +9,7 @@ import { useChatRealtime } from '@/lib/realtime/use-chat-realtime';
 import { browserSupabase } from '@/lib/supabase/client';
 import type { MessageRow } from '@/lib/db/types';
 
-type Payload = { v?: number; text?: string; imagePath?: string; imagePaths?: string[] };
+type Payload = { v?: number; text?: string; imagePath?: string; imagePaths?: string[]; videoPath?: string };
 
 function parseCipher(ciphertext: string): Payload {
   try {
@@ -40,7 +40,8 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
 
   // compose
   const [text, setText] = useState('');
-  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [pendingImages, setPendingImages] = useState<File[]>([]);
+  const [pendingVideo, setPendingVideo] = useState<File | null>(null);
 
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
@@ -48,7 +49,8 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
   // signed url cache (path -> url)
   const [signedUrls, setSignedUrls] = useState<Record<string, string>>({});
 
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const imageInputRef = useRef<HTMLInputElement | null>(null);
+  const videoInputRef = useRef<HTMLInputElement | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
   // Load members (no embeds)
@@ -116,25 +118,23 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
     el.scrollTop = el.scrollHeight;
   }, [items.length]);
 
-  function extractAllImagePaths(body: Payload): string[] {
+  function extractAllPaths(body: Payload): string[] {
     const arr: string[] = [];
     if (body.imagePath) arr.push(body.imagePath);
     if (Array.isArray(body.imagePaths)) {
       for (const p of body.imagePaths) if (typeof p === 'string' && p) arr.push(p);
     }
-    // dedupe
+    if (body.videoPath) arr.push(body.videoPath);
     return Array.from(new Set(arr));
   }
 
-  // Fetch signed URLs for any image paths we haven't resolved yet
+  // Fetch signed URLs for any paths we haven't resolved yet
   useEffect(() => {
     let cancelled = false;
 
     async function resolveAll() {
       const allPaths = new Set<string>();
-      for (const m of items) {
-        for (const p of extractAllImagePaths(m.body)) allPaths.add(p);
-      }
+      for (const m of items) for (const p of extractAllPaths(m.body)) allPaths.add(p);
 
       const paths = Array.from(allPaths);
       const missing = paths.filter((p) => !signedUrls[p]);
@@ -161,23 +161,18 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
     }
 
     resolveAll();
-
     return () => {
       cancelled = true;
     };
   }, [items, signedUrls]);
 
-  function onPickFiles() {
+  // -------- Attach: Images --------
+  function onPickImages() {
     setErr('');
-    fileInputRef.current?.click();
+    imageInputRef.current?.click();
   }
 
-  function clearPendingFiles() {
-    setPendingFiles([]);
-    if (fileInputRef.current) fileInputRef.current.value = '';
-  }
-
-  async function onFilesChange(e: React.ChangeEvent<HTMLInputElement>) {
+  async function onImagesChange(e: React.ChangeEvent<HTMLInputElement>) {
     setErr('');
     const files = Array.from(e.target.files ?? []);
     if (files.length === 0) return;
@@ -185,7 +180,6 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
     const allowed = new Set(['image/jpeg', 'image/png', 'image/webp']);
     const maxSize = 5 * 1024 * 1024;
 
-    // hard cap to keep MVP sane
     const MAX_FILES = 6;
     const picked = files.slice(0, MAX_FILES);
 
@@ -208,34 +202,81 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
       }
     }
 
-    // normalize filenames
     const normalized = picked.map((f) => new File([f], sanitizeFilename(f.name), { type: f.type }));
-
-    // Append (so you can attach multiple times)
-    setPendingFiles((prev) => [...prev, ...normalized].slice(0, MAX_FILES));
+    setPendingImages((prev) => [...prev, ...normalized].slice(0, MAX_FILES));
     e.target.value = '';
   }
 
+  function clearPendingImages() {
+    setPendingImages([]);
+    if (imageInputRef.current) imageInputRef.current.value = '';
+  }
+
+  // -------- Attach: Video (1 per message) --------
+  function onPickVideo() {
+    setErr('');
+    videoInputRef.current?.click();
+  }
+
+  async function onVideoChange(e: React.ChangeEvent<HTMLInputElement>) {
+    setErr('');
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // MVP: mp4 + webm, cap 50MB
+    const allowed = new Set(['video/mp4', 'video/webm']);
+    const maxSize = 50 * 1024 * 1024;
+
+    if (!allowed.has(file.type)) {
+      setErr('Solo MP4 o WEBM.');
+      e.target.value = '';
+      return;
+    }
+    if (file.size > maxSize) {
+      setErr('Máximo 50MB por video.');
+      e.target.value = '';
+      return;
+    }
+
+    const safeName = sanitizeFilename(file.name);
+    if (!safeName || safeName.length < 3) {
+      setErr('Nombre de archivo inválido.');
+      e.target.value = '';
+      return;
+    }
+
+    // IMPORTANT: avoid mixing attachments that explode UX
+    // Rule: if you choose a video, clear pending images (one message: either images or video)
+    setPendingImages([]);
+    if (imageInputRef.current) imageInputRef.current.value = '';
+
+    setPendingVideo(new File([file], safeName, { type: file.type }));
+    e.target.value = '';
+  }
+
+  function clearPendingVideo() {
+    setPendingVideo(null);
+    if (videoInputRef.current) videoInputRef.current.value = '';
+  }
+
+  // -------- Send --------
   async function onSend() {
     setErr('');
     const t = text.trim();
 
-    if (!t && pendingFiles.length === 0) return;
+    if (!t && pendingImages.length === 0 && !pendingVideo) return;
 
     setBusy(true);
 
     try {
-      // multi-image flow
-      if (pendingFiles.length > 0) {
-        const files = pendingFiles;
+      // Video message (1 video)
+      if (pendingVideo) {
+        // reuse uploadChatImage for now (it just uploads to storage); path policies allow any file.
+        // If later you want separate function name, we can add uploadChatMedia().
+        const { path } = await uploadChatImage(chatId, pendingVideo);
 
-        // upload all (parallel)
-        const results = await Promise.all(files.map((file) => uploadChatImage(chatId, file)));
-        const paths = results.map((r) => r.path);
+        const payload: { text?: string; videoPath: string } = t ? { text: t, videoPath: path } : { videoPath: path };
 
-        const payload: { text?: string; imagePaths: string[] } = t ? { text: t, imagePaths: paths } : { imagePaths: paths };
-
-        // optimistic append
         const temp: MessageRow = {
           id: `local-${crypto.randomUUID()}`,
           chat_id: chatId,
@@ -248,13 +289,40 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
         appendLocal(temp);
 
         setText('');
-        clearPendingFiles();
+        clearPendingVideo();
 
         await sendMessage(chatId, payload);
         return;
       }
 
-      // text-only flow
+      // Multi-image message
+      if (pendingImages.length > 0) {
+        const results = await Promise.all(pendingImages.map((file) => uploadChatImage(chatId, file)));
+        const paths = results.map((r) => r.path);
+
+        const payload: { text?: string; imagePaths: string[] } = t
+          ? { text: t, imagePaths: paths }
+          : { imagePaths: paths };
+
+        const temp: MessageRow = {
+          id: `local-${crypto.randomUUID()}`,
+          chat_id: chatId,
+          sender_device_id: 'local',
+          ciphertext: JSON.stringify({ v: 1, ...payload }),
+          nonce: `local-${crypto.randomUUID()}`,
+          message_type: 'whisper',
+          created_at: new Date().toISOString(),
+        };
+        appendLocal(temp);
+
+        setText('');
+        clearPendingImages();
+
+        await sendMessage(chatId, payload);
+        return;
+      }
+
+      // text-only
       const temp: MessageRow = {
         id: `local-${crypto.randomUUID()}`,
         chat_id: chatId,
@@ -298,7 +366,11 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
             ) : (
               <ul className="space-y-2">
                 {items.map((m) => {
-                  const paths = extractAllImagePaths(m.body);
+                  const imgPaths: string[] = [];
+                  if (m.body.imagePath) imgPaths.push(m.body.imagePath);
+                  if (Array.isArray(m.body.imagePaths)) imgPaths.push(...m.body.imagePaths.filter(Boolean));
+
+                  const videoPath = m.body.videoPath;
 
                   return (
                     <li key={m.id} className="rounded-lg border border-slate-900 bg-slate-950/60 p-2">
@@ -306,9 +378,10 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
 
                       {m.body.text ? <div className="text-sm">{m.body.text}</div> : null}
 
-                      {paths.length ? (
+                      {/* Images */}
+                      {imgPaths.length ? (
                         <div className="mt-2 grid grid-cols-2 gap-2">
-                          {paths.map((path) => {
+                          {Array.from(new Set(imgPaths)).map((path) => {
                             const url = signedUrls[path] || '';
                             return url ? (
                               // eslint-disable-next-line @next/next/no-img-element
@@ -327,6 +400,21 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
                           })}
                         </div>
                       ) : null}
+
+                      {/* Video */}
+                      {videoPath ? (
+                        <div className="mt-2">
+                          {signedUrls[videoPath] ? (
+                            <video
+                              src={signedUrls[videoPath]}
+                              controls
+                              className="max-h-96 w-full rounded-lg border border-slate-900"
+                            />
+                          ) : (
+                            <div className="h-40 w-full animate-pulse rounded-lg border border-slate-900 bg-slate-800" />
+                          )}
+                        </div>
+                      ) : null}
                     </li>
                   );
                 })}
@@ -335,22 +423,41 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Images */}
             <button
               className="rounded bg-slate-800 px-3 py-2 text-sm hover:bg-slate-700"
-              onClick={onPickFiles}
+              onClick={onPickImages}
               type="button"
               title="Attach images"
+              disabled={!!pendingVideo || busy}
             >
-              📎
+              🖼️
             </button>
-
             <input
-              ref={fileInputRef}
+              ref={imageInputRef}
               type="file"
               hidden
               multiple
               accept="image/jpeg,image/png,image/webp"
-              onChange={onFilesChange}
+              onChange={onImagesChange}
+            />
+
+            {/* Video */}
+            <button
+              className="rounded bg-slate-800 px-3 py-2 text-sm hover:bg-slate-700"
+              onClick={onPickVideo}
+              type="button"
+              title="Attach video"
+              disabled={pendingImages.length > 0 || busy}
+            >
+              🎥
+            </button>
+            <input
+              ref={videoInputRef}
+              type="file"
+              hidden
+              accept="video/mp4,video/webm"
+              onChange={onVideoChange}
             />
 
             <input
@@ -372,16 +479,34 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
             </button>
           </div>
 
-          {pendingFiles.length ? (
+          {/* Pending images */}
+          {pendingImages.length ? (
             <div className="flex items-center justify-between rounded border border-slate-900 bg-slate-950/40 p-2 text-sm">
               <div className="text-slate-200">
-                Imágenes listas: <span className="font-mono">{pendingFiles.length}</span> (máx 6)
+                Imágenes listas: <span className="font-mono">{pendingImages.length}</span> (máx 6)
               </div>
               <button
                 className="rounded bg-slate-800 px-3 py-1.5 text-xs hover:bg-slate-700"
-                onClick={clearPendingFiles}
+                onClick={clearPendingImages}
+                disabled={busy}
               >
                 Remove all
+              </button>
+            </div>
+          ) : null}
+
+          {/* Pending video */}
+          {pendingVideo ? (
+            <div className="flex items-center justify-between rounded border border-slate-900 bg-slate-950/40 p-2 text-sm">
+              <div className="text-slate-200">
+                Video listo: <span className="font-mono">{pendingVideo.name}</span> ({Math.round(pendingVideo.size / (1024 * 1024))} MB)
+              </div>
+              <button
+                className="rounded bg-slate-800 px-3 py-1.5 text-xs hover:bg-slate-700"
+                onClick={clearPendingVideo}
+                disabled={busy}
+              >
+                Remove
               </button>
             </div>
           ) : null}
