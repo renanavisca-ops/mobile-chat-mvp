@@ -12,36 +12,42 @@ export default function ContactsPage() {
   const { loading } = useRequireAuth();
   const supabase = browserSupabase();
 
-  const [q, setQ] = useState('');
-  const [results, setResults] = useState<ProfileLite[]>([]);
   const [contacts, setContacts] = useState<ProfileLite[]>([]);
   const [err, setErr] = useState('');
 
+  // modal state
   const [openAdd, setOpenAdd] = useState(false);
+  const [q, setQ] = useState('');
+  const [results, setResults] = useState<ProfileLite[]>([]);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   const canSearch = useMemo(() => q.trim().length >= 2, [q]);
 
+  async function refreshContacts() {
+    const list = await listMyContacts();
+    setContacts(list);
+  }
+
   useEffect(() => {
     if (loading) return;
-    listMyContacts()
-      .then(setContacts)
-      .catch((e) => setErr(e?.message ?? String(e)));
+    refreshContacts().catch((e) => setErr(e?.message ?? String(e)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading]);
 
   useEffect(() => {
     if (!openAdd) return;
-    // focus input when modal opens
     const t = setTimeout(() => inputRef.current?.focus(), 0);
     return () => clearTimeout(t);
   }, [openAdd]);
 
   useEffect(() => {
     if (!openAdd) return;
+
     if (!canSearch) {
       setResults([]);
       return;
     }
+
     searchUsers(q)
       .then(setResults)
       .catch((e) => setErr(e?.message ?? String(e)));
@@ -58,11 +64,6 @@ export default function ContactsPage() {
     setOpenAdd(false);
     setQ('');
     setResults([]);
-  }
-
-  async function refreshContacts() {
-    const list = await listMyContacts();
-    setContacts(list);
   }
 
   async function onAdd(userId: string) {
@@ -102,7 +103,6 @@ export default function ContactsPage() {
     >
       {err ? <p className="mb-3 text-sm text-red-300">{err}</p> : null}
 
-      {/* My contacts */}
       <div className="rounded-xl border border-slate-900 bg-slate-950/40 p-3">
         <div className="text-sm text-slate-300">My contacts</div>
 
@@ -130,7 +130,6 @@ export default function ContactsPage() {
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
           onMouseDown={(e) => {
-            // click outside closes
             if (e.target === e.currentTarget) closeModal();
           }}
         >
@@ -139,7 +138,7 @@ export default function ContactsPage() {
               <div>
                 <div className="text-base font-semibold">Add contact</div>
                 <div className="text-xs text-slate-400">
-                  Search by <b>username</b> (set in /onboarding). Min 2 chars.
+                  Search by <b>username</b> (set in <b>/onboarding</b>). Min 2 chars.
                 </div>
               </div>
               <button
