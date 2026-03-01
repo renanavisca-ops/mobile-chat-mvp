@@ -9,7 +9,13 @@ import { useChatRealtime } from '@/lib/realtime/use-chat-realtime';
 import { browserSupabase } from '@/lib/supabase/client';
 import type { MessageRow } from '@/lib/db/types';
 
-type Payload = { v?: number; text?: string; imagePath?: string; imagePaths?: string[]; videoPath?: string };
+type Payload = {
+  v?: number;
+  text?: string;
+  imagePath?: string;
+  imagePaths?: string[];
+  videoPath?: string;
+};
 
 function parseCipher(ciphertext: string): Payload {
   try {
@@ -27,6 +33,41 @@ function sanitizeFilename(name: string) {
   return name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 120);
 }
 
+function extFromPath(path: string) {
+  const m = path.toLowerCase().match(/\.([a-z0-9]+)$/);
+  return m ? m[1] : '';
+}
+
+function guessVideoMimeFromExt(ext: string) {
+  switch (ext) {
+    case 'mp4':
+      return 'video/mp4';
+    case 'webm':
+      return 'video/webm';
+    case 'mov':
+      return 'video/quicktime';
+    case 'ogv':
+      return 'video/ogg';
+    case 'mkv':
+      return 'video/x-matroska';
+    case 'avi':
+      return 'video/x-msvideo';
+    case 'mpeg':
+    case 'mpg':
+      return 'video/mpeg';
+    default:
+      return '';
+  }
+}
+
+function canBrowserPlayVideo(mime: string) {
+  if (!mime) return false;
+  if (typeof document === 'undefined') return false;
+  const v = document.createElement('video');
+  const r = v.canPlayType(mime);
+  return r === 'probably' || r === 'maybe';
+}
+
 export default function ChatPage({ params }: { params: { chatId: string } }) {
   const { loading: authLoading } = useRequireAuth();
   const chatId = params.chatId;
@@ -41,7 +82,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
   const [pendingImages, setPendingImages] = useState<File[]>([]);
   const [pendingVideo, setPendingVideo] = useState<File | null>(null);
 
-  // previews locales (object URLs)
+  // local previews
   const [previewImages, setPreviewImages] = useState<string[]>([]);
   const [previewVideo, setPreviewVideo] = useState<string>('');
 
@@ -50,11 +91,14 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
 
   const [signedUrls, setSignedUrls] = useState<Record<string, string>>({});
 
+  // track video playback failures by path so we can fallback to download
+  const [videoFailed, setVideoFailed] = useState<Record<string, boolean>>({});
+
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const videoInputRef = useRef<HTMLInputElement | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
-  // members
+  // Load members (no embeds)
   useEffect(() => {
     let alive = true;
 
@@ -127,7 +171,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
     return Array.from(new Set(arr));
   }
 
-  // signed urls
+  // Fetch signed URLs for any paths we haven't resolved yet
   useEffect(() => {
     let cancelled = false;
 
@@ -141,7 +185,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
       try {
         const pairs = await Promise.all(
           missing.map(async (path) => {
-            const url = await createSignedChatMediaUrl(path, 300);
+            const url = await createSignedChatMediaUrl(path, 300); // 5 min
             return [path, url] as const;
           })
         );
@@ -159,19 +203,19 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
     }
 
     resolveAll();
+
     return () => {
       cancelled = true;
     };
   }, [items, signedUrls]);
 
-  // -------- Images --------
+  // -------- Attach: Images --------
   function onPickImages() {
     setErr('');
     imageInputRef.current?.click();
   }
 
   function clearPendingImages() {
-    // cleanup previews
     for (const u of previewImages) URL.revokeObjectURL(u);
     setPreviewImages([]);
     setPendingImages([]);
@@ -208,12 +252,10 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
       }
     }
 
-    // regla MVP: si eliges imágenes, borra video pending
+    // if picking images, clear pending video
     if (pendingVideo) clearPendingVideo();
 
     const normalized = picked.map((f) => new File([f], sanitizeFilename(f.name), { type: f.type }));
-
-    // previews
     const urls = normalized.map((f) => URL.createObjectURL(f));
 
     setPendingImages((prev) => [...prev, ...normalized].slice(0, MAX_FILES));
@@ -222,7 +264,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
     e.target.value = '';
   }
 
-  // -------- Video --------
+  // -------- Attach: Video --------
   function onPickVideo() {
     setErr('');
     videoInputRef.current?.click();
@@ -254,7 +296,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
       return;
     }
 
-    // regla MVP: si eliges video, borra imágenes pending
+    // if picking video, clear pending images
     if (pendingImages.length) clearPendingImages();
 
     const normalized = new File([file], safeName, { type: file.type });
@@ -285,7 +327,6 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
     setBusy(true);
 
     try {
-      // VIDEO
       if (pendingVideo) {
         const { path } = await uploadChatMedia({ chatId, file: pendingVideo, kind: 'video' });
 
@@ -309,7 +350,6 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
         return;
       }
 
-      // IMAGES (multi)
       if (pendingImages.length > 0) {
         const results = await Promise.all(pendingImages.map((file) => uploadChatImage(chatId, file)));
         const paths = results.map((r) => r.path);
@@ -336,7 +376,6 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
         return;
       }
 
-      // TEXT
       const temp: MessageRow = {
         id: `local-${crypto.randomUUID()}`,
         chat_id: chatId,
@@ -351,7 +390,8 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
       setText('');
       await sendMessage(chatId, { text: t });
     } catch (e: any) {
-      setErr(e?.message ?? String(e));
+      // Prefix so we can distinguish UPLOAD errors from browser playback errors
+      setErr(`UPLOAD: ${e?.message ?? String(e)}`);
     } finally {
       setBusy(false);
     }
@@ -383,6 +423,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
                   const imgPaths: string[] = [];
                   if (m.body.imagePath) imgPaths.push(m.body.imagePath);
                   if (Array.isArray(m.body.imagePaths)) imgPaths.push(...m.body.imagePaths.filter(Boolean));
+
                   const videoPath = m.body.videoPath;
 
                   return (
@@ -390,6 +431,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
                       <div className="text-xs text-slate-500">{new Date(m.created_at).toLocaleString()}</div>
                       {m.body.text ? <div className="text-sm">{m.body.text}</div> : null}
 
+                      {/* Images */}
                       {imgPaths.length ? (
                         <div className="mt-2 grid grid-cols-2 gap-2">
                           {Array.from(new Set(imgPaths)).map((path) => {
@@ -412,14 +454,51 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
                         </div>
                       ) : null}
 
+                      {/* Video: play if supported, else download */}
                       {videoPath ? (
                         <div className="mt-2">
                           {signedUrls[videoPath] ? (
-                            <video
-                              src={signedUrls[videoPath]}
-                              controls
-                              className="max-h-96 w-full rounded-lg border border-slate-900"
-                            />
+                            (() => {
+                              const url = signedUrls[videoPath];
+                              const ext = extFromPath(videoPath);
+                              const mimeGuess = guessVideoMimeFromExt(ext);
+                              const playable = canBrowserPlayVideo(mimeGuess);
+                              const failed = !!videoFailed[videoPath];
+
+                              // If browser likely can't play (mov/mkv/avi) OR already failed, show download/open
+                              if (!playable || failed) {
+                                return (
+                                  <div className="rounded-lg border border-slate-900 bg-slate-950/50 p-3">
+                                    <div className="text-sm text-slate-200">🎥 Video adjunto</div>
+                                    <div className="mt-1 text-xs text-slate-400">
+                                      Este navegador no soporta reproducir este formato/codec inline.
+                                    </div>
+                                    <div className="mt-2">
+                                      <a
+                                        className="text-sm text-blue-400 underline"
+                                        href={url}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                      >
+                                        Abrir / Descargar video
+                                      </a>
+                                    </div>
+                                  </div>
+                                );
+                              }
+
+                              return (
+                                <video
+                                  src={url}
+                                  controls
+                                  className="max-h-96 w-full rounded-lg border border-slate-900"
+                                  onError={() => {
+                                    // fallback if codec unsupported even for mp4 container (e.g. HEVC)
+                                    setVideoFailed((prev) => ({ ...prev, [videoPath]: true }));
+                                  }}
+                                />
+                              );
+                            })()
                           ) : (
                             <div className="h-40 w-full animate-pulse rounded-lg border border-slate-900 bg-slate-800" />
                           )}
@@ -432,7 +511,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
             )}
           </div>
 
-          {/* PREVIEW antes de enviar */}
+          {/* PREVIEW before send */}
           {previewImages.length ? (
             <div className="rounded border border-slate-900 bg-slate-950/40 p-2">
               <div className="mb-2 text-xs text-slate-400">Preview imágenes:</div>
@@ -498,13 +577,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
             >
               🎥
             </button>
-            <input
-              ref={videoInputRef}
-              type="file"
-              hidden
-              accept="video/*"
-              onChange={onVideoChange}
-            />
+            <input ref={videoInputRef} type="file" hidden accept="video/*" onChange={onVideoChange} />
 
             <input
               className="flex-1 rounded border border-slate-800 bg-slate-950 px-3 py-2 text-slate-100"
