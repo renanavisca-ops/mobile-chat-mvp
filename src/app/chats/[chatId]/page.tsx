@@ -16,6 +16,10 @@ function parseCipher(ciphertext: string): { text?: string; imageUrl?: string; im
   return {};
 }
 
+function shortId(id: string) {
+  return id.length > 10 ? `${id.slice(0, 6)}…${id.slice(-4)}` : id;
+}
+
 export default function ChatPage({ params }: { params: { chatId: string } }) {
   const { loading: authLoading } = useRequireAuth();
   const chatId = params.chatId;
@@ -24,29 +28,73 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
   const { messages, loading: msgLoading, appendLocal } = useChatRealtime(chatId);
 
   const [members, setMembers] = useState<string[]>([]);
+  const [membersLoading, setMembersLoading] = useState(true);
+
   const [text, setText] = useState('');
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
-  // 🔹 Cargar miembros del chat
+  // ✅ Cargar miembros SIN embeds (porque puede no existir FK usable para profiles)
   useEffect(() => {
+    let alive = true;
+
     async function loadMembers() {
-      const { data, error } = await supabase
+      setMembersLoading(true);
+
+      // 1) sacar user_ids del chat
+      const { data: cms, error: cmErr } = await supabase
         .from('chat_members')
-        .select('profiles(username)')
+        .select('user_id')
         .eq('chat_id', chatId);
 
-      if (!error && data) {
-        const names = data
-          .map((row: any) => row.profiles?.username)
-          .filter(Boolean);
-        setMembers(names);
+      if (!alive) return;
+
+      if (cmErr) {
+        setErr(cmErr.message);
+        setMembersLoading(false);
+        return;
       }
+
+      const userIds = (cms ?? []).map((r: any) => r.user_id).filter(Boolean);
+
+      if (userIds.length === 0) {
+        setMembers([]);
+        setMembersLoading(false);
+        return;
+      }
+
+      // 2) buscar usernames por id
+      const { data: profs, error: pErr } = await supabase
+        .from('profiles')
+        .select('id, username')
+        .in('id', userIds);
+
+      if (!alive) return;
+
+      if (pErr) {
+        setErr(pErr.message);
+        setMembersLoading(false);
+        return;
+      }
+
+      const byId = new Map<string, string>();
+      for (const p of profs ?? []) {
+        byId.set((p as any).id, (p as any).username ?? '');
+      }
+
+      // mantener el orden original, fallback a id corto si no hay username
+      const names = userIds.map((id: string) => byId.get(id) || shortId(id));
+      setMembers(names);
+      setMembersLoading(false);
     }
 
     loadMembers();
+
+    return () => {
+      alive = false;
+    };
   }, [chatId]);
 
   const items = useMemo(() => {
@@ -96,10 +144,9 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
         <p className="text-sm text-slate-300">Loading…</p>
       ) : (
         <div className="flex flex-col gap-3">
-
-          {/* 🔹 Mostrar miembros */}
           <div className="text-xs text-slate-400">
-            Members: {members.length > 0 ? members.join(', ') : 'Loading...'}
+            Members:{' '}
+            {membersLoading ? 'Loading…' : members.length ? members.join(', ') : '—'}
           </div>
 
           {err ? <p className="text-sm text-red-300">{err}</p> : null}
@@ -142,7 +189,6 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
               Send
             </button>
           </div>
-
         </div>
       )}
     </PageShell>
