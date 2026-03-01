@@ -79,9 +79,18 @@ export async function listMessages(chatId: string, limit = 200): Promise<Message
   return (data ?? []) as MessageRow[];
 }
 
+/**
+ * Payload MVP:
+ * - text
+ * - single imagePath (legacy)
+ * - multi imagePaths (new)
+ *
+ * We keep imagePath for backward compatibility with already-sent messages.
+ */
 export type MessagePayload = {
   text?: string;
   imagePath?: string;
+  imagePaths?: string[];
 };
 
 export async function sendMessage(chatId: string, payload: MessagePayload) {
