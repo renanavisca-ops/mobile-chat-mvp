@@ -1,16 +1,26 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
-export function browserSupabase() {
+let _client: SupabaseClient | null = null;
+
+export function browserSupabase(): SupabaseClient {
+  if (_client) return _client;
+
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
   if (!url || !anon) {
-    throw new Error('FALTA_DATO_CRITICO: Configurar NEXT_PUBLIC_SUPABASE_URL y NEXT_PUBLIC_SUPABASE_ANON_KEY');
+    throw new Error(
+      'FALTA_DATO_CRITICO: Configurar NEXT_PUBLIC_SUPABASE_URL y NEXT_PUBLIC_SUPABASE_ANON_KEY'
+    );
   }
-  return createClient(url, anon, {
+
+  _client = createClient(url, anon, {
     auth: {
       persistSession: true,
       autoRefreshToken: true,
-      detectSessionInUrl: true
-    }
+      detectSessionInUrl: true,
+    },
   });
+
+  return _client;
 }
