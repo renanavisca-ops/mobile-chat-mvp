@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { PageShell } from '@/components/page-shell';
 import { ForwardModal } from '@/components/forward-modal';
 import { MessageActionsSheet } from '@/components/message-actions-sheet';
+import { AttachSheet } from '@/components/attach-sheet';
 import { useRequireAuth } from '@/lib/auth/use-require-auth';
 import { listChats, sendMessage } from '@/lib/db/chats';
 import { forwardMessageToChats, type ForwardPayload } from '@/lib/db/forward';
@@ -80,8 +81,16 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
   const [actionsOpen, setActionsOpen] = useState(false);
   const [actionsMsg, setActionsMsg] = useState<{ id: string; body: Payload } | null>(null);
 
+  // Attach sheet
+  const [attachOpen, setAttachOpen] = useState(false);
+
+  // Inputs
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const videoInputRef = useRef<HTMLInputElement | null>(null);
+  const cameraPhotoRef = useRef<HTMLInputElement | null>(null);
+  const cameraVideoRef = useRef<HTMLInputElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
   // Long-press support
@@ -160,9 +169,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
     };
   }, [chatId, supabase]);
 
-  const items = useMemo(() => {
-    return messages.map((m) => ({ ...m, body: parseCipher(m.ciphertext) }));
-  }, [messages]);
+  const items = useMemo(() => messages.map((m) => ({ ...m, body: parseCipher(m.ciphertext) })), [messages]);
 
   // autoscroll
   useEffect(() => {
@@ -244,9 +251,9 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
   }
 
   async function doCopy(body: Payload) {
-    const text = body.text?.trim();
-    if (text) {
-      await navigator.clipboard.writeText(text);
+    const t = body.text?.trim();
+    if (t) {
+      await navigator.clipboard.writeText(t);
       return;
     }
     const parts: string[] = [];
@@ -261,12 +268,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
     setTimeout(() => setErr(''), 2500);
   }
 
-  // -------- Attach: Images
-  function onPickImages() {
-    setErr('');
-    imageInputRef.current?.click();
-  }
-
+  // -------- Pending cleanup
   function clearPendingImages() {
     for (const u of previewImages) URL.revokeObjectURL(u);
     setPreviewImages([]);
@@ -274,6 +276,37 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
     if (imageInputRef.current) imageInputRef.current.value = '';
   }
 
+  function clearPendingVideo() {
+    if (previewVideo) URL.revokeObjectURL(previewVideo);
+    setPreviewVideo('');
+    setPendingVideo(null);
+    if (videoInputRef.current) videoInputRef.current.value = '';
+    if (cameraVideoRef.current) cameraVideoRef.current.value = '';
+  }
+
+  // -------- Pick handlers (sheet -> inputs)
+  function pickPhotos() {
+    setErr('');
+    imageInputRef.current?.click();
+  }
+  function pickVideo() {
+    setErr('');
+    videoInputRef.current?.click();
+  }
+  function cameraPhoto() {
+    setErr('');
+    cameraPhotoRef.current?.click();
+  }
+  function cameraVideo() {
+    setErr('');
+    cameraVideoRef.current?.click();
+  }
+  function pickFile() {
+    toast('File: pendiente (siguiente paso).');
+    fileInputRef.current?.click();
+  }
+
+  // -------- Input change: images
   async function onImagesChange(e: React.ChangeEvent<HTMLInputElement>) {
     setErr('');
     const files = Array.from(e.target.files ?? []);
@@ -315,19 +348,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
     e.target.value = '';
   }
 
-  // -------- Attach: Video
-  function onPickVideo() {
-    setErr('');
-    videoInputRef.current?.click();
-  }
-
-  function clearPendingVideo() {
-    if (previewVideo) URL.revokeObjectURL(previewVideo);
-    setPreviewVideo('');
-    setPendingVideo(null);
-    if (videoInputRef.current) videoInputRef.current.value = '';
-  }
-
+  // -------- Input change: video (library)
   async function onVideoChange(e: React.ChangeEvent<HTMLInputElement>) {
     setErr('');
     const file = e.target.files?.[0];
@@ -358,6 +379,17 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
     e.target.value = '';
   }
 
+  // -------- Input change: camera photo
+  async function onCameraPhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
+    // camera photo returns an image file
+    await onImagesChange(e as any);
+  }
+
+  // -------- Input change: camera video
+  async function onCameraVideoChange(e: React.ChangeEvent<HTMLInputElement>) {
+    await onVideoChange(e as any);
+  }
+
   // cleanup on unmount
   useEffect(() => {
     return () => {
@@ -377,9 +409,11 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
     setBusy(true);
 
     try {
+      // VIDEO
       if (pendingVideo) {
         const { path } = await uploadChatMedia({ chatId, file: pendingVideo, kind: 'video' });
 
+        // Prefetch signed url for instant render
         try {
           const url = await createSignedChatMediaUrl(path, 300);
           setSignedUrls((prev) => ({ ...prev, [path]: url }));
@@ -405,10 +439,12 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
         return;
       }
 
+      // IMAGES (multi)
       if (pendingImages.length > 0) {
         const results = await Promise.all(pendingImages.map((file) => uploadChatImage(chatId, file)));
         const paths = results.map((r) => r.path);
 
+        // Prefetch signed urls
         try {
           const pairs = await Promise.all(paths.map(async (p) => [p, await createSignedChatMediaUrl(p, 300)] as const));
           setSignedUrls((prev) => {
@@ -438,6 +474,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
         return;
       }
 
+      // TEXT
       const temp: MessageRow = {
         id: `local-${crypto.randomUUID()}`,
         chat_id: chatId,
@@ -505,6 +542,47 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
         ]}
       />
 
+      <AttachSheet
+        open={attachOpen}
+        onClose={() => setAttachOpen(false)}
+        onPickPhotos={pickPhotos}
+        onPickVideo={pickVideo}
+        onCameraPhoto={cameraPhoto}
+        onCameraVideo={cameraVideo}
+        onPickFile={pickFile}
+      />
+
+      {/* Hidden inputs */}
+      <input
+        ref={imageInputRef}
+        type="file"
+        hidden
+        multiple
+        accept="image/jpeg,image/png,image/webp"
+        onChange={onImagesChange}
+      />
+      <input ref={videoInputRef} type="file" hidden accept="video/*" onChange={onVideoChange} />
+
+      {/* Camera capture inputs (mobile) */}
+      <input
+        ref={cameraPhotoRef}
+        type="file"
+        hidden
+        accept="image/*"
+        capture="environment"
+        onChange={onCameraPhotoChange}
+      />
+      <input
+        ref={cameraVideoRef}
+        type="file"
+        hidden
+        accept="video/*"
+        capture="environment"
+        onChange={onCameraVideoChange}
+      />
+
+      <input ref={fileInputRef} type="file" hidden />
+
       {loading ? (
         <p className="text-sm text-slate-300">Loading…</p>
       ) : (
@@ -533,17 +611,14 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
                     <li
                       key={m.id}
                       className="rounded-lg border border-slate-900 bg-slate-950/60 p-2"
-                      // Desktop right-click
                       onContextMenu={(e) => {
                         e.preventDefault();
                         openActions(m.id, m.body);
                       }}
-                      // Mobile long-press
                       onPointerDown={() => startLongPress(m.id, m.body)}
                       onPointerUp={clearLongPress}
                       onPointerCancel={clearLongPress}
                       onPointerMove={clearLongPress}
-                      // Desktop single-click (optional). If you prefer not to open on click, delete this.
                       onDoubleClick={() => openActions(m.id, m.body)}
                     >
                       <div className="text-xs text-slate-500">{new Date(m.created_at).toLocaleString()}</div>
@@ -556,9 +631,17 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
                             const url = signedUrls[path] || '';
                             return url ? (
                               // eslint-disable-next-line @next/next/no-img-element
-                              <img key={path} src={url} alt="chat image" className="max-h-80 w-auto rounded-lg border border-slate-900" />
+                              <img
+                                key={path}
+                                src={url}
+                                alt="chat image"
+                                className="max-h-80 w-auto rounded-lg border border-slate-900"
+                              />
                             ) : (
-                              <div key={path} className="h-28 w-full animate-pulse rounded-lg border border-slate-900 bg-slate-800" />
+                              <div
+                                key={path}
+                                className="h-28 w-full animate-pulse rounded-lg border border-slate-900 bg-slate-800"
+                              />
                             );
                           })}
                         </div>
@@ -578,7 +661,12 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
                               {videoPlayError[videoPath] ? (
                                 <div className="mt-2 text-xs text-slate-400">
                                   No se pudo reproducir inline.{' '}
-                                  <a className="text-blue-400 underline" href={signedUrls[videoPath]} target="_blank" rel="noreferrer">
+                                  <a
+                                    className="text-blue-400 underline"
+                                    href={signedUrls[videoPath]}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                  >
                                     Abrir video
                                   </a>
                                 </div>
@@ -603,11 +691,20 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
               <div className="grid grid-cols-3 gap-2">
                 {previewImages.map((u) => (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img key={u} src={u} alt="preview" className="h-24 w-full rounded border border-slate-900 object-cover" />
+                  <img
+                    key={u}
+                    src={u}
+                    alt="preview"
+                    className="h-24 w-full rounded border border-slate-900 object-cover"
+                  />
                 ))}
               </div>
               <div className="mt-2 flex justify-end">
-                <button className="rounded bg-slate-800 px-3 py-1.5 text-xs hover:bg-slate-700" onClick={clearPendingImages} disabled={busy}>
+                <button
+                  className="rounded bg-slate-800 px-3 py-1.5 text-xs hover:bg-slate-700"
+                  onClick={clearPendingImages}
+                  disabled={busy}
+                >
                   Remove all
                 </button>
               </div>
@@ -620,7 +717,11 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
               <div className="mb-2 text-xs text-slate-400">Preview video:</div>
               <video src={previewVideo} controls className="max-h-72 w-full rounded border border-slate-900" />
               <div className="mt-2 flex justify-end">
-                <button className="rounded bg-slate-800 px-3 py-1.5 text-xs hover:bg-slate-700" onClick={clearPendingVideo} disabled={busy}>
+                <button
+                  className="rounded bg-slate-800 px-3 py-1.5 text-xs hover:bg-slate-700"
+                  onClick={clearPendingVideo}
+                  disabled={busy}
+                >
                   Remove
                 </button>
               </div>
@@ -628,27 +729,16 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
           ) : null}
 
           <div className="flex items-center gap-2">
+            {/* + button */}
             <button
               className="rounded bg-slate-800 px-3 py-2 text-sm hover:bg-slate-700"
-              onClick={onPickImages}
+              onClick={() => setAttachOpen(true)}
               type="button"
-              title="Attach images"
-              disabled={!!pendingVideo || busy}
+              title="Attach"
+              disabled={busy}
             >
-              🖼️
+              +
             </button>
-            <input ref={imageInputRef} type="file" hidden multiple accept="image/jpeg,image/png,image/webp" onChange={onImagesChange} />
-
-            <button
-              className="rounded bg-slate-800 px-3 py-2 text-sm hover:bg-slate-700"
-              onClick={onPickVideo}
-              type="button"
-              title="Attach video"
-              disabled={pendingImages.length > 0 || busy}
-            >
-              🎥
-            </button>
-            <input ref={videoInputRef} type="file" hidden accept="video/*" onChange={onVideoChange} />
 
             <input
               className="flex-1 rounded border border-slate-800 bg-slate-950 px-3 py-2 text-slate-100"
@@ -660,7 +750,11 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
               }}
             />
 
-            <button className="rounded bg-blue-600 px-3 py-2 text-sm hover:bg-blue-500 disabled:opacity-60" onClick={onSend} disabled={busy}>
+            <button
+              className="rounded bg-blue-600 px-3 py-2 text-sm hover:bg-blue-500 disabled:opacity-60"
+              onClick={onSend}
+              disabled={busy}
+            >
               Send
             </button>
           </div>
