@@ -3,20 +3,23 @@
 import { browserSupabase } from '@/lib/supabase/client';
 
 const IMAGE_MIME = new Set(['image/jpeg', 'image/png', 'image/webp']);
-const VIDEO_MIME = new Set([
-  'video/mp4',
-  'video/webm',
-  'video/quicktime', // .mov (Safari / iOS)
-  'video/x-matroska', // .mkv (a veces)
-  'video/3gpp', // .3gp
-  'video/3gpp2', // .3g2
-  'video/ogg',
-  'video/x-msvideo', // .avi
-  'video/mpeg', // .mpeg
+const IMAGE_EXT = new Set(['jpg', 'jpeg', 'png', 'webp']);
+
+const VIDEO_EXT = new Set([
+  'mp4',
+  'webm',
+  'mov',
+  'mkv',
+  '3gp',
+  '3g2',
+  'ogv',
+  'avi',
+  'mpeg',
+  'mpg'
 ]);
 
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024; // 5MB
-const MAX_VIDEO_BYTES = 200 * 1024 * 1024; // 200MB (ajústalo luego si quieres)
+const MAX_VIDEO_BYTES = 200 * 1024 * 1024; // 200MB (ajústalo cuando quieras)
 
 function sanitizeFilename(name: string) {
   let cleaned = (name || '').replace(/[^a-zA-Z0-9._-]/g, '_');
@@ -25,39 +28,10 @@ function sanitizeFilename(name: string) {
   return cleaned.slice(0, 120);
 }
 
-function guessExt(mime: string) {
-  switch (mime) {
-    // images
-    case 'image/jpeg':
-      return 'jpg';
-    case 'image/png':
-      return 'png';
-    case 'image/webp':
-      return 'webp';
-
-    // videos
-    case 'video/mp4':
-      return 'mp4';
-    case 'video/webm':
-      return 'webm';
-    case 'video/quicktime':
-      return 'mov';
-    case 'video/x-matroska':
-      return 'mkv';
-    case 'video/3gpp':
-      return '3gp';
-    case 'video/3gpp2':
-      return '3g2';
-    case 'video/ogg':
-      return 'ogv';
-    case 'video/x-msvideo':
-      return 'avi';
-    case 'video/mpeg':
-      return 'mpeg';
-
-    default:
-      return 'bin';
-  }
+function getExtFromName(name: string) {
+  const safe = sanitizeFilename(name);
+  const m = safe.toLowerCase().match(/\.([a-z0-9]+)$/);
+  return m ? m[1] : '';
 }
 
 function assertFilenameOk(fileName: string) {
@@ -72,14 +46,32 @@ function assertFilenameOk(fileName: string) {
   return safe;
 }
 
+function pickExt(kind: 'image' | 'video', file: File) {
+  // prefer filename ext (más estable que mime)
+  const extFromName = getExtFromName(file.name);
+  if (extFromName) return extFromName;
+
+  // fallback to mime
+  const t = (file.type || '').toLowerCase();
+  if (kind === 'image') {
+    if (t === 'image/jpeg') return 'jpg';
+    if (t === 'image/png') return 'png';
+    if (t === 'image/webp') return 'webp';
+  } else {
+    if (t === 'video/mp4') return 'mp4';
+    if (t === 'video/webm') return 'webm';
+    if (t === 'video/quicktime') return 'mov';
+  }
+  return 'bin';
+}
+
 /**
  * Upload universal para chat-media (bucket privado)
  * Path: chats/<chatId>/<timestamp>_<uuid>_<safeName>.<ext>
  *
- * - kind='image' aplica allowlist + 5MB
- * - kind='video' aplica allowlist + 200MB
- *
- * Guarda SOLO path (nunca URL).
+ * Video validation (robusta):
+ * - acepta si file.type empieza con "video/" OR ext permitido
+ * - NO depende de un allowlist exacto de mime
  */
 export async function uploadChatMedia(input: {
   chatId: string;
@@ -88,22 +80,30 @@ export async function uploadChatMedia(input: {
 }): Promise<{ path: string }> {
   const { chatId, file, kind } = input;
 
-  const mime = file.type || '';
+  const mime = (file.type || '').toLowerCase();
   const safeName = assertFilenameOk(file.name);
+  const ext = pickExt(kind, file).toLowerCase();
 
   if (kind === 'image') {
-    if (!IMAGE_MIME.has(mime)) throw new Error(`Mime type ${mime || '(unknown)'} not supported`);
+    if (!IMAGE_MIME.has(mime) && !IMAGE_EXT.has(ext)) {
+      throw new Error(`Mime type ${mime || '(unknown)'} not supported`);
+    }
     if (file.size > MAX_IMAGE_BYTES) throw new Error('Máximo 5MB por imagen.');
   } else {
-    if (!VIDEO_MIME.has(mime)) throw new Error(`Mime type ${mime || '(unknown)'} not supported`);
+    const looksLikeVideo = mime.startsWith('video/');
+    const extOk = VIDEO_EXT.has(ext);
+
+    if (!looksLikeVideo && !extOk) {
+      // Mensaje claro para debug
+      throw new Error(`Mime type ${mime || '(unknown)'} not supported`);
+    }
     if (file.size > MAX_VIDEO_BYTES) throw new Error('Máximo 200MB por video.');
   }
 
   const ts = Date.now();
   const id = crypto.randomUUID();
-  const ext = guessExt(mime);
 
-  const base = safeName.replace(/\.[^.]+$/, '');
+  const base = sanitizeFilename(safeName).replace(/\.[^.]+$/, '');
   const finalName = `${ts}_${id}_${base}.${ext}`;
 
   const path = `chats/${chatId}/${finalName}`;
