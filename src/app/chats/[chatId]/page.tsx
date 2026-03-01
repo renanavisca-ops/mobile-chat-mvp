@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { PageShell } from '@/components/page-shell';
 import { useRequireAuth } from '@/lib/auth/use-require-auth';
 import { sendMessage } from '@/lib/db/chats';
-import { uploadChatImage, createSignedChatMediaUrl } from '@/lib/storage/upload';
+import { uploadChatImage, uploadChatMedia, createSignedChatMediaUrl } from '@/lib/storage/upload';
 import { useChatRealtime } from '@/lib/realtime/use-chat-realtime';
 import { browserSupabase } from '@/lib/supabase/client';
 import type { MessageRow } from '@/lib/db/types';
@@ -34,11 +34,9 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
   const supabase = browserSupabase();
   const { messages, loading: msgLoading, appendLocal } = useChatRealtime(chatId);
 
-  // members
   const [members, setMembers] = useState<string[]>([]);
   const [membersLoading, setMembersLoading] = useState(true);
 
-  // compose
   const [text, setText] = useState('');
   const [pendingImages, setPendingImages] = useState<File[]>([]);
   const [pendingVideo, setPendingVideo] = useState<File | null>(null);
@@ -46,14 +44,12 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
 
-  // signed url cache (path -> url)
   const [signedUrls, setSignedUrls] = useState<Record<string, string>>({});
 
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const videoInputRef = useRef<HTMLInputElement | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
-  // Load members (no embeds)
   useEffect(() => {
     let alive = true;
 
@@ -111,7 +107,6 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
     return messages.map((m) => ({ ...m, body: parseCipher(m.ciphertext) }));
   }, [messages]);
 
-  // autoscroll
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
@@ -121,14 +116,11 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
   function extractAllPaths(body: Payload): string[] {
     const arr: string[] = [];
     if (body.imagePath) arr.push(body.imagePath);
-    if (Array.isArray(body.imagePaths)) {
-      for (const p of body.imagePaths) if (typeof p === 'string' && p) arr.push(p);
-    }
+    if (Array.isArray(body.imagePaths)) for (const p of body.imagePaths) if (p) arr.push(p);
     if (body.videoPath) arr.push(body.videoPath);
     return Array.from(new Set(arr));
   }
 
-  // Fetch signed URLs for any paths we haven't resolved yet
   useEffect(() => {
     let cancelled = false;
 
@@ -136,14 +128,13 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
       const allPaths = new Set<string>();
       for (const m of items) for (const p of extractAllPaths(m.body)) allPaths.add(p);
 
-      const paths = Array.from(allPaths);
-      const missing = paths.filter((p) => !signedUrls[p]);
+      const missing = Array.from(allPaths).filter((p) => !signedUrls[p]);
       if (missing.length === 0) return;
 
       try {
         const pairs = await Promise.all(
           missing.map(async (path) => {
-            const url = await createSignedChatMediaUrl(path, 300); // 5 min
+            const url = await createSignedChatMediaUrl(path, 300);
             return [path, url] as const;
           })
         );
@@ -166,7 +157,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
     };
   }, [items, signedUrls]);
 
-  // -------- Attach: Images --------
+  // Images
   function onPickImages() {
     setErr('');
     imageInputRef.current?.click();
@@ -179,8 +170,8 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
 
     const allowed = new Set(['image/jpeg', 'image/png', 'image/webp']);
     const maxSize = 5 * 1024 * 1024;
-
     const MAX_FILES = 6;
+
     const picked = files.slice(0, MAX_FILES);
 
     for (const f of picked) {
@@ -212,7 +203,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
     if (imageInputRef.current) imageInputRef.current.value = '';
   }
 
-  // -------- Attach: Video (1 per message) --------
+  // Video
   function onPickVideo() {
     setErr('');
     videoInputRef.current?.click();
@@ -223,17 +214,11 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // MVP: mp4 + webm, cap 50MB
-    const allowed = new Set(['video/mp4', 'video/webm']);
-    const maxSize = 50 * 1024 * 1024;
+    // allowlist más amplio ya lo maneja uploadChatMedia; aquí solo validamos tamaño básico + nombre
+    const maxSize = 200 * 1024 * 1024;
 
-    if (!allowed.has(file.type)) {
-      setErr('Solo MP4 o WEBM.');
-      e.target.value = '';
-      return;
-    }
     if (file.size > maxSize) {
-      setErr('Máximo 50MB por video.');
+      setErr('Máximo 200MB por video.');
       e.target.value = '';
       return;
     }
@@ -245,8 +230,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
       return;
     }
 
-    // IMPORTANT: avoid mixing attachments that explode UX
-    // Rule: if you choose a video, clear pending images (one message: either images or video)
+    // regla MVP: no mezclar video con imágenes en el mismo mensaje
     setPendingImages([]);
     if (imageInputRef.current) imageInputRef.current.value = '';
 
@@ -259,7 +243,6 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
     if (videoInputRef.current) videoInputRef.current.value = '';
   }
 
-  // -------- Send --------
   async function onSend() {
     setErr('');
     const t = text.trim();
@@ -269,11 +252,9 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
     setBusy(true);
 
     try {
-      // Video message (1 video)
+      // Video
       if (pendingVideo) {
-        // reuse uploadChatImage for now (it just uploads to storage); path policies allow any file.
-        // If later you want separate function name, we can add uploadChatMedia().
-        const { path } = await uploadChatImage(chatId, pendingVideo);
+        const { path } = await uploadChatMedia({ chatId, file: pendingVideo, kind: 'video' });
 
         const payload: { text?: string; videoPath: string } = t ? { text: t, videoPath: path } : { videoPath: path };
 
@@ -295,7 +276,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
         return;
       }
 
-      // Multi-image message
+      // Images
       if (pendingImages.length > 0) {
         const results = await Promise.all(pendingImages.map((file) => uploadChatImage(chatId, file)));
         const paths = results.map((r) => r.path);
@@ -322,7 +303,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
         return;
       }
 
-      // text-only
+      // Text-only
       const temp: MessageRow = {
         id: `local-${crypto.randomUUID()}`,
         chat_id: chatId,
@@ -378,7 +359,6 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
 
                       {m.body.text ? <div className="text-sm">{m.body.text}</div> : null}
 
-                      {/* Images */}
                       {imgPaths.length ? (
                         <div className="mt-2 grid grid-cols-2 gap-2">
                           {Array.from(new Set(imgPaths)).map((path) => {
@@ -401,7 +381,6 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
                         </div>
                       ) : null}
 
-                      {/* Video */}
                       {videoPath ? (
                         <div className="mt-2">
                           {signedUrls[videoPath] ? (
@@ -423,7 +402,6 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Images */}
             <button
               className="rounded bg-slate-800 px-3 py-2 text-sm hover:bg-slate-700"
               onClick={onPickImages}
@@ -442,7 +420,6 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
               onChange={onImagesChange}
             />
 
-            {/* Video */}
             <button
               className="rounded bg-slate-800 px-3 py-2 text-sm hover:bg-slate-700"
               onClick={onPickVideo}
@@ -456,7 +433,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
               ref={videoInputRef}
               type="file"
               hidden
-              accept="video/mp4,video/webm"
+              accept="video/*"
               onChange={onVideoChange}
             />
 
@@ -479,7 +456,6 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
             </button>
           </div>
 
-          {/* Pending images */}
           {pendingImages.length ? (
             <div className="flex items-center justify-between rounded border border-slate-900 bg-slate-950/40 p-2 text-sm">
               <div className="text-slate-200">
@@ -495,7 +471,6 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
             </div>
           ) : null}
 
-          {/* Pending video */}
           {pendingVideo ? (
             <div className="flex items-center justify-between rounded border border-slate-900 bg-slate-950/40 p-2 text-sm">
               <div className="text-slate-200">
