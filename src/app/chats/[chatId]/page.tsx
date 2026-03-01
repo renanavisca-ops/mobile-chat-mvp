@@ -9,7 +9,7 @@ import { useChatRealtime } from '@/lib/realtime/use-chat-realtime';
 import { browserSupabase } from '@/lib/supabase/client';
 import type { MessageRow } from '@/lib/db/types';
 
-type Payload = { v?: number; text?: string; imagePath?: string; imageUrl?: string };
+type Payload = { v?: number; text?: string; imagePath?: string };
 
 function parseCipher(ciphertext: string): Payload {
   try {
@@ -35,9 +35,11 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
 
   const { messages, loading: msgLoading, appendLocal } = useChatRealtime(chatId);
 
+  // members
   const [members, setMembers] = useState<string[]>([]);
   const [membersLoading, setMembersLoading] = useState(true);
 
+  // compose
   const [text, setText] = useState('');
   const [pendingFile, setPendingFile] = useState<File | null>(null);
 
@@ -47,6 +49,14 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
+  // Signed URL cache: path -> url
+  const [signedByPath, setSignedByPath] = useState<Record<string, string>>({});
+  const signedByPathRef = useRef<Record<string, string>>({});
+  useEffect(() => {
+    signedByPathRef.current = signedByPath;
+  }, [signedByPath]);
+
+  // Load members (no embeds)
   useEffect(() => {
     let alive = true;
 
@@ -102,17 +112,61 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
     return () => {
       alive = false;
     };
-  }, [chatId]);
+  }, [chatId, supabase]);
 
   const items = useMemo(() => {
     return messages.map((m) => ({ ...m, body: parseCipher(m.ciphertext) }));
   }, [messages]);
 
+  // Auto-scroll
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
     el.scrollTop = el.scrollHeight;
   }, [items.length]);
+
+  // Fetch signed URLs for any imagePath that is not cached yet
+  useEffect(() => {
+    let cancelled = false;
+
+    async function ensureSignedUrls() {
+      const paths = Array.from(
+        new Set(
+          items
+            .map((m) => m.body.imagePath)
+            .filter((p): p is string => typeof p === 'string' && p.length > 0)
+        )
+      );
+
+      const missing = paths.filter((p) => !signedByPathRef.current[p]);
+      if (missing.length === 0) return;
+
+      const updates: Record<string, string> = {};
+
+      for (const path of missing) {
+        const { data, error } = await supabase.storage.from('chat-media').createSignedUrl(path, 300); // 5 min
+        if (cancelled) return;
+
+        if (error) {
+          // no rompas la UI si una falla; solo log y sigue
+          console.warn('createSignedUrl failed for', path, error.message);
+          continue;
+        }
+
+        if (data?.signedUrl) updates[path] = data.signedUrl;
+      }
+
+      if (Object.keys(updates).length) {
+        setSignedByPath((prev) => ({ ...prev, ...updates }));
+      }
+    }
+
+    ensureSignedUrls();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [items, supabase]);
 
   function onPickFile() {
     setErr('');
@@ -130,7 +184,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
     if (!file) return;
 
     const allowed = new Set(['image/jpeg', 'image/png', 'image/webp']);
-    const maxSize = 5 * 1024 * 1024;
+    const maxSize = 5 * 1024 * 1024; // 5MB
 
     if (!allowed.has(file.type)) {
       setErr('Solo JPG, PNG o WEBP.');
@@ -158,22 +212,22 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
     setErr('');
     const t = text.trim();
 
+    // allow text-only, image-only, image+caption
     if (!t && !pendingFile) return;
 
     setBusy(true);
 
     try {
-      // IMAGE flow: upload first -> then save only imagePath in message payload.
+      // IMAGE: upload -> send only imagePath
       if (pendingFile) {
         const file = pendingFile;
-
-        // ✅ FIX: your uploadChatImage expects (chatId, file)
         const { path } = await uploadChatImage(chatId, file);
 
         const payload: { text?: string; imagePath: string } = t
           ? { text: t, imagePath: path }
           : { imagePath: path };
 
+        // optimistic message (already has imagePath)
         const temp: MessageRow = {
           id: `local-${crypto.randomUUID()}`,
           chat_id: chatId,
@@ -192,7 +246,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
         return;
       }
 
-      // TEXT-only flow
+      // TEXT
       if (!t) return;
 
       const temp: MessageRow = {
@@ -223,90 +277,6 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
         <p className="text-sm text-slate-300">Loading…</p>
       ) : (
         <div className="flex flex-col gap-3">
+          {/* Members */}
           <div className="text-xs text-slate-400">
-            Members: {membersLoading ? 'Loading…' : members.length ? members.join(', ') : '—'}
-          </div>
-
-          {err ? <p className="text-sm text-red-300">{err}</p> : null}
-
-          <div
-            ref={scrollRef}
-            className="h-[55vh] overflow-auto rounded-xl border border-slate-900 bg-slate-950/40 p-3"
-          >
-            {items.length === 0 ? (
-              <p className="text-sm text-slate-400">No messages yet.</p>
-            ) : (
-              <ul className="space-y-2">
-                {items.map((m) => (
-                  <li key={m.id} className="rounded-lg border border-slate-900 bg-slate-950/60 p-2">
-                    <div className="text-xs text-slate-500">{new Date(m.created_at).toLocaleString()}</div>
-                    {m.body.text ? <div className="text-sm">{m.body.text}</div> : null}
-
-                    {/* next step: render image via signed URL */}
-                    {m.body.imagePath ? (
-                      <div className="mt-2 text-xs text-slate-400">
-                        📷 imagePath: <span className="font-mono">{m.body.imagePath}</span>
-                      </div>
-                    ) : null}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              className="rounded bg-slate-800 px-3 py-2 text-sm hover:bg-slate-700"
-              onClick={onPickFile}
-              type="button"
-              title="Attach image"
-            >
-              📎
-            </button>
-
-            <input
-              ref={fileInputRef}
-              type="file"
-              hidden
-              accept="image/jpeg,image/png,image/webp"
-              onChange={onFileChange}
-            />
-
-            <input
-              className="flex-1 rounded border border-slate-800 bg-slate-950 px-3 py-2 text-slate-100"
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              placeholder="Type a message…"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') onSend();
-              }}
-            />
-
-            <button
-              className="rounded bg-blue-600 px-3 py-2 text-sm hover:bg-blue-500 disabled:opacity-60"
-              onClick={onSend}
-              disabled={busy}
-            >
-              Send
-            </button>
-          </div>
-
-          {pendingFile ? (
-            <div className="flex items-center justify-between rounded border border-slate-900 bg-slate-950/40 p-2 text-sm">
-              <div className="text-slate-200">
-                Imagen lista: <span className="font-mono">{pendingFile.name}</span> ({Math.round(pendingFile.size / 1024)}{' '}
-                KB)
-              </div>
-              <button
-                className="rounded bg-slate-800 px-3 py-1.5 text-xs hover:bg-slate-700"
-                onClick={clearPendingFile}
-              >
-                Remove
-              </button>
-            </div>
-          ) : null}
-        </div>
-      )}
-    </PageShell>
-  );
-}
+            Members: {membersLoading ? 'Loading…' : members.length ? members.join(', ') : '
