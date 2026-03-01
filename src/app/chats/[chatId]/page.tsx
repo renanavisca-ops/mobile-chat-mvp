@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { PageShell } from '@/components/page-shell';
 import { useRequireAuth } from '@/lib/auth/use-require-auth';
 import { sendMessage } from '@/lib/db/chats';
+import { uploadChatImage } from '@/lib/storage/upload';
 import { useChatRealtime } from '@/lib/realtime/use-chat-realtime';
 import { browserSupabase } from '@/lib/supabase/client';
 import type { MessageRow } from '@/lib/db/types';
@@ -157,7 +158,6 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
       return;
     }
 
-    // ✅ for now: mark as “ready” (NO upload yet)
     setPendingFile(new File([file], safeName, { type: file.type }));
   }
 
@@ -165,34 +165,53 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
     setErr('');
     const t = text.trim();
 
-    // In this step, we only send TEXT.
-    // Next step we'll upload pendingFile and then send { imagePath }.
+    // Allow: text-only, image-only, or image + text (caption).
     if (!t && !pendingFile) return;
-
-    // If user selected a file but no upload implemented yet, block sending it.
-    if (pendingFile) {
-      setErr('Imagen lista, pero todavía no está implementado el upload. (Siguiente paso)');
-      return;
-    }
-
-    if (!t) return;
 
     setBusy(true);
 
-    // optimistic (optional but nice)
-    const temp: MessageRow = {
-      id: `local-${crypto.randomUUID()}`,
-      chat_id: chatId,
-      sender_device_id: 'local',
-      ciphertext: JSON.stringify({ v: 1, text: t }),
-      nonce: `local-${crypto.randomUUID()}`,
-      message_type: 'whisper',
-      created_at: new Date().toISOString(),
-    };
-    appendLocal(temp);
-    setText('');
-
     try {
+      // IMAGE flow: upload first -> then save only imagePath in message payload.
+      if (pendingFile) {
+        const file = pendingFile;
+        const { path } = await uploadChatImage({ chatId, file });
+
+        const payload: { text?: string; imagePath: string } = t ? { text: t, imagePath: path } : { imagePath: path };
+
+        // optimistic local append (after upload so we already have path)
+        const temp: MessageRow = {
+          id: `local-${crypto.randomUUID()}`,
+          chat_id: chatId,
+          sender_device_id: 'local',
+          ciphertext: JSON.stringify({ v: 1, ...payload }),
+          nonce: `local-${crypto.randomUUID()}`,
+          message_type: 'whisper',
+          created_at: new Date().toISOString(),
+        };
+        appendLocal(temp);
+
+        setText('');
+        clearPendingFile();
+
+        await sendMessage(chatId, payload);
+        return;
+      }
+
+      // TEXT-only flow (keeps existing optimistic UI).
+      if (!t) return;
+
+      const temp: MessageRow = {
+        id: `local-${crypto.randomUUID()}`,
+        chat_id: chatId,
+        sender_device_id: 'local',
+        ciphertext: JSON.stringify({ v: 1, text: t }),
+        nonce: `local-${crypto.randomUUID()}`,
+        message_type: 'whisper',
+        created_at: new Date().toISOString(),
+      };
+      appendLocal(temp);
+      setText('');
+
       await sendMessage(chatId, { text: t });
     } catch (e: any) {
       setErr(e?.message ?? String(e));
@@ -230,7 +249,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
                     <div className="text-xs text-slate-500">{new Date(m.created_at).toLocaleString()}</div>
                     {m.body.text ? <div className="text-sm">{m.body.text}</div> : null}
 
-                    {/* future: when we start saving imagePath, we'll render signed URL */}
+                    {/* next step: render image via signed URL */}
                     {m.body.imagePath ? (
                       <div className="mt-2 text-xs text-slate-400">
                         📷 imagePath: <span className="font-mono">{m.body.imagePath}</span>
@@ -280,11 +299,12 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
             </button>
           </div>
 
-          {/* Pending file UI (no upload yet) */}
+          {/* Pending file UI */}
           {pendingFile ? (
             <div className="flex items-center justify-between rounded border border-slate-900 bg-slate-950/40 p-2 text-sm">
               <div className="text-slate-200">
-                Imagen lista: <span className="font-mono">{pendingFile.name}</span> ({Math.round(pendingFile.size / 1024)} KB)
+                Imagen lista: <span className="font-mono">{pendingFile.name}</span> ({Math.round(pendingFile.size / 1024)}{' '}
+                KB)
               </div>
               <button
                 className="rounded bg-slate-800 px-3 py-1.5 text-xs hover:bg-slate-700"
