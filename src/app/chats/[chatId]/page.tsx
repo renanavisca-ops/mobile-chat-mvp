@@ -2,12 +2,14 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { PageShell } from '@/components/page-shell';
+import { ForwardModal } from '@/components/forward-modal';
 import { useRequireAuth } from '@/lib/auth/use-require-auth';
-import { sendMessage } from '@/lib/db/chats';
+import { listChats, sendMessage } from '@/lib/db/chats';
+import { forwardMessageToChats, type ForwardPayload } from '@/lib/db/forward';
 import { uploadChatImage, uploadChatMedia, createSignedChatMediaUrl } from '@/lib/storage/upload';
 import { useChatRealtime } from '@/lib/realtime/use-chat-realtime';
 import { browserSupabase } from '@/lib/supabase/client';
-import type { MessageRow } from '@/lib/db/types';
+import type { ChatSummary, MessageRow } from '@/lib/db/types';
 
 type Payload = { v?: number; text?: string; imagePath?: string; imagePaths?: string[]; videoPath?: string };
 
@@ -27,6 +29,18 @@ function sanitizeFilename(name: string) {
   return name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 120);
 }
 
+function toForwardPayload(body: Payload): ForwardPayload {
+  // forward “tal cual” (sin resubir)
+  const out: ForwardPayload = {};
+  if (body.text) out.text = body.text;
+
+  if (Array.isArray(body.imagePaths) && body.imagePaths.length) out.imagePaths = body.imagePaths.filter(Boolean);
+  else if (body.imagePath) out.imagePath = body.imagePath;
+
+  if (body.videoPath) out.videoPath = body.videoPath;
+  return out;
+}
+
 export default function ChatPage({ params }: { params: { chatId: string } }) {
   const { loading: authLoading } = useRequireAuth();
   const chatId = params.chatId;
@@ -34,9 +48,11 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
   const supabase = browserSupabase();
   const { messages, loading: msgLoading, appendLocal } = useChatRealtime(chatId);
 
+  // members
   const [members, setMembers] = useState<string[]>([]);
   const [membersLoading, setMembersLoading] = useState(true);
 
+  // compose
   const [text, setText] = useState('');
   const [pendingImages, setPendingImages] = useState<File[]>([]);
   const [pendingVideo, setPendingVideo] = useState<File | null>(null);
@@ -48,17 +64,43 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
 
-  // Signed URL cache (path -> url)
+  // signed url cache (path -> url)
   const [signedUrls, setSignedUrls] = useState<Record<string, string>>({});
 
-  // If a video fails to play, we show a small “Open video” link but we DO NOT replace the player
+  // Video play error -> only shows “Abrir video”
   const [videoPlayError, setVideoPlayError] = useState<Record<string, boolean>>({});
+
+  // Forward state
+  const [forwardOpen, setForwardOpen] = useState(false);
+  const [forwardBody, setForwardBody] = useState<ForwardPayload | null>(null);
+  const [chats, setChats] = useState<ChatSummary[]>([]);
+  const [chatsLoading, setChatsLoading] = useState(false);
 
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const videoInputRef = useRef<HTMLInputElement | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
-  // ---------------- Members (no embeds)
+  // Load chats for forward (once)
+  useEffect(() => {
+    let alive = true;
+    async function load() {
+      setChatsLoading(true);
+      try {
+        const list = await listChats();
+        if (!alive) return;
+        // Optional: put current chat first? not needed. We'll keep order.
+        setChats(list);
+      } finally {
+        if (alive) setChatsLoading(false);
+      }
+    }
+    load();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  // Load members (no embeds)
   useEffect(() => {
     let alive = true;
 
@@ -112,7 +154,6 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
     };
   }, [chatId, supabase]);
 
-  // ---------------- Messages
   const items = useMemo(() => {
     return messages.map((m) => ({ ...m, body: parseCipher(m.ciphertext) }));
   }, [messages]);
@@ -132,11 +173,11 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
     return Array.from(new Set(arr));
   }
 
-  // ---------------- Signed URL resolver (for incoming / realtime)
+  // Resolve signed URLs for incoming / realtime
   useEffect(() => {
     let cancelled = false;
 
-    async function resolveMissingSignedUrls() {
+    async function resolveMissing() {
       const allPaths = new Set<string>();
       for (const m of items) for (const p of extractAllPaths(m.body)) allPaths.add(p);
 
@@ -163,13 +204,32 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
       }
     }
 
-    resolveMissingSignedUrls();
+    resolveMissing();
     return () => {
       cancelled = true;
     };
   }, [items, signedUrls]);
 
-  // ---------------- Attach: Images
+  // -------- Forward handlers
+  function openForward(body: Payload) {
+    const payload = toForwardPayload(body);
+    const hasSomething =
+      !!payload.text || !!payload.imagePath || (payload.imagePaths?.length ?? 0) > 0 || !!payload.videoPath;
+
+    if (!hasSomething) return;
+
+    setForwardBody(payload);
+    setForwardOpen(true);
+  }
+
+  async function confirmForward(destChatIds: string[]) {
+    if (!forwardBody) return;
+    // optional: prevent forwarding back to same chat if you want
+    // const filtered = destChatIds.filter((id) => id !== chatId);
+    await forwardMessageToChats(destChatIds, forwardBody);
+  }
+
+  // -------- Attach: Images
   function onPickImages() {
     setErr('');
     imageInputRef.current?.click();
@@ -224,7 +284,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
     e.target.value = '';
   }
 
-  // ---------------- Attach: Video
+  // -------- Attach: Video
   function onPickVideo() {
     setErr('');
     videoInputRef.current?.click();
@@ -277,7 +337,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ---------------- Send
+  // -------- Send
   async function onSend() {
     setErr('');
     const t = text.trim();
@@ -291,13 +351,11 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
       if (pendingVideo) {
         const { path } = await uploadChatMedia({ chatId, file: pendingVideo, kind: 'video' });
 
-        // ✅ Prefetch signed url so it renders immediately (no need to leave/re-enter)
+        // Prefetch signed url for instant render
         try {
           const url = await createSignedChatMediaUrl(path, 300);
           setSignedUrls((prev) => ({ ...prev, [path]: url }));
-        } catch {
-          // ignore; the resolver effect will try again
-        }
+        } catch {}
 
         const payload: { text?: string; videoPath: string } = t ? { text: t, videoPath: path } : { videoPath: path };
 
@@ -308,14 +366,14 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
           ciphertext: JSON.stringify({ v: 1, ...payload }),
           nonce: `local-${crypto.randomUUID()}`,
           message_type: 'whisper',
-          created_at: new Date().toISOString(),
+          created_at: new Date().toISOString()
         };
         appendLocal(temp);
 
         setText('');
         clearPendingVideo();
 
-        await sendMessage(chatId, payload);
+        await sendMessage(chatId, payload as any);
         return;
       }
 
@@ -324,7 +382,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
         const results = await Promise.all(pendingImages.map((file) => uploadChatImage(chatId, file)));
         const paths = results.map((r) => r.path);
 
-        // ✅ Prefetch signed urls
+        // Prefetch signed urls
         try {
           const pairs = await Promise.all(paths.map(async (p) => [p, await createSignedChatMediaUrl(p, 300)] as const));
           setSignedUrls((prev) => {
@@ -332,9 +390,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
             for (const [p, u] of pairs) next[p] = u;
             return next;
           });
-        } catch {
-          // ignore; resolver effect will fill
-        }
+        } catch {}
 
         const payload: { text?: string; imagePaths: string[] } = t
           ? { text: t, imagePaths: paths }
@@ -347,14 +403,14 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
           ciphertext: JSON.stringify({ v: 1, ...payload }),
           nonce: `local-${crypto.randomUUID()}`,
           message_type: 'whisper',
-          created_at: new Date().toISOString(),
+          created_at: new Date().toISOString()
         };
         appendLocal(temp);
 
         setText('');
         clearPendingImages();
 
-        await sendMessage(chatId, payload);
+        await sendMessage(chatId, payload as any);
         return;
       }
 
@@ -366,12 +422,12 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
         ciphertext: JSON.stringify({ v: 1, text: t }),
         nonce: `local-${crypto.randomUUID()}`,
         message_type: 'whisper',
-        created_at: new Date().toISOString(),
+        created_at: new Date().toISOString()
       };
       appendLocal(temp);
 
       setText('');
-      await sendMessage(chatId, { text: t });
+      await sendMessage(chatId, { text: t } as any);
     } catch (e: any) {
       setErr(e?.message ?? String(e));
     } finally {
@@ -383,6 +439,14 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
 
   return (
     <PageShell title="Chat">
+      <ForwardModal
+        open={forwardOpen}
+        chats={chats}
+        loading={chatsLoading}
+        onClose={() => setForwardOpen(false)}
+        onConfirm={confirmForward}
+      />
+
       {loading ? (
         <p className="text-sm text-slate-300">Loading…</p>
       ) : (
@@ -393,10 +457,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
 
           {err ? <p className="text-sm text-red-300">{err}</p> : null}
 
-          <div
-            ref={scrollRef}
-            className="h-[55vh] overflow-auto rounded-xl border border-slate-900 bg-slate-950/40 p-3"
-          >
+          <div ref={scrollRef} className="h-[55vh] overflow-auto rounded-xl border border-slate-900 bg-slate-950/40 p-3">
             {items.length === 0 ? (
               <p className="text-sm text-slate-400">No messages yet.</p>
             ) : (
@@ -409,10 +470,20 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
                   const videoPath = m.body.videoPath;
 
                   return (
-                    <li key={m.id} className="rounded-lg border border-slate-900 bg-slate-950/60 p-2">
+                    <li key={m.id} className="relative rounded-lg border border-slate-900 bg-slate-950/60 p-2">
+                      {/* Forward button */}
+                      <button
+                        type="button"
+                        title="Forward"
+                        className="absolute right-2 top-2 rounded bg-slate-800 px-2 py-1 text-xs hover:bg-slate-700"
+                        onClick={() => openForward(m.body)}
+                      >
+                        ↪
+                      </button>
+
                       <div className="text-xs text-slate-500">{new Date(m.created_at).toLocaleString()}</div>
 
-                      {m.body.text ? <div className="text-sm">{m.body.text}</div> : null}
+                      {m.body.text ? <div className="text-sm pr-10">{m.body.text}</div> : null}
 
                       {/* Images */}
                       {imgPaths.length ? (
@@ -437,7 +508,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
                         </div>
                       ) : null}
 
-                      {/* Video: ALWAYS attempt inline playback */}
+                      {/* Video */}
                       {videoPath ? (
                         <div className="mt-2">
                           {signedUrls[videoPath] ? (
@@ -451,13 +522,8 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
                               />
                               {videoPlayError[videoPath] ? (
                                 <div className="mt-2 text-xs text-slate-400">
-                                  Este video no se pudo reproducir inline en este navegador.{' '}
-                                  <a
-                                    className="text-blue-400 underline"
-                                    href={signedUrls[videoPath]}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                  >
+                                  No se pudo reproducir inline.{' '}
+                                  <a className="text-blue-400 underline" href={signedUrls[videoPath]} target="_blank" rel="noreferrer">
                                     Abrir video
                                   </a>
                                 </div>
@@ -482,12 +548,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
               <div className="grid grid-cols-3 gap-2">
                 {previewImages.map((u) => (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    key={u}
-                    src={u}
-                    alt="preview"
-                    className="h-24 w-full rounded border border-slate-900 object-cover"
-                  />
+                  <img key={u} src={u} alt="preview" className="h-24 w-full rounded border border-slate-900 object-cover" />
                 ))}
               </div>
               <div className="mt-2 flex justify-end">
@@ -529,14 +590,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
             >
               🖼️
             </button>
-            <input
-              ref={imageInputRef}
-              type="file"
-              hidden
-              multiple
-              accept="image/jpeg,image/png,image/webp"
-              onChange={onImagesChange}
-            />
+            <input ref={imageInputRef} type="file" hidden multiple accept="image/jpeg,image/png,image/webp" onChange={onImagesChange} />
 
             <button
               className="rounded bg-slate-800 px-3 py-2 text-sm hover:bg-slate-700"
@@ -559,11 +613,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
               }}
             />
 
-            <button
-              className="rounded bg-blue-600 px-3 py-2 text-sm hover:bg-blue-500 disabled:opacity-60"
-              onClick={onSend}
-              disabled={busy}
-            >
+            <button className="rounded bg-blue-600 px-3 py-2 text-sm hover:bg-blue-500 disabled:opacity-60" onClick={onSend} disabled={busy}>
               Send
             </button>
           </div>
