@@ -144,7 +144,6 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
           return next;
         });
       } catch (e: any) {
-        // If user is not a member, policy will block signed url. Show error once.
         if (!cancelled) setErr(e?.message ?? String(e));
       }
     }
@@ -154,7 +153,6 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
     return () => {
       cancelled = true;
     };
-    // IMPORTANT: depend on items + signedUrls snapshot
   }, [items, signedUrls]);
 
   function onPickFile() {
@@ -201,7 +199,6 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
     setErr('');
     const t = text.trim();
 
-    // allow text-only, image-only, or image+text
     if (!t && !pendingFile) return;
 
     setBusy(true);
@@ -210,14 +207,12 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
       // image flow: upload first -> store only imagePath
       if (pendingFile) {
         const file = pendingFile;
-
         const { path } = await uploadChatImage(chatId, file);
 
         const payload: { text?: string; imagePath: string } = t
           ? { text: t, imagePath: path }
           : { imagePath: path };
 
-        // optimistic append (after upload so we have path)
         const temp: MessageRow = {
           id: `local-${crypto.randomUUID()}`,
           chat_id: chatId,
@@ -299,7 +294,8 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
                               className="max-h-80 w-auto rounded-lg border border-slate-900"
                             />
                           ) : (
-                            <div className="text-xs text-slate-400">Cargando imagen…</div>
+                            // ✅ Skeleton mientras llega la signed URL / descarga
+                            <div className="max-h-80 w-48 animate-pulse rounded-lg border border-slate-900 bg-slate-800" />
                           )}
                         </div>
                       ) : null}
