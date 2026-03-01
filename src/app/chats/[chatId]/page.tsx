@@ -9,13 +9,7 @@ import { useChatRealtime } from '@/lib/realtime/use-chat-realtime';
 import { browserSupabase } from '@/lib/supabase/client';
 import type { MessageRow } from '@/lib/db/types';
 
-type Payload = {
-  v?: number;
-  text?: string;
-  imagePath?: string;
-  imagePaths?: string[];
-  videoPath?: string;
-};
+type Payload = { v?: number; text?: string; imagePath?: string; imagePaths?: string[]; videoPath?: string };
 
 function parseCipher(ciphertext: string): Payload {
   try {
@@ -33,41 +27,6 @@ function sanitizeFilename(name: string) {
   return name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 120);
 }
 
-function extFromPath(path: string) {
-  const m = path.toLowerCase().match(/\.([a-z0-9]+)$/);
-  return m ? m[1] : '';
-}
-
-function guessVideoMimeFromExt(ext: string) {
-  switch (ext) {
-    case 'mp4':
-      return 'video/mp4';
-    case 'webm':
-      return 'video/webm';
-    case 'mov':
-      return 'video/quicktime';
-    case 'ogv':
-      return 'video/ogg';
-    case 'mkv':
-      return 'video/x-matroska';
-    case 'avi':
-      return 'video/x-msvideo';
-    case 'mpeg':
-    case 'mpg':
-      return 'video/mpeg';
-    default:
-      return '';
-  }
-}
-
-function canBrowserPlayVideo(mime: string) {
-  if (!mime) return false;
-  if (typeof document === 'undefined') return false;
-  const v = document.createElement('video');
-  const r = v.canPlayType(mime);
-  return r === 'probably' || r === 'maybe';
-}
-
 export default function ChatPage({ params }: { params: { chatId: string } }) {
   const { loading: authLoading } = useRequireAuth();
   const chatId = params.chatId;
@@ -82,23 +41,24 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
   const [pendingImages, setPendingImages] = useState<File[]>([]);
   const [pendingVideo, setPendingVideo] = useState<File | null>(null);
 
-  // local previews
+  // Local previews
   const [previewImages, setPreviewImages] = useState<string[]>([]);
   const [previewVideo, setPreviewVideo] = useState<string>('');
 
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
 
+  // Signed URL cache (path -> url)
   const [signedUrls, setSignedUrls] = useState<Record<string, string>>({});
 
-  // track video playback failures by path so we can fallback to download
-  const [videoFailed, setVideoFailed] = useState<Record<string, boolean>>({});
+  // If a video fails to play, we show a small “Open video” link but we DO NOT replace the player
+  const [videoPlayError, setVideoPlayError] = useState<Record<string, boolean>>({});
 
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const videoInputRef = useRef<HTMLInputElement | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
-  // Load members (no embeds)
+  // ---------------- Members (no embeds)
   useEffect(() => {
     let alive = true;
 
@@ -152,6 +112,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
     };
   }, [chatId, supabase]);
 
+  // ---------------- Messages
   const items = useMemo(() => {
     return messages.map((m) => ({ ...m, body: parseCipher(m.ciphertext) }));
   }, [messages]);
@@ -171,11 +132,11 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
     return Array.from(new Set(arr));
   }
 
-  // Fetch signed URLs for any paths we haven't resolved yet
+  // ---------------- Signed URL resolver (for incoming / realtime)
   useEffect(() => {
     let cancelled = false;
 
-    async function resolveAll() {
+    async function resolveMissingSignedUrls() {
       const allPaths = new Set<string>();
       for (const m of items) for (const p of extractAllPaths(m.body)) allPaths.add(p);
 
@@ -185,7 +146,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
       try {
         const pairs = await Promise.all(
           missing.map(async (path) => {
-            const url = await createSignedChatMediaUrl(path, 300); // 5 min
+            const url = await createSignedChatMediaUrl(path, 300);
             return [path, url] as const;
           })
         );
@@ -202,14 +163,13 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
       }
     }
 
-    resolveAll();
-
+    resolveMissingSignedUrls();
     return () => {
       cancelled = true;
     };
   }, [items, signedUrls]);
 
-  // -------- Attach: Images --------
+  // ---------------- Attach: Images
   function onPickImages() {
     setErr('');
     imageInputRef.current?.click();
@@ -252,7 +212,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
       }
     }
 
-    // if picking images, clear pending video
+    // MVP: no mezclar con video
     if (pendingVideo) clearPendingVideo();
 
     const normalized = picked.map((f) => new File([f], sanitizeFilename(f.name), { type: f.type }));
@@ -264,7 +224,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
     e.target.value = '';
   }
 
-  // -------- Attach: Video --------
+  // ---------------- Attach: Video
   function onPickVideo() {
     setErr('');
     videoInputRef.current?.click();
@@ -296,7 +256,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
       return;
     }
 
-    // if picking video, clear pending images
+    // MVP: no mezclar con imágenes
     if (pendingImages.length) clearPendingImages();
 
     const normalized = new File([file], safeName, { type: file.type });
@@ -317,7 +277,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // -------- Send --------
+  // ---------------- Send
   async function onSend() {
     setErr('');
     const t = text.trim();
@@ -327,8 +287,17 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
     setBusy(true);
 
     try {
+      // VIDEO
       if (pendingVideo) {
         const { path } = await uploadChatMedia({ chatId, file: pendingVideo, kind: 'video' });
+
+        // ✅ Prefetch signed url so it renders immediately (no need to leave/re-enter)
+        try {
+          const url = await createSignedChatMediaUrl(path, 300);
+          setSignedUrls((prev) => ({ ...prev, [path]: url }));
+        } catch {
+          // ignore; the resolver effect will try again
+        }
 
         const payload: { text?: string; videoPath: string } = t ? { text: t, videoPath: path } : { videoPath: path };
 
@@ -350,9 +319,22 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
         return;
       }
 
+      // IMAGES (multi)
       if (pendingImages.length > 0) {
         const results = await Promise.all(pendingImages.map((file) => uploadChatImage(chatId, file)));
         const paths = results.map((r) => r.path);
+
+        // ✅ Prefetch signed urls
+        try {
+          const pairs = await Promise.all(paths.map(async (p) => [p, await createSignedChatMediaUrl(p, 300)] as const));
+          setSignedUrls((prev) => {
+            const next = { ...prev };
+            for (const [p, u] of pairs) next[p] = u;
+            return next;
+          });
+        } catch {
+          // ignore; resolver effect will fill
+        }
 
         const payload: { text?: string; imagePaths: string[] } = t
           ? { text: t, imagePaths: paths }
@@ -376,6 +358,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
         return;
       }
 
+      // TEXT
       const temp: MessageRow = {
         id: `local-${crypto.randomUUID()}`,
         chat_id: chatId,
@@ -390,8 +373,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
       setText('');
       await sendMessage(chatId, { text: t });
     } catch (e: any) {
-      // Prefix so we can distinguish UPLOAD errors from browser playback errors
-      setErr(`UPLOAD: ${e?.message ?? String(e)}`);
+      setErr(e?.message ?? String(e));
     } finally {
       setBusy(false);
     }
@@ -429,6 +411,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
                   return (
                     <li key={m.id} className="rounded-lg border border-slate-900 bg-slate-950/60 p-2">
                       <div className="text-xs text-slate-500">{new Date(m.created_at).toLocaleString()}</div>
+
                       {m.body.text ? <div className="text-sm">{m.body.text}</div> : null}
 
                       {/* Images */}
@@ -454,51 +437,32 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
                         </div>
                       ) : null}
 
-                      {/* Video: play if supported, else download */}
+                      {/* Video: ALWAYS attempt inline playback */}
                       {videoPath ? (
                         <div className="mt-2">
                           {signedUrls[videoPath] ? (
-                            (() => {
-                              const url = signedUrls[videoPath];
-                              const ext = extFromPath(videoPath);
-                              const mimeGuess = guessVideoMimeFromExt(ext);
-                              const playable = canBrowserPlayVideo(mimeGuess);
-                              const failed = !!videoFailed[videoPath];
-
-                              // If browser likely can't play (mov/mkv/avi) OR already failed, show download/open
-                              if (!playable || failed) {
-                                return (
-                                  <div className="rounded-lg border border-slate-900 bg-slate-950/50 p-3">
-                                    <div className="text-sm text-slate-200">🎥 Video adjunto</div>
-                                    <div className="mt-1 text-xs text-slate-400">
-                                      Este navegador no soporta reproducir este formato/codec inline.
-                                    </div>
-                                    <div className="mt-2">
-                                      <a
-                                        className="text-sm text-blue-400 underline"
-                                        href={url}
-                                        target="_blank"
-                                        rel="noreferrer"
-                                      >
-                                        Abrir / Descargar video
-                                      </a>
-                                    </div>
-                                  </div>
-                                );
-                              }
-
-                              return (
-                                <video
-                                  src={url}
-                                  controls
-                                  className="max-h-96 w-full rounded-lg border border-slate-900"
-                                  onError={() => {
-                                    // fallback if codec unsupported even for mp4 container (e.g. HEVC)
-                                    setVideoFailed((prev) => ({ ...prev, [videoPath]: true }));
-                                  }}
-                                />
-                              );
-                            })()
+                            <>
+                              <video
+                                src={signedUrls[videoPath]}
+                                controls
+                                className="max-h-96 w-full rounded-lg border border-slate-900"
+                                onError={() => setVideoPlayError((prev) => ({ ...prev, [videoPath]: true }))}
+                                onCanPlay={() => setVideoPlayError((prev) => ({ ...prev, [videoPath]: false }))}
+                              />
+                              {videoPlayError[videoPath] ? (
+                                <div className="mt-2 text-xs text-slate-400">
+                                  Este video no se pudo reproducir inline en este navegador.{' '}
+                                  <a
+                                    className="text-blue-400 underline"
+                                    href={signedUrls[videoPath]}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                  >
+                                    Abrir video
+                                  </a>
+                                </div>
+                              ) : null}
+                            </>
                           ) : (
                             <div className="h-40 w-full animate-pulse rounded-lg border border-slate-900 bg-slate-800" />
                           )}
@@ -511,14 +475,19 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
             )}
           </div>
 
-          {/* PREVIEW before send */}
+          {/* Preview images */}
           {previewImages.length ? (
             <div className="rounded border border-slate-900 bg-slate-950/40 p-2">
               <div className="mb-2 text-xs text-slate-400">Preview imágenes:</div>
               <div className="grid grid-cols-3 gap-2">
                 {previewImages.map((u) => (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img key={u} src={u} alt="preview" className="h-24 w-full rounded border border-slate-900 object-cover" />
+                  <img
+                    key={u}
+                    src={u}
+                    alt="preview"
+                    className="h-24 w-full rounded border border-slate-900 object-cover"
+                  />
                 ))}
               </div>
               <div className="mt-2 flex justify-end">
@@ -533,6 +502,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
             </div>
           ) : null}
 
+          {/* Preview video */}
           {previewVideo ? (
             <div className="rounded border border-slate-900 bg-slate-950/40 p-2">
               <div className="mb-2 text-xs text-slate-400">Preview video:</div>
