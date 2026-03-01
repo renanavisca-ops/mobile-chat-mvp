@@ -8,16 +8,12 @@ import { useChatRealtime } from '@/lib/realtime/use-chat-realtime';
 import { browserSupabase } from '@/lib/supabase/client';
 import type { MessageRow } from '@/lib/db/types';
 
-function parseCipher(ciphertext: string): { text?: string; imageUrl?: string; imagePath?: string } {
+function parseCipher(ciphertext: string): any {
   try {
-    const obj = JSON.parse(ciphertext);
-    if (obj && typeof obj === 'object') return obj;
-  } catch {}
-  return {};
-}
-
-function shortId(id: string) {
-  return id.length > 10 ? `${id.slice(0, 6)}…${id.slice(-4)}` : id;
+    return JSON.parse(ciphertext);
+  } catch {
+    return {};
+  }
 }
 
 export default function ChatPage({ params }: { params: { chatId: string } }) {
@@ -27,75 +23,12 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
 
   const { messages, loading: msgLoading, appendLocal } = useChatRealtime(chatId);
 
-  const [members, setMembers] = useState<string[]>([]);
-  const [membersLoading, setMembersLoading] = useState(true);
-
   const [text, setText] = useState('');
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
 
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
-
-  // ✅ Cargar miembros SIN embeds (porque puede no existir FK usable para profiles)
-  useEffect(() => {
-    let alive = true;
-
-    async function loadMembers() {
-      setMembersLoading(true);
-
-      // 1) sacar user_ids del chat
-      const { data: cms, error: cmErr } = await supabase
-        .from('chat_members')
-        .select('user_id')
-        .eq('chat_id', chatId);
-
-      if (!alive) return;
-
-      if (cmErr) {
-        setErr(cmErr.message);
-        setMembersLoading(false);
-        return;
-      }
-
-      const userIds = (cms ?? []).map((r: any) => r.user_id).filter(Boolean);
-
-      if (userIds.length === 0) {
-        setMembers([]);
-        setMembersLoading(false);
-        return;
-      }
-
-      // 2) buscar usernames por id
-      const { data: profs, error: pErr } = await supabase
-        .from('profiles')
-        .select('id, username')
-        .in('id', userIds);
-
-      if (!alive) return;
-
-      if (pErr) {
-        setErr(pErr.message);
-        setMembersLoading(false);
-        return;
-      }
-
-      const byId = new Map<string, string>();
-      for (const p of profs ?? []) {
-        byId.set((p as any).id, (p as any).username ?? '');
-      }
-
-      // mantener el orden original, fallback a id corto si no hay username
-      const names = userIds.map((id: string) => byId.get(id) || shortId(id));
-      setMembers(names);
-      setMembersLoading(false);
-    }
-
-    loadMembers();
-
-    return () => {
-      alive = false;
-    };
-  }, [chatId]);
 
   const items = useMemo(() => {
     return messages.map((m) => ({ ...m, body: parseCipher(m.ciphertext) }));
@@ -108,23 +41,10 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
   }, [items.length]);
 
   async function onSend() {
-    setErr('');
     const t = text.trim();
     if (!t) return;
 
     setBusy(true);
-
-    const temp: MessageRow = {
-      id: `local-${crypto.randomUUID()}`,
-      chat_id: chatId,
-      sender_device_id: 'local',
-      ciphertext: JSON.stringify({ v: 1, text: t }),
-      nonce: `local-${crypto.randomUUID()}`,
-      message_type: 'whisper',
-      created_at: new Date().toISOString(),
-    };
-
-    appendLocal(temp);
     setText('');
 
     try {
@@ -136,42 +56,74 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
     }
   }
 
+  function onPickFile() {
+    fileInputRef.current?.click();
+  }
+
+  async function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // 🔒 Validaciones
+    const allowed = ['image/jpeg', 'image/png', 'image/webp'];
+    const maxSize = 5 * 1024 * 1024; // 5MB
+
+    if (!allowed.includes(file.type)) {
+      setErr('Only JPG, PNG, WEBP allowed');
+      return;
+    }
+
+    if (file.size > maxSize) {
+      setErr('Max size 5MB');
+      return;
+    }
+
+    // Por ahora solo mostramos que pasó validación
+    alert(`Image valid: ${file.name}`);
+
+    // reset input
+    e.target.value = '';
+  }
+
   const loading = authLoading || msgLoading;
 
   return (
     <PageShell title="Chat">
       {loading ? (
-        <p className="text-sm text-slate-300">Loading…</p>
+        <p>Loading…</p>
       ) : (
         <div className="flex flex-col gap-3">
-          <div className="text-xs text-slate-400">
-            Members:{' '}
-            {membersLoading ? 'Loading…' : members.length ? members.join(', ') : '—'}
-          </div>
-
-          {err ? <p className="text-sm text-red-300">{err}</p> : null}
+          {err && <p className="text-sm text-red-400">{err}</p>}
 
           <div
             ref={scrollRef}
             className="h-[55vh] overflow-auto rounded-xl border border-slate-900 bg-slate-950/40 p-3"
           >
-            {items.length === 0 ? (
-              <p className="text-sm text-slate-400">No messages yet.</p>
-            ) : (
-              <ul className="space-y-2">
-                {items.map((m) => (
-                  <li key={m.id} className="rounded-lg border border-slate-900 bg-slate-950/60 p-2">
-                    <div className="text-xs text-slate-500">
-                      {new Date(m.created_at).toLocaleString()}
-                    </div>
-                    {m.body.text ? <div className="text-sm">{m.body.text}</div> : null}
-                  </li>
-                ))}
-              </ul>
-            )}
+            {items.map((m) => (
+              <div key={m.id} className="mb-2 text-sm">
+                {m.body.text}
+              </div>
+            ))}
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-center">
+            {/* 📎 */}
+            <button
+              className="text-xl px-2"
+              onClick={onPickFile}
+              type="button"
+            >
+              📎
+            </button>
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              hidden
+              accept="image/jpeg,image/png,image/webp"
+              onChange={onFileChange}
+            />
+
             <input
               className="flex-1 rounded border border-slate-800 bg-slate-950 px-3 py-2 text-slate-100"
               value={text}
@@ -181,8 +133,9 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
                 if (e.key === 'Enter') onSend();
               }}
             />
+
             <button
-              className="rounded bg-blue-600 px-3 py-2 text-sm hover:bg-blue-500 disabled:opacity-60"
+              className="rounded bg-blue-600 px-3 py-2 text-sm"
               onClick={onSend}
               disabled={busy}
             >
