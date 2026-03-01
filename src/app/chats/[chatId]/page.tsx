@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { PageShell } from '@/components/page-shell';
 import { ForwardModal } from '@/components/forward-modal';
+import { MessageActionsSheet } from '@/components/message-actions-sheet';
 import { useRequireAuth } from '@/lib/auth/use-require-auth';
 import { listChats, sendMessage } from '@/lib/db/chats';
 import { forwardMessageToChats, type ForwardPayload } from '@/lib/db/forward';
@@ -30,7 +31,6 @@ function sanitizeFilename(name: string) {
 }
 
 function toForwardPayload(body: Payload): ForwardPayload {
-  // forward “tal cual” (sin resubir)
   const out: ForwardPayload = {};
   if (body.text) out.text = body.text;
 
@@ -64,7 +64,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
 
-  // signed url cache (path -> url)
+  // Signed URL cache (path -> url)
   const [signedUrls, setSignedUrls] = useState<Record<string, string>>({});
 
   // Video play error -> only shows “Abrir video”
@@ -75,6 +75,10 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
   const [forwardBody, setForwardBody] = useState<ForwardPayload | null>(null);
   const [chats, setChats] = useState<ChatSummary[]>([]);
   const [chatsLoading, setChatsLoading] = useState(false);
+
+  // Message Actions Sheet state
+  const [actionsOpen, setActionsOpen] = useState(false);
+  const [actionsMsg, setActionsMsg] = useState<{ id: string; body: Payload } | null>(null);
 
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const videoInputRef = useRef<HTMLInputElement | null>(null);
@@ -88,7 +92,6 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
       try {
         const list = await listChats();
         if (!alive) return;
-        // Optional: put current chat first? not needed. We'll keep order.
         setChats(list);
       } finally {
         if (alive) setChatsLoading(false);
@@ -210,23 +213,35 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
     };
   }, [items, signedUrls]);
 
-  // -------- Forward handlers
-  function openForward(body: Payload) {
-    const payload = toForwardPayload(body);
-    const hasSomething =
-      !!payload.text || !!payload.imagePath || (payload.imagePaths?.length ?? 0) > 0 || !!payload.videoPath;
-
-    if (!hasSomething) return;
-
-    setForwardBody(payload);
-    setForwardOpen(true);
-  }
-
+  // -------- Forward
   async function confirmForward(destChatIds: string[]) {
     if (!forwardBody) return;
-    // optional: prevent forwarding back to same chat if you want
-    // const filtered = destChatIds.filter((id) => id !== chatId);
     await forwardMessageToChats(destChatIds, forwardBody);
+  }
+
+  // -------- Actions Sheet
+  function openActions(messageId: string, body: Payload) {
+    setActionsMsg({ id: messageId, body });
+    setActionsOpen(true);
+  }
+
+  async function doCopy(body: Payload) {
+    const text = body.text?.trim();
+    if (text) {
+      await navigator.clipboard.writeText(text);
+      return;
+    }
+    // media: copy path(s) (MVP)
+    const parts: string[] = [];
+    if (body.videoPath) parts.push(body.videoPath);
+    if (body.imagePath) parts.push(body.imagePath);
+    if (body.imagePaths?.length) parts.push(...body.imagePaths);
+    if (parts.length) await navigator.clipboard.writeText(parts.join('\n'));
+  }
+
+  function todo(msg: string) {
+    setErr(msg);
+    setTimeout(() => setErr(''), 2500);
   }
 
   // -------- Attach: Images
@@ -392,9 +407,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
           });
         } catch {}
 
-        const payload: { text?: string; imagePaths: string[] } = t
-          ? { text: t, imagePaths: paths }
-          : { imagePaths: paths };
+        const payload: { text?: string; imagePaths: string[] } = t ? { text: t, imagePaths: paths } : { imagePaths: paths };
 
         const temp: MessageRow = {
           id: `local-${crypto.randomUUID()}`,
@@ -447,6 +460,67 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
         onConfirm={confirmForward}
       />
 
+      <MessageActionsSheet
+        open={actionsOpen}
+        onClose={() => setActionsOpen(false)}
+        title={actionsMsg?.id}
+        actions={[
+          {
+            key: 'reply',
+            label: 'Reply',
+            icon: '↩️',
+            onClick: () => todo('Reply: pendiente (siguiente paso).'),
+          },
+          {
+            key: 'forward',
+            label: 'Forward',
+            icon: '↪️',
+            onClick: () => {
+              if (!actionsMsg) return;
+              setForwardBody(toForwardPayload(actionsMsg.body));
+              setForwardOpen(true);
+            },
+          },
+          {
+            key: 'copy',
+            label: 'Copy',
+            icon: '📄',
+            onClick: async () => {
+              if (!actionsMsg) return;
+              await doCopy(actionsMsg.body);
+              todo('Copiado.');
+            },
+          },
+          {
+            key: 'save',
+            label: 'Save',
+            icon: '💾',
+            onClick: () => todo('Save: pendiente (siguiente paso).'),
+          },
+          {
+            key: 'delete',
+            label: 'Delete',
+            icon: '🗑️',
+            tone: 'danger',
+            onClick: () => todo('Delete: pendiente (siguiente paso).'),
+          },
+        ]}
+        moreActions={[
+          {
+            key: 'pin',
+            label: 'Pin',
+            icon: '📌',
+            onClick: () => todo('Pin: pendiente (siguiente paso).'),
+          },
+          {
+            key: 'report',
+            label: 'Report',
+            icon: '🚩',
+            onClick: () => todo('Report: pendiente (siguiente paso).'),
+          },
+        ]}
+      />
+
       {loading ? (
         <p className="text-sm text-slate-300">Loading…</p>
       ) : (
@@ -471,14 +545,14 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
 
                   return (
                     <li key={m.id} className="relative rounded-lg border border-slate-900 bg-slate-950/60 p-2">
-                      {/* Forward button */}
+                      {/* Actions button */}
                       <button
                         type="button"
-                        title="Forward"
+                        title="Actions"
                         className="absolute right-2 top-2 rounded bg-slate-800 px-2 py-1 text-xs hover:bg-slate-700"
-                        onClick={() => openForward(m.body)}
+                        onClick={() => openActions(m.id, m.body)}
                       >
-                        ↪
+                        ⋯
                       </button>
 
                       <div className="text-xs text-slate-500">{new Date(m.created_at).toLocaleString()}</div>
@@ -499,10 +573,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
                                 className="max-h-80 w-auto rounded-lg border border-slate-900"
                               />
                             ) : (
-                              <div
-                                key={path}
-                                className="h-28 w-full animate-pulse rounded-lg border border-slate-900 bg-slate-800"
-                              />
+                              <div key={path} className="h-28 w-full animate-pulse rounded-lg border border-slate-900 bg-slate-800" />
                             );
                           })}
                         </div>
@@ -552,11 +623,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
                 ))}
               </div>
               <div className="mt-2 flex justify-end">
-                <button
-                  className="rounded bg-slate-800 px-3 py-1.5 text-xs hover:bg-slate-700"
-                  onClick={clearPendingImages}
-                  disabled={busy}
-                >
+                <button className="rounded bg-slate-800 px-3 py-1.5 text-xs hover:bg-slate-700" onClick={clearPendingImages} disabled={busy}>
                   Remove all
                 </button>
               </div>
@@ -569,11 +636,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
               <div className="mb-2 text-xs text-slate-400">Preview video:</div>
               <video src={previewVideo} controls className="max-h-72 w-full rounded border border-slate-900" />
               <div className="mt-2 flex justify-end">
-                <button
-                  className="rounded bg-slate-800 px-3 py-1.5 text-xs hover:bg-slate-700"
-                  onClick={clearPendingVideo}
-                  disabled={busy}
-                >
+                <button className="rounded bg-slate-800 px-3 py-1.5 text-xs hover:bg-slate-700" onClick={clearPendingVideo} disabled={busy}>
                   Remove
                 </button>
               </div>
