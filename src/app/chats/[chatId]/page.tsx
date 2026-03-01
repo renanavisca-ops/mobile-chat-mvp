@@ -24,9 +24,7 @@ function shortId(id: string) {
 }
 
 function sanitizeFilename(name: string) {
-  // keep it simple: letters, numbers, dot, dash, underscore
   const cleaned = name.replace(/[^a-zA-Z0-9._-]/g, '_');
-  // avoid absurd lengths
   return cleaned.slice(0, 120);
 }
 
@@ -37,11 +35,9 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
 
   const { messages, loading: msgLoading, appendLocal } = useChatRealtime(chatId);
 
-  // members
   const [members, setMembers] = useState<string[]>([]);
   const [membersLoading, setMembersLoading] = useState(true);
 
-  // compose
   const [text, setText] = useState('');
   const [pendingFile, setPendingFile] = useState<File | null>(null);
 
@@ -51,7 +47,6 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
-  // Load members (no embeds)
   useEffect(() => {
     let alive = true;
 
@@ -134,9 +129,8 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // limits
     const allowed = new Set(['image/jpeg', 'image/png', 'image/webp']);
-    const maxSize = 5 * 1024 * 1024; // 5MB
+    const maxSize = 5 * 1024 * 1024;
 
     if (!allowed.has(file.type)) {
       setErr('Solo JPG, PNG o WEBP.');
@@ -150,7 +144,6 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
       return;
     }
 
-    // filename guardrails (we'll use sanitized name later for storage)
     const safeName = sanitizeFilename(file.name);
     if (!safeName || safeName.length < 3) {
       setErr('Nombre de archivo inválido.');
@@ -165,7 +158,6 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
     setErr('');
     const t = text.trim();
 
-    // Allow: text-only, image-only, or image + text (caption).
     if (!t && !pendingFile) return;
 
     setBusy(true);
@@ -174,11 +166,14 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
       // IMAGE flow: upload first -> then save only imagePath in message payload.
       if (pendingFile) {
         const file = pendingFile;
-        const { path } = await uploadChatImage({ chatId, file });
 
-        const payload: { text?: string; imagePath: string } = t ? { text: t, imagePath: path } : { imagePath: path };
+        // ✅ FIX: your uploadChatImage expects (chatId, file)
+        const { path } = await uploadChatImage(chatId, file);
 
-        // optimistic local append (after upload so we already have path)
+        const payload: { text?: string; imagePath: string } = t
+          ? { text: t, imagePath: path }
+          : { imagePath: path };
+
         const temp: MessageRow = {
           id: `local-${crypto.randomUUID()}`,
           chat_id: chatId,
@@ -197,7 +192,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
         return;
       }
 
-      // TEXT-only flow (keeps existing optimistic UI).
+      // TEXT-only flow
       if (!t) return;
 
       const temp: MessageRow = {
@@ -228,14 +223,12 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
         <p className="text-sm text-slate-300">Loading…</p>
       ) : (
         <div className="flex flex-col gap-3">
-          {/* Members */}
           <div className="text-xs text-slate-400">
             Members: {membersLoading ? 'Loading…' : members.length ? members.join(', ') : '—'}
           </div>
 
           {err ? <p className="text-sm text-red-300">{err}</p> : null}
 
-          {/* Messages */}
           <div
             ref={scrollRef}
             className="h-[55vh] overflow-auto rounded-xl border border-slate-900 bg-slate-950/40 p-3"
@@ -261,7 +254,6 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
             )}
           </div>
 
-          {/* Composer */}
           <div className="flex items-center gap-2">
             <button
               className="rounded bg-slate-800 px-3 py-2 text-sm hover:bg-slate-700"
@@ -299,7 +291,6 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
             </button>
           </div>
 
-          {/* Pending file UI */}
           {pendingFile ? (
             <div className="flex items-center justify-between rounded border border-slate-900 bg-slate-950/40 p-2 text-sm">
               <div className="text-slate-200">
