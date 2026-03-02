@@ -5,6 +5,7 @@ import { PageShell } from '@/components/page-shell';
 import { ForwardModal } from '@/components/forward-modal';
 import { MessageActionsSheet } from '@/components/message-actions-sheet';
 import { AttachSheet } from '@/components/attach-sheet';
+import { EmojiPicker } from '@/components/emoji-picker';
 import { useRequireAuth } from '@/lib/auth/use-require-auth';
 import { listChats, sendMessage } from '@/lib/db/chats';
 import { forwardMessageToChats, type ForwardPayload } from '@/lib/db/forward';
@@ -84,13 +85,18 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
   // Attach sheet
   const [attachOpen, setAttachOpen] = useState(false);
 
+  // Emoji picker
+  const [emojiOpen, setEmojiOpen] = useState(false);
+
   // Inputs
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const videoInputRef = useRef<HTMLInputElement | null>(null);
   const cameraPhotoRef = useRef<HTMLInputElement | null>(null);
   const cameraVideoRef = useRef<HTMLInputElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const textInputRef = useRef<HTMLInputElement | null>(null);
 
+  const composerRef = useRef<HTMLDivElement | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
   // Long-press support
@@ -268,6 +274,29 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
     setTimeout(() => setErr(''), 2500);
   }
 
+  // -------- Emoji insert at cursor
+  function insertEmoji(emoji: string) {
+    const input = textInputRef.current;
+    if (!input) {
+      setText((prev) => prev + emoji);
+      return;
+    }
+    const start = input.selectionStart ?? text.length;
+    const end = input.selectionEnd ?? text.length;
+
+    const next = text.slice(0, start) + emoji + text.slice(end);
+    setText(next);
+
+    // restore cursor after state commit
+    requestAnimationFrame(() => {
+      input.focus();
+      const pos = start + emoji.length;
+      try {
+        input.setSelectionRange(pos, pos);
+      } catch {}
+    });
+  }
+
   // -------- Pending cleanup
   function clearPendingImages() {
     for (const u of previewImages) URL.revokeObjectURL(u);
@@ -381,7 +410,6 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
 
   // -------- Input change: camera photo
   async function onCameraPhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
-    // camera photo returns an image file
     await onImagesChange(e as any);
   }
 
@@ -545,42 +573,33 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
       <AttachSheet
         open={attachOpen}
         onClose={() => setAttachOpen(false)}
-        onPickPhotos={pickPhotos}
-        onPickVideo={pickVideo}
-        onCameraPhoto={cameraPhoto}
-        onCameraVideo={cameraVideo}
-        onPickFile={pickFile}
+        onPickPhotos={() => {
+          setEmojiOpen(false);
+          pickPhotos();
+        }}
+        onPickVideo={() => {
+          setEmojiOpen(false);
+          pickVideo();
+        }}
+        onCameraPhoto={() => {
+          setEmojiOpen(false);
+          cameraPhoto();
+        }}
+        onCameraVideo={() => {
+          setEmojiOpen(false);
+          cameraVideo();
+        }}
+        onPickFile={() => {
+          setEmojiOpen(false);
+          pickFile();
+        }}
       />
 
       {/* Hidden inputs */}
-      <input
-        ref={imageInputRef}
-        type="file"
-        hidden
-        multiple
-        accept="image/jpeg,image/png,image/webp"
-        onChange={onImagesChange}
-      />
+      <input ref={imageInputRef} type="file" hidden multiple accept="image/jpeg,image/png,image/webp" onChange={onImagesChange} />
       <input ref={videoInputRef} type="file" hidden accept="video/*" onChange={onVideoChange} />
-
-      {/* Camera capture inputs (mobile) */}
-      <input
-        ref={cameraPhotoRef}
-        type="file"
-        hidden
-        accept="image/*"
-        capture="environment"
-        onChange={onCameraPhotoChange}
-      />
-      <input
-        ref={cameraVideoRef}
-        type="file"
-        hidden
-        accept="video/*"
-        capture="environment"
-        onChange={onCameraVideoChange}
-      />
-
+      <input ref={cameraPhotoRef} type="file" hidden accept="image/*" capture="environment" onChange={onCameraPhotoChange} />
+      <input ref={cameraVideoRef} type="file" hidden accept="video/*" capture="environment" onChange={onCameraVideoChange} />
       <input ref={fileInputRef} type="file" hidden />
 
       {loading ? (
@@ -593,10 +612,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
 
           {err ? <p className="text-sm text-red-300">{err}</p> : null}
 
-          <div
-            ref={scrollRef}
-            className="h-[55vh] overflow-auto rounded-xl border border-slate-900 bg-slate-950/40 p-3"
-          >
+          <div ref={scrollRef} className="h-[55vh] overflow-auto rounded-xl border border-slate-900 bg-slate-950/40 p-3">
             {items.length === 0 ? (
               <p className="text-sm text-slate-400">No messages yet.</p>
             ) : (
@@ -631,17 +647,9 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
                             const url = signedUrls[path] || '';
                             return url ? (
                               // eslint-disable-next-line @next/next/no-img-element
-                              <img
-                                key={path}
-                                src={url}
-                                alt="chat image"
-                                className="max-h-80 w-auto rounded-lg border border-slate-900"
-                              />
+                              <img key={path} src={url} alt="chat image" className="max-h-80 w-auto rounded-lg border border-slate-900" />
                             ) : (
-                              <div
-                                key={path}
-                                className="h-28 w-full animate-pulse rounded-lg border border-slate-900 bg-slate-800"
-                              />
+                              <div key={path} className="h-28 w-full animate-pulse rounded-lg border border-slate-900 bg-slate-800" />
                             );
                           })}
                         </div>
@@ -661,12 +669,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
                               {videoPlayError[videoPath] ? (
                                 <div className="mt-2 text-xs text-slate-400">
                                   No se pudo reproducir inline.{' '}
-                                  <a
-                                    className="text-blue-400 underline"
-                                    href={signedUrls[videoPath]}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                  >
+                                  <a className="text-blue-400 underline" href={signedUrls[videoPath]} target="_blank" rel="noreferrer">
                                     Abrir video
                                   </a>
                                 </div>
@@ -691,20 +694,11 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
               <div className="grid grid-cols-3 gap-2">
                 {previewImages.map((u) => (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    key={u}
-                    src={u}
-                    alt="preview"
-                    className="h-24 w-full rounded border border-slate-900 object-cover"
-                  />
+                  <img key={u} src={u} alt="preview" className="h-24 w-full rounded border border-slate-900 object-cover" />
                 ))}
               </div>
               <div className="mt-2 flex justify-end">
-                <button
-                  className="rounded bg-slate-800 px-3 py-1.5 text-xs hover:bg-slate-700"
-                  onClick={clearPendingImages}
-                  disabled={busy}
-                >
+                <button className="rounded bg-slate-800 px-3 py-1.5 text-xs hover:bg-slate-700" onClick={clearPendingImages} disabled={busy}>
                   Remove all
                 </button>
               </div>
@@ -717,22 +711,21 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
               <div className="mb-2 text-xs text-slate-400">Preview video:</div>
               <video src={previewVideo} controls className="max-h-72 w-full rounded border border-slate-900" />
               <div className="mt-2 flex justify-end">
-                <button
-                  className="rounded bg-slate-800 px-3 py-1.5 text-xs hover:bg-slate-700"
-                  onClick={clearPendingVideo}
-                  disabled={busy}
-                >
+                <button className="rounded bg-slate-800 px-3 py-1.5 text-xs hover:bg-slate-700" onClick={clearPendingVideo} disabled={busy}>
                   Remove
                 </button>
               </div>
             </div>
           ) : null}
 
-          <div className="flex items-center gap-2">
+          <div ref={composerRef} className="relative flex items-center gap-2">
             {/* + button */}
             <button
               className="rounded bg-slate-800 px-3 py-2 text-sm hover:bg-slate-700"
-              onClick={() => setAttachOpen(true)}
+              onClick={() => {
+                setEmojiOpen(false);
+                setAttachOpen(true);
+              }}
               type="button"
               title="Attach"
               disabled={busy}
@@ -740,21 +733,44 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
               +
             </button>
 
+            {/* Emoji button */}
+            <div className="relative">
+              <button
+                className="rounded bg-slate-800 px-3 py-2 text-sm hover:bg-slate-700"
+                onClick={() => {
+                  setAttachOpen(false);
+                  setEmojiOpen((v) => !v);
+                }}
+                type="button"
+                title="Emoji"
+                disabled={busy}
+              >
+                😀
+              </button>
+
+              <EmojiPicker
+                open={emojiOpen}
+                onClose={() => setEmojiOpen(false)}
+                onPick={(e) => {
+                  insertEmoji(e);
+                  setEmojiOpen(false);
+                }}
+              />
+            </div>
+
             <input
+              ref={textInputRef}
               className="flex-1 rounded border border-slate-800 bg-slate-950 px-3 py-2 text-slate-100"
               value={text}
               onChange={(e) => setText(e.target.value)}
               placeholder="Type a message…"
+              onFocus={() => setEmojiOpen(false)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') onSend();
               }}
             />
 
-            <button
-              className="rounded bg-blue-600 px-3 py-2 text-sm hover:bg-blue-500 disabled:opacity-60"
-              onClick={onSend}
-              disabled={busy}
-            >
+            <button className="rounded bg-blue-600 px-3 py-2 text-sm hover:bg-blue-500 disabled:opacity-60" onClick={onSend} disabled={busy}>
               Send
             </button>
           </div>
