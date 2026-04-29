@@ -65,12 +65,24 @@ function contentTypeFromExt(ext: string): string | '' {
     case '3g2':
       return 'video/3gpp2';
 
+    // audio
+    case 'mp3':
+      return 'audio/mpeg';
+    case 'wav':
+      return 'audio/wav';
+    case 'ogg':
+      return 'audio/ogg';
+    case 'webm':
+      return 'audio/webm';
+    case 'm4a':
+      return 'audio/mp4';
+
     default:
       return '';
   }
 }
 
-function pickExt(kind: 'image' | 'video', file: File) {
+function pickExt(kind: 'image' | 'video' | 'audio', file: File) {
   const extFromName = getExtFromName(file.name);
   if (extFromName) return extFromName;
 
@@ -82,9 +94,19 @@ function pickExt(kind: 'image' | 'video', file: File) {
     return 'bin';
   }
 
-  if (t === 'video/mp4') return 'mp4';
-  if (t === 'video/webm') return 'webm';
-  if (t === 'video/quicktime') return 'mov';
+  if (kind === 'video') {
+    if (t === 'video/mp4') return 'mp4';
+    if (t === 'video/webm') return 'webm';
+    if (t === 'video/quicktime') return 'mov';
+  }
+
+  if (kind === 'audio') {
+    if (t === 'audio/mpeg') return 'mp3';
+    if (t === 'audio/wav') return 'wav';
+    if (t === 'audio/ogg') return 'ogg';
+    if (t === 'audio/webm') return 'webm';
+  }
+
   return 'bin';
 }
 
@@ -99,26 +121,33 @@ function pickExt(kind: 'image' | 'video', file: File) {
  */
 export async function uploadChatMedia(input: {
   chatId: string;
-  file: File;
-  kind: 'image' | 'video';
+  file: File | Blob;
+  kind: 'image' | 'video' | 'audio';
+  name?: string;
 }): Promise<{ path: string }> {
-  const { chatId, file, kind } = input;
+  const { chatId, file, kind, name } = input;
 
+  const fileName = name || (file instanceof File ? file.name : `audio_${Date.now()}.webm`);
   const mimeRaw = (file.type || '').toLowerCase();
-  const safeName = assertFilenameOk(file.name);
-  const ext = pickExt(kind, file).toLowerCase();
+  const safeName = assertFilenameOk(fileName);
+  const ext = pickExt(kind, file instanceof File ? file : new File([file], fileName, { type: file.type })).toLowerCase();
 
   if (kind === 'image') {
     const okByMime = IMAGE_MIME.has(mimeRaw);
     const okByExt = IMAGE_EXT.has(ext);
     if (!okByMime && !okByExt) throw new Error(`Mime type ${mimeRaw || '(unknown)'} is not supported`);
     if (file.size > MAX_IMAGE_BYTES) throw new Error('Máximo 5MB por imagen.');
-  } else {
+  } else if (kind === 'video') {
     // Video: NO allowlist estricta (codec no se puede validar aquí)
     if (mimeRaw && !mimeRaw.startsWith('video/')) {
       throw new Error(`Mime type ${mimeRaw || '(unknown)'} is not supported`);
     }
     if (file.size > MAX_VIDEO_BYTES) throw new Error('Máximo 200MB por video.');
+  } else if (kind === 'audio') {
+    if (mimeRaw && !mimeRaw.startsWith('audio/') && !mimeRaw.startsWith('video/')) {
+      // webm audio sometimes reported as video/webm in some browsers
+      throw new Error(`Mime type ${mimeRaw || '(unknown)'} is not supported for audio`);
+    }
   }
 
   const ts = Date.now();
@@ -144,6 +173,10 @@ export async function uploadChatMedia(input: {
 
 export async function uploadChatImage(chatId: string, file: File): Promise<{ path: string }> {
   return uploadChatMedia({ chatId, file, kind: 'image' });
+}
+
+export async function uploadChatAudio(chatId: string, file: Blob): Promise<{ path: string }> {
+  return uploadChatMedia({ chatId, file, kind: 'audio', name: `audio_${Date.now()}.webm` });
 }
 
 export async function createSignedChatMediaUrl(path: string, expiresSeconds = 60 * 5): Promise<string> {

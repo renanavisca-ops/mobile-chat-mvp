@@ -1,10 +1,13 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
+
 import { PageShell } from '@/components/page-shell';
 import { useRequireAuth } from '@/lib/auth/use-require-auth';
+import { browserSupabase } from '@/lib/supabase/client';
 import { listChats } from '@/lib/db/chats';
+
 import type { ChatSummary } from '@/lib/db/types';
 
 function fmt(ts: string | null) {
@@ -14,16 +17,91 @@ function fmt(ts: string | null) {
 }
 
 export default function ChatsPage() {
-  const { loading } = useRequireAuth();
+  const { loading, profile, user } = useRequireAuth();
   const [chats, setChats] = useState<ChatSummary[]>([]);
   const [err, setErr] = useState<string>('');
+  const [unreadCount, setUnreadCount] = useState(0);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
-    if (loading) return;
-    listChats()
-      .then(setChats)
-      .catch((e) => setErr(e?.message ?? String(e)));
-  }, [loading]);
+    audioRef.current = new Audio('/notification.mp3');
+  }, []);
+
+  useEffect(() => {
+    // Carga inicial — always attempt, even if session is still loading
+    // (listChats() internally gets user from supabase.auth and returns [] if none)
+    const load = () => {
+      listChats()
+        .then(setChats)
+        .catch((e) => setErr(e?.message ?? String(e)));
+    };
+
+    // If still loading session, try once anyway (may return [])
+    // When loading finishes, this effect re-runs with user/profile populated
+    load();
+
+    // Don't set up realtime channels until we have the user info
+    if (loading || !user || !profile) return;
+
+    // Configuración de Suscripción Realtime con filtrado manual y notificaciones
+    const supabase = browserSupabase();
+
+    const channel = supabase
+      .channel('public:chats')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'chats' },
+        (payload: any) => {
+          const newRow = payload.new;
+          if (!newRow) return;
+
+          // Notificar solo cuando el chat es creado
+          if (payload.eventType !== 'INSERT') return;
+
+          // 1. Lógica para Agente
+          if (profile.role === 'agent') {
+            if (newRow.assigned_to === user.id) {
+              setUnreadCount(prev => prev + 1);
+              audioRef.current?.play().catch(() => {});
+              console.log('Nuevo chat asignado');
+              load();
+            }
+            return;
+          }
+
+          // 2. Lógica para Admin
+          if (profile.role === 'admin') {
+            if (newRow.store_id === profile.store_id) {
+              console.log('Nuevo chat en tienda');
+              load();
+            }
+            return;
+          }
+
+          // 3. Superadmin
+          load();
+        }
+      )
+      .subscribe();
+
+    const messagesChannel = supabase
+      .channel('public:messages')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'messages' },
+        (payload: any) => {
+          load();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      void browserSupabase().removeChannel(channel);
+      void browserSupabase().removeChannel(messagesChannel);
+    };
+  }, [loading, user, profile]);
+
+
 
   return (
     <PageShell title="Chats" right={<Link className="text-sm text-slate-200 hover:text-white" href="/contacts">New chat</Link>}>
@@ -46,11 +124,21 @@ export default function ChatsPage() {
                 <div className="flex items-center justify-between gap-3">
                   <div className="font-medium">
                     {c.kind === 'group' ? c.title ?? 'Group' : 'Direct chat'}
+                    {c.status && (
+                      <span className={`ml-2 rounded px-1.5 py-0.5 text-[10px] uppercase ${
+                        c.status === 'open' ? 'bg-green-900/40 text-green-400' :
+                        c.status === 'in_progress' ? 'bg-blue-900/40 text-blue-400' :
+                        'bg-slate-800 text-slate-400'
+                      }`}>
+                        {c.status}
+                      </span>
+                    )}
                   </div>
+
                   <div className="text-xs text-slate-500">{fmt(c.last_message_at)}</div>
                 </div>
                 <div className="mt-1 truncate text-xs text-slate-400">
-                  {c.last_ciphertext ? '…new message' : 'No messages yet'}
+                  {c.last_ciphertext ? c.last_ciphertext : 'No messages yet'}
                 </div>
               </Link>
             </li>

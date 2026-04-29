@@ -7,21 +7,30 @@ import { MessageActionsSheet } from '@/components/message-actions-sheet';
 import { AttachSheet } from '@/components/attach-sheet';
 import { EmojiPicker } from '@/components/emoji-picker';
 import { useRequireAuth } from '@/lib/auth/use-require-auth';
-import { listChats, sendMessage } from '@/lib/db/chats';
+import { listChats, sendMessage, deleteMessage } from '@/lib/db/chats';
 import { forwardMessageToChats, type ForwardPayload } from '@/lib/db/forward';
-import { uploadChatImage, uploadChatMedia, createSignedChatMediaUrl } from '@/lib/storage/upload';
+import { uploadChatImage, uploadChatMedia, uploadChatAudio, createSignedChatMediaUrl } from '@/lib/storage/upload';
 import { useChatRealtime } from '@/lib/realtime/use-chat-realtime';
 import { browserSupabase } from '@/lib/supabase/client';
 import type { ChatSummary, MessageRow } from '@/lib/db/types';
 
-type Payload = { v?: number; text?: string; imagePath?: string; imagePaths?: string[]; videoPath?: string };
+type Payload = { v?: number; text?: string; imagePath?: string; imagePaths?: string[]; videoPath?: string; audioPath?: string; reply_to?: string; is_deleted?: boolean; };
 
-function parseCipher(ciphertext: string): Payload {
+function parseCipher(ciphertext: string | undefined | null): Payload {
+  if (!ciphertext) return {};
   try {
     const obj = JSON.parse(ciphertext);
     if (obj && typeof obj === 'object') return obj as Payload;
   } catch {}
   return {};
+}
+
+function getMessagePayload(message: MessageRow): Payload {
+  const parsed = parseCipher(message.ciphertext);
+  if (message.content && !parsed.text) {
+    parsed.text = message.content;
+  }
+  return parsed;
 }
 
 function shortId(id: string) {
@@ -40,6 +49,7 @@ function toForwardPayload(body: Payload): ForwardPayload {
   else if (body.imagePath) out.imagePath = body.imagePath;
 
   if (body.videoPath) out.videoPath = body.videoPath;
+  if (body.audioPath) out.audioPath = body.audioPath;
   return out;
 }
 
@@ -48,16 +58,78 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
   const chatId = params.chatId;
 
   const supabase = browserSupabase();
-  const { messages, loading: msgLoading, appendLocal } = useChatRealtime(chatId);
+  const { messages, loading: msgLoading, appendLocal, loadMore, hasMore, loadingMore, typingUsers, setMeTyping } = useChatRealtime(chatId);
+
+  // chat details
+  const [chat, setChat] = useState<ChatSummary | null>(null);
+  const [chatLoading, setChatLoading] = useState(true);
 
   // members
   const [members, setMembers] = useState<string[]>([]);
   const [membersLoading, setMembersLoading] = useState(true);
 
+  // ... (rest of states)
+
+  // Load chat details
+  useEffect(() => {
+    let alive = true;
+    async function loadChat() {
+      setChatLoading(true);
+      const { data, error } = await supabase
+        .from('chats')
+        .select('*, store_id, assigned_to, status')
+        .eq('id', chatId)
+        .single();
+      
+      if (!alive) return;
+      if (error) {
+        setErr(error.message);
+      } else {
+        setChat(data as ChatSummary);
+      }
+      setChatLoading(false);
+    }
+    loadChat();
+    return () => { alive = false; };
+  }, [chatId, supabase]);
+
+  async function updateStatus(newStatus: 'in_progress' | 'closed') {
+    setBusy(true);
+    try {
+      const { data: { session } } = await browserSupabase().auth.getSession();
+      const res = await fetch(`/api/chat/${chatId}/status`, {
+        method: 'PATCH',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token}`
+        },
+        body: JSON.stringify({ status: newStatus })
+      });
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || 'Error al actualizar estado');
+      }
+      
+      setChat(prev => prev ? { ...prev, status: newStatus } : null);
+      toast(`Estado actualizado a ${newStatus}`);
+    } catch (e: any) {
+      setErr(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+
+
   // compose
   const [text, setText] = useState('');
   const [pendingImages, setPendingImages] = useState<File[]>([]);
   const [pendingVideo, setPendingVideo] = useState<File | null>(null);
+
+  const [isRecording, setIsRecording] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const [replyingTo, setReplyingTo] = useState<MessageRow | null>(null);
 
   // Local previews
   const [previewImages, setPreviewImages] = useState<string[]>([]);
@@ -175,20 +247,100 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
     };
   }, [chatId, supabase]);
 
-  const items = useMemo(() => messages.map((m) => ({ ...m, body: parseCipher(m.ciphertext) })), [messages]);
+  const items = useMemo(() => messages.map((m) => ({ ...m, body: getMessagePayload(m) })), [messages]);
 
-  // autoscroll
+  // autoscroll (solo si estamos al final)
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
-    el.scrollTop = el.scrollHeight;
+    if (el.scrollHeight - el.scrollTop - el.clientHeight < 150) {
+      el.scrollTop = el.scrollHeight;
+    }
   }, [items.length]);
+
+  const handleScroll = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    if (el.scrollTop === 0 && hasMore && !loadingMore) {
+      loadMore();
+    }
+  };
+
+  // Typing detection
+  useEffect(() => {
+    const typingTimeout = setTimeout(() => setMeTyping(text.length > 0), 300);
+    return () => clearTimeout(typingTimeout);
+  }, [text, setMeTyping]);
+
+  useEffect(() => {
+    const clearTyping = setTimeout(() => setMeTyping(false), 3000);
+    return () => clearTimeout(clearTyping);
+  }, [text, setMeTyping]);
+
+  // Audio recording
+  async function startRecording() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = recorder;
+      audioChunksRef.current = [];
+
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+      };
+
+      recorder.onstop = async () => {
+        const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        stream.getTracks().forEach(t => t.stop());
+        await sendAudioMessage(blob);
+      };
+
+      recorder.start();
+      setIsRecording(true);
+    } catch (e: any) {
+      setErr('No se pudo acceder al micrófono: ' + e.message);
+    }
+  }
+
+  function stopRecording() {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+    }
+  }
+
+  async function sendAudioMessage(blob: Blob) {
+    setBusy(true);
+    try {
+      const { path } = await uploadChatAudio(chatId, blob);
+      const payload: Payload = { audioPath: path };
+      if (replyingTo) payload.reply_to = replyingTo.id;
+
+      const temp: MessageRow = {
+        id: `local-${crypto.randomUUID()}`,
+        chat_id: chatId,
+        sender_device_id: 'local',
+        ciphertext: JSON.stringify({ v: 1, ...payload }),
+        nonce: `local-${crypto.randomUUID()}`,
+        message_type: 'whisper',
+        created_at: new Date().toISOString(),
+      };
+      appendLocal(temp);
+      setReplyingTo(null);
+      await sendMessage(chatId, payload as any);
+    } catch (e: any) {
+      setErr(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
 
   function extractAllPaths(body: Payload): string[] {
     const arr: string[] = [];
     if (body.imagePath) arr.push(body.imagePath);
     if (Array.isArray(body.imagePaths)) for (const p of body.imagePaths) if (p) arr.push(p);
     if (body.videoPath) arr.push(body.videoPath);
+    if (body.audioPath) arr.push(body.audioPath);
     return Array.from(new Set(arr));
   }
 
@@ -447,7 +599,8 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
           setSignedUrls((prev) => ({ ...prev, [path]: url }));
         } catch {}
 
-        const payload: { text?: string; videoPath: string } = t ? { text: t, videoPath: path } : { videoPath: path };
+        const payload: Payload = t ? { text: t, videoPath: path } : { videoPath: path };
+        if (replyingTo) payload.reply_to = replyingTo.id;
 
         const temp: MessageRow = {
           id: `local-${crypto.randomUUID()}`,
@@ -459,6 +612,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
           created_at: new Date().toISOString(),
         };
         appendLocal(temp);
+        setReplyingTo(null);
 
         setText('');
         clearPendingVideo();
@@ -482,7 +636,8 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
           });
         } catch {}
 
-        const payload: { text?: string; imagePaths: string[] } = t ? { text: t, imagePaths: paths } : { imagePaths: paths };
+        const payload: Payload = t ? { text: t, imagePaths: paths } : { imagePaths: paths };
+        if (replyingTo) payload.reply_to = replyingTo.id;
 
         const temp: MessageRow = {
           id: `local-${crypto.randomUUID()}`,
@@ -503,19 +658,23 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
       }
 
       // TEXT
+      const payload: Payload = { text: t };
+      if (replyingTo) payload.reply_to = replyingTo.id;
+
       const temp: MessageRow = {
         id: `local-${crypto.randomUUID()}`,
         chat_id: chatId,
         sender_device_id: 'local',
-        ciphertext: JSON.stringify({ v: 1, text: t }),
+        ciphertext: JSON.stringify({ v: 1, ...payload }),
         nonce: `local-${crypto.randomUUID()}`,
         message_type: 'whisper',
         created_at: new Date().toISOString(),
       };
       appendLocal(temp);
+      setReplyingTo(null);
 
       setText('');
-      await sendMessage(chatId, { text: t } as any);
+      await sendMessage(chatId, payload as any);
     } catch (e: any) {
       setErr(e?.message ?? String(e));
     } finally {
@@ -540,7 +699,11 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
         onClose={() => setActionsOpen(false)}
         title={actionsMsg?.id}
         actions={[
-          { key: 'reply', label: 'Reply', icon: '↩️', onClick: () => toast('Reply: pendiente (siguiente paso).') },
+          { key: 'reply', label: 'Reply', icon: '↩️', onClick: () => {
+            const found = items.find(m => m.id === actionsMsg?.id);
+            if (found) setReplyingTo(found as any);
+            setActionsOpen(false);
+          }},
           {
             key: 'forward',
             label: 'Forward',
@@ -562,7 +725,18 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
             },
           },
           { key: 'save', label: 'Save', icon: '💾', onClick: () => toast('Save: pendiente (siguiente paso).') },
-          { key: 'delete', label: 'Delete', icon: '🗑️', tone: 'danger', onClick: () => toast('Delete: pendiente (siguiente paso).') },
+          { key: 'delete', label: 'Delete', icon: '🗑️', tone: 'danger', onClick: async () => {
+            if (!actionsMsg) return;
+            setActionsOpen(false);
+            setBusy(true);
+            try {
+              await deleteMessage(actionsMsg.id, chatId);
+            } catch(e:any) {
+              setErr(e.message);
+            } finally {
+              setBusy(false);
+            }
+          } },
         ]}
         moreActions={[
           { key: 'pin', label: 'Pin', icon: '📌', onClick: () => toast('Pin: pendiente (siguiente paso).') },
@@ -606,13 +780,46 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
         <p className="text-sm text-slate-300">Loading…</p>
       ) : (
         <div className="flex flex-col gap-3">
-          <div className="text-xs text-slate-400">
-            Members: {membersLoading ? 'Loading…' : members.length ? members.join(', ') : '—'}
+          <div className="flex items-center justify-between gap-2 text-xs text-slate-400">
+            <div>
+              Members: {membersLoading ? 'Loading…' : members.length ? members.join(', ') : '—'}
+            </div>
+            {chat && (
+              <div className="flex items-center gap-2">
+                <span className={`rounded px-1.5 py-0.5 uppercase ${
+                  chat.status === 'open' ? 'bg-green-900/40 text-green-400' :
+                  chat.status === 'in_progress' ? 'bg-blue-900/40 text-blue-400' :
+                  'bg-slate-800 text-slate-400'
+                }`}>
+                  {chat.status}
+                </span>
+                
+                {chat.status === 'open' && (
+                  <button 
+                    onClick={() => updateStatus('in_progress')}
+                    className="rounded bg-blue-600 px-2 py-1 text-white hover:bg-blue-500"
+                  >
+                    Tomar
+                  </button>
+                )}
+                
+                {chat.status !== 'closed' && (
+                  <button 
+                    onClick={() => updateStatus('closed')}
+                    className="rounded bg-slate-700 px-2 py-1 text-white hover:bg-slate-600"
+                  >
+                    Cerrar
+                  </button>
+                )}
+              </div>
+            )}
           </div>
+
 
           {err ? <p className="text-sm text-red-300">{err}</p> : null}
 
-          <div ref={scrollRef} className="h-[55vh] overflow-auto rounded-xl border border-slate-900 bg-slate-950/40 p-3">
+          <div ref={scrollRef} onScroll={handleScroll} className="h-[55vh] overflow-auto rounded-xl border border-slate-900 bg-slate-950/40 p-3">
+            {loadingMore && <div className="text-center text-xs text-slate-500 my-2">Cargando anteriores...</div>}
             {items.length === 0 ? (
               <p className="text-sm text-slate-400">No messages yet.</p>
             ) : (
@@ -622,24 +829,51 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
                   if (m.body.imagePath) imgPaths.push(m.body.imagePath);
                   if (Array.isArray(m.body.imagePaths)) imgPaths.push(...m.body.imagePaths.filter(Boolean));
                   const videoPath = m.body.videoPath;
+                  const audioPath = m.body.audioPath;
 
                   return (
                     <li
                       key={m.id}
-                      className="rounded-lg border border-slate-900 bg-slate-950/60 p-2"
+                      className={`flex flex-col mb-2 p-2 rounded-lg max-w-[80%] ${
+                        m.sender_type === 'system' ? 'mx-auto bg-slate-800 text-center text-xs text-slate-400 border border-slate-700' :
+                        (m.sender_type === 'agent' || m.sender_device_id === 'local') ? 'ml-auto bg-blue-900/40 border border-blue-800' :
+                        'mr-auto bg-slate-900 border border-slate-800'
+                      }`}
                       onContextMenu={(e) => {
                         e.preventDefault();
-                        openActions(m.id, m.body);
+                        if (!m.body.is_deleted) openActions(m.id, m.body);
                       }}
-                      onPointerDown={() => startLongPress(m.id, m.body)}
+                      onPointerDown={() => {
+                        if (!m.body.is_deleted) startLongPress(m.id, m.body);
+                      }}
                       onPointerUp={clearLongPress}
                       onPointerCancel={clearLongPress}
                       onPointerMove={clearLongPress}
-                      onDoubleClick={() => openActions(m.id, m.body)}
+                      onDoubleClick={() => {
+                        if (!m.body.is_deleted) openActions(m.id, m.body);
+                      }}
                     >
-                      <div className="text-xs text-slate-500">{new Date(m.created_at).toLocaleString()}</div>
+                      <div className="text-[10px] text-slate-500 flex items-center justify-between mb-1">
+                        <span>{new Date(m.created_at).toLocaleString()}</span>
+                        {(m.sender_type === 'agent' || m.sender_device_id === 'local') ? (
+                          <span className={m.read ? 'text-blue-400 ml-2' : 'text-slate-600 ml-2'}>
+                            {m.read ? '✓✓' : '✓'}
+                          </span>
+                        ) : null}
+                      </div>
 
-                      {m.body.text ? <div className="text-sm">{m.body.text}</div> : null}
+                      {m.body.is_deleted ? (
+                        <div className="text-sm text-slate-500 italic mt-1 flex items-center gap-1">
+                          <span>🚫</span> Este mensaje fue eliminado
+                        </div>
+                      ) : (
+                        <>
+                          {m.body.reply_to && (
+                            <div className="mb-1 text-xs border-l-2 border-blue-500 pl-2 text-slate-400 bg-slate-900/50 rounded py-1 pr-2 mt-1">
+                              Respuesta a un mensaje
+                            </div>
+                          )}
+                          {m.body.text ? <div className="text-sm mt-1">{m.body.text}</div> : null}
 
                       {imgPaths.length ? (
                         <div className="mt-2 grid grid-cols-2 gap-2">
@@ -680,6 +914,18 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
                           )}
                         </div>
                       ) : null}
+
+                      {audioPath ? (
+                        <div className="mt-2">
+                          {signedUrls[audioPath] ? (
+                            <audio src={signedUrls[audioPath]} controls className="w-full h-10" />
+                          ) : (
+                            <div className="h-10 w-full animate-pulse rounded-lg border border-slate-900 bg-slate-800" />
+                          )}
+                        </div>
+                      ) : null}
+                    </>
+                  )}
                     </li>
                   );
                 })}
@@ -717,6 +963,23 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
               </div>
             </div>
           ) : null}
+
+          {typingUsers.length > 0 && (
+            <div className="text-xs text-blue-400 animate-pulse ml-2">
+              Alguien está escribiendo...
+            </div>
+          )}
+
+          {replyingTo && (
+            <div className="flex items-center justify-between rounded border border-blue-900 bg-blue-950/40 p-2 text-xs text-blue-200">
+              <div className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap pr-2 border-l-2 border-blue-500 pl-2">
+                Respondiendo a: {parseCipher(replyingTo.ciphertext).text || 'Mensaje multimedia'}
+              </div>
+              <button className="text-slate-400 hover:text-white" onClick={() => setReplyingTo(null)}>
+                ✕
+              </button>
+            </div>
+          )}
 
           <div ref={composerRef} className="relative flex items-center gap-2">
             {/* + button */}
@@ -770,8 +1033,16 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
               }}
             />
 
-            <button className="rounded bg-blue-600 px-3 py-2 text-sm hover:bg-blue-500 disabled:opacity-60" onClick={onSend} disabled={busy}>
+            <button className="rounded bg-blue-600 px-3 py-2 text-sm hover:bg-blue-500 disabled:opacity-60" onClick={onSend} disabled={busy || isRecording}>
               Send
+            </button>
+            <button 
+              className={`rounded px-3 py-2 text-sm disabled:opacity-60 ${isRecording ? 'bg-red-600 animate-pulse text-white' : 'bg-slate-800 hover:bg-slate-700'}`}
+              onClick={isRecording ? stopRecording : startRecording} 
+              disabled={busy}
+              title={isRecording ? 'Parar y enviar' : 'Grabar audio'}
+            >
+              🎤
             </button>
           </div>
         </div>

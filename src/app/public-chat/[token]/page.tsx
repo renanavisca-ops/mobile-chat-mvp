@@ -1,0 +1,280 @@
+'use client';
+
+import { useEffect, useState, useRef, useMemo } from 'react';
+import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
+import { browserSupabase } from '@/lib/supabase/client';
+import { createSignedChatMediaUrl } from '@/lib/storage/upload';
+
+type Payload = { v?: number; text?: string; imagePath?: string; imagePaths?: string[]; videoPath?: string; audioPath?: string; reply_to?: string; is_deleted?: boolean; };
+
+function parseCipher(ciphertext: string | undefined | null): Payload {
+  if (!ciphertext) return {};
+  try {
+    const obj = JSON.parse(ciphertext);
+    if (obj && typeof obj === 'object') return obj as Payload;
+  } catch {}
+  return {};
+}
+
+function getMessagePayload(message: any): Payload {
+  const parsed = parseCipher(message.ciphertext);
+  if (message.content && !parsed.text) {
+    parsed.text = message.content;
+  }
+  return parsed;
+}
+
+export default function PublicChatPage({ params }: { params: { token: string } }) {
+  const token = params.token;
+
+  const [sessionData, setSessionData] = useState<any>(null);
+  const [messages, setMessages] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [text, setText] = useState('');
+  const [busy, setBusy] = useState(false);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const [signedUrls, setSignedUrls] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    let alive = true;
+    async function loadData() {
+      try {
+        const res = await fetch(`/api/public-chat/${token}`);
+        if (!res.ok) {
+          throw new Error('Chat session not found or expired');
+        }
+        const data = await res.json();
+        if (alive) {
+          setSessionData(data.session);
+          setMessages(data.messages || []);
+          setLoading(false);
+        }
+      } catch (e: any) {
+        if (alive) {
+          setError(e.message);
+          setLoading(false);
+        }
+      }
+    }
+    loadData();
+    return () => { alive = false; };
+  }, [token]);
+
+  // Realtime subscription
+  useEffect(() => {
+    if (!sessionData?.chat_id) return;
+    const supabase = browserSupabase();
+    
+    // We subscribe using standard anon key, assuming RLS allows reading if the user has the token or we just rely on channel.
+    // Wait, realtime requires RLS or public access. If RLS blocks it, we won't get messages. 
+    // We can just poll, or use realtime if RLS allows it. Since it's a prototype, we'll try realtime.
+    const channel = supabase.channel(`public:chat:${sessionData.chat_id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'messages', filter: `chat_id=eq.${sessionData.chat_id}` },
+        (payload: RealtimePostgresChangesPayload<any>) => {
+          if (payload.eventType === 'INSERT') {
+            setMessages(prev => {
+              if (prev.some(m => m.id === payload.new.id)) return prev;
+              return [...prev, payload.new];
+            });
+          } else if (payload.eventType === 'UPDATE') {
+            setMessages(prev => prev.map(m => m.id === payload.new.id ? payload.new : m));
+          } else if (payload.eventType === 'DELETE') {
+            setMessages(prev => prev.filter(m => m.id !== payload.old.id));
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [sessionData?.chat_id]);
+
+  const items = useMemo(() => messages.map((m) => ({ ...m, body: getMessagePayload(m) })), [messages]);
+
+  // Autoscroll
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+  }, [items.length]);
+
+  // Signed URLs resolution
+  useEffect(() => {
+    let cancelled = false;
+    async function resolveMissing() {
+      const allPaths = new Set<string>();
+      for (const m of items) {
+        if (m.body.imagePath) allPaths.add(m.body.imagePath);
+        if (m.body.imagePaths) m.body.imagePaths.forEach((p: string) => allPaths.add(p));
+        if (m.body.videoPath) allPaths.add(m.body.videoPath);
+        if (m.body.audioPath) allPaths.add(m.body.audioPath);
+      }
+
+      const missing = Array.from(allPaths).filter((p) => !signedUrls[p]);
+      if (missing.length === 0) return;
+
+      try {
+        const pairs = await Promise.all(
+          missing.map(async (path) => {
+            const url = await createSignedChatMediaUrl(path, 300);
+            return [path, url] as const;
+          })
+        );
+        if (cancelled) return;
+        setSignedUrls((prev) => {
+          const next = { ...prev };
+          for (const [p, u] of pairs) next[p] = u;
+          return next;
+        });
+      } catch (e: any) {
+        console.error(e);
+      }
+    }
+    resolveMissing();
+    return () => { cancelled = true; };
+  }, [items, signedUrls]);
+
+  const onSend = async () => {
+    const t = text.trim();
+    if (!t) return;
+    setBusy(true);
+    try {
+      // Optimistic
+      const tempId = `local-${Date.now()}`;
+      setMessages(prev => [...prev, {
+        id: tempId,
+        chat_id: sessionData.chat_id,
+        content: t,
+        ciphertext: JSON.stringify({ v: 1, text: t }),
+        created_at: new Date().toISOString(),
+        sender_type: 'customer',
+        sender_id: sessionData.customer_id,
+        read: false
+      }]);
+      setText('');
+
+      const res = await fetch(`/api/public-chat/${token}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: t })
+      });
+      if (!res.ok) throw new Error('Error al enviar mensaje');
+    } catch (e: any) {
+      console.error(e);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (loading) {
+    return <div className="min-h-screen flex items-center justify-center bg-gray-50">Cargando chat...</div>;
+  }
+
+  if (error || !sessionData) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="bg-white p-8 rounded-xl shadow-sm border border-red-100 text-center">
+          <h2 className="text-xl font-bold text-red-600 mb-2">Error</h2>
+          <p className="text-gray-600">{error || 'Chat no encontrado'}</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50 flex flex-col max-w-md mx-auto shadow-xl">
+      {/* Header */}
+      <div className="bg-blue-600 text-white p-4 shadow-md flex items-center justify-between z-10">
+        <div>
+          <h1 className="font-bold text-lg">{sessionData.chats?.title || 'Soporte Toky Chat'}</h1>
+          <p className="text-blue-100 text-xs">
+            {sessionData.chats?.status === 'closed' ? 'Chat finalizado' : 'Conectado'}
+          </p>
+        </div>
+        <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
+          <span className="text-xl">🎧</span>
+        </div>
+      </div>
+
+      {/* Messages */}
+      <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50">
+        {items.length === 0 ? (
+          <div className="text-center text-gray-400 mt-10">No hay mensajes aún.</div>
+        ) : (
+          items.map(m => {
+            const isCustomer = m.sender_type === 'customer';
+            const isSystem = m.sender_type === 'system';
+
+            if (isSystem) {
+              return (
+                <div key={m.id} className="text-center">
+                  <span className="inline-block bg-slate-200 text-slate-600 text-xs px-3 py-1 rounded-full">
+                    {m.body.text || 'Notificación del sistema'}
+                  </span>
+                </div>
+              );
+            }
+
+            return (
+              <div key={m.id} className={`flex flex-col ${isCustomer ? 'items-end' : 'items-start'}`}>
+                <div className={`max-w-[85%] rounded-2xl px-4 py-2 shadow-sm ${
+                  isCustomer ? 'bg-blue-600 text-white rounded-br-none' : 'bg-white text-gray-800 border border-gray-100 rounded-bl-none'
+                }`}>
+                  {m.body.text && <div className="text-sm">{m.body.text}</div>}
+                  
+                  {m.body.imagePaths && m.body.imagePaths.map((p: string) => signedUrls[p] && (
+                    <img key={p} src={signedUrls[p]} alt="attachment" className="max-w-full rounded mt-2" />
+                  ))}
+                  {m.body.imagePath && signedUrls[m.body.imagePath] && (
+                    <img src={signedUrls[m.body.imagePath]} alt="attachment" className="max-w-full rounded mt-2" />
+                  )}
+                  {m.body.videoPath && signedUrls[m.body.videoPath] && (
+                    <video src={signedUrls[m.body.videoPath]} controls className="max-w-full rounded mt-2" />
+                  )}
+                  {m.body.audioPath && signedUrls[m.body.audioPath] && (
+                    <audio src={signedUrls[m.body.audioPath]} controls className="max-w-full mt-2" />
+                  )}
+
+                  <div className={`text-[10px] mt-1 text-right ${isCustomer ? 'text-blue-200' : 'text-gray-400'}`}>
+                    {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </div>
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      {/* Input */}
+      {sessionData.chats?.status !== 'closed' ? (
+        <div className="bg-white p-3 border-t border-gray-100 flex items-center gap-2 pb-safe">
+          <input
+            className="flex-1 bg-gray-100 border-transparent focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-200 rounded-full px-4 py-2.5 text-sm transition-all"
+            placeholder="Escribe un mensaje..."
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && onSend()}
+            disabled={busy}
+          />
+          <button
+            onClick={onSend}
+            disabled={busy || !text.trim()}
+            className="w-10 h-10 bg-blue-600 text-white rounded-full flex items-center justify-center shadow-md hover:bg-blue-700 disabled:opacity-50 transition-colors"
+          >
+            <svg className="w-5 h-5 ml-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+            </svg>
+          </button>
+        </div>
+      ) : (
+        <div className="bg-gray-100 p-4 text-center text-sm text-gray-500 pb-safe">
+          Este chat ha sido cerrado.
+        </div>
+      )}
+    </div>
+  );
+}

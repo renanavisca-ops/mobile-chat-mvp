@@ -10,7 +10,7 @@ if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
   throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY")
 }
 
-export const supabaseAdmin = createClient(
+export const supabaseAdmin: any = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY,
   {

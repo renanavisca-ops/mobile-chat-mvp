@@ -28,9 +28,20 @@ export default function OnboardingPage() {
     try {
       const supabase = browserSupabase();
 
-      const { data: userData, error: userErr } = await supabase.auth.getUser();
-      if (userErr) throw userErr;
-      if (!userData.user) throw new Error('No estás autenticado. Ve a /login.');
+      let userId: string;
+      try {
+        const { data: userData, error: userErr } = await supabase.auth.getUser();
+        if (userErr || !userData.user) {
+          setStatus('❌ No estás autenticado. Ve a /login primero.');
+          setBusy(false);
+          return;
+        }
+        userId = userData.user.id;
+      } catch {
+        setStatus('❌ Error al verificar sesión. Intenta recargar la página.');
+        setBusy(false);
+        return;
+      }
 
       const bundle = await createLocalDeviceBundle();
       window.localStorage.setItem('device_bundle', JSON.stringify(bundle));
@@ -40,8 +51,8 @@ export default function OnboardingPage() {
 
       setStatus('Guardando perfil…');
       const { error: profErr } = await supabase.from('profiles').upsert(
-        { id: userData.user.id, username: uname || null },
-        { onConflict: 'id' }
+        { id: userId, username: uname || null, role: 'agent' },
+        { onConflict: 'id', ignoreDuplicates: false }
       );
       if (profErr) throw profErr;
 
@@ -51,7 +62,7 @@ export default function OnboardingPage() {
       const { data: deviceRow, error: devErr } = await supabase
         .from('devices')
         .insert({
-          user_id: userData.user.id,
+          user_id: userId,
           device_label: deviceLabel,
           registration_id: bundle.registrationId,
           identity_public_key: bundle.identityKey,

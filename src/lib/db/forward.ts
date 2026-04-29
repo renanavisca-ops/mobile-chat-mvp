@@ -7,6 +7,7 @@ export type ForwardPayload = {
   imagePath?: string;
   imagePaths?: string[];
   videoPath?: string;
+  audioPath?: string;
 };
 
 export async function forwardMessageToChats(chatIds: string[], payload: ForwardPayload) {
