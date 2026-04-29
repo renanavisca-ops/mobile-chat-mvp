@@ -28,7 +28,15 @@ export default function LoginPage() {
 
     try {
       const supabase = browserSupabase();
-      const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase());
+      const { error } = await supabase.auth.resetPasswordForEmail(
+  email.trim().toLowerCase(),
+  {
+    redirectTo:
+      typeof window !== 'undefined'
+        ? `${window.location.origin}/reset-password`
+        : undefined,
+  }
+);
 
       if (error) throw error;
 
