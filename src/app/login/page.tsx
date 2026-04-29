@@ -52,8 +52,11 @@ export default function LoginPage() {
       
       if (mode === 'signup') {
         if (password.length < 6) throw new Error('Password mínimo 6 caracteres.');
+
         const emailRedirectTo =
-          typeof window !== 'undefined' ? `${window.location.origin}/login` : undefined;
+          typeof window !== 'undefined'
+            ? `${window.location.origin}/auth/callback`
+            : undefined;
 
         const { data, error } = await supabase.auth.signUp({
           email: e,
