@@ -24,11 +24,11 @@ async function loadOrCreateProfile(userId: string): Promise<ProfileRow | null> {
     console.warn('Profile not found, auto-creating for user:', userId);
 
     const { data: created, error: createErr } = await supabase
-      .from('profiles')
-      .upsert(
-        { id: userId, username: null, role: 'agent' },
-        { onConflict: 'id' }
-      )
+  .from('profiles')
+  .upsert(
+    [{ id: userId, username: null, role: 'agent' }] as any,
+    { onConflict: 'id' }
+  )
       .select('*')
       .single();
 
