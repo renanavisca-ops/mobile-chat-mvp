@@ -63,6 +63,9 @@ export function useSession() {
     const load = async () => {
       try {
         const { data, error } = await supabase.auth.getSession();
+
+        console.log('RAW SESSION:', data.session); // 👈 ESTE ES EL DEBUG
+
         if (error) {
           console.error('getSession error:', error);
           setUser(null);
@@ -92,6 +95,8 @@ export function useSession() {
 
     const { data: sub } = supabase.auth.onAuthStateChange(
       async (_evt: AuthChangeEvent, session: Session | null) => {
+        console.log('AUTH CHANGE SESSION:', session); // 👈 EXTRA DEBUG
+
         const currentUser = session?.user ?? null;
         setUser(currentUser);
 
