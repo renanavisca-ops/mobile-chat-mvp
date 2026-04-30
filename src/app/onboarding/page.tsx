@@ -50,10 +50,12 @@ export default function OnboardingPage() {
       if (uname) window.localStorage.setItem('username', uname);
 
       setStatus('Guardando perfil…');
-      const { error: profErr } = await supabase.from('profiles').upsert(
-        { id: userId, username: uname || null, role: 'agent' },
-        { onConflict: 'id', ignoreDuplicates: false }
-      );
+     const { error: profErr } = await supabase
+  .from('profiles')
+  .upsert(
+    [{ id: userId, username: uname || null, role: 'agent' }] as any,
+    { onConflict: 'id', ignoreDuplicates: false }
+  );
       if (profErr) throw profErr;
 
       setStatus('Registrando device…');
