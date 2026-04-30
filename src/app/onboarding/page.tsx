@@ -75,9 +75,9 @@ export default function OnboardingPage() {
 
       if (devErr) throw devErr;
 
-      window.localStorage.setItem('active_device_id', deviceRow.id);
+      window.localStorage.setItem('active_device_id', (deviceRow as any)?.id);
 
-      setStatus(`✅ Listo. Device registrado: ${deviceRow.id}`);
+      setStatus(`✅ Listo. Device registrado: ${(deviceRow as any)?.id}`);
     } catch (e: any) {
       setStatus(`❌ Error: ${e?.message ?? String(e)}`);
     } finally {
