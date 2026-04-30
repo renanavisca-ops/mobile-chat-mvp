@@ -63,15 +63,13 @@ export default function OnboardingPage() {
 
       const { data: deviceRow, error: devErr } = await supabase
         .from('devices')
-        .insert({
-          user_id: userId,
-          device_label: deviceLabel,
-          registration_id: bundle.registrationId,
-          identity_public_key: bundle.identityKey,
-          signed_prekey_id: bundle.signedPreKeyId,
-          signed_prekey_public: 'mvp',
-          signed_prekey_signature: 'mvp'
-        })
+        .insert([
+  {
+    user_id: userId,
+    device_label: deviceLabel,
+    registration_id: bundle.registrationId,
+  }
+] as any)
         .select('id')
         .single();
 
