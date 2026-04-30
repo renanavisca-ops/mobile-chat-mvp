@@ -25,9 +25,9 @@ export async function listChats(): Promise<ChatSummary[]> {
 
 
   // 3. Aplicar filtros según rol
-  if (profile.role === 'agent') {
+  if ((profile as any)?.role === 'agent') {
     query = query.eq('assigned_to', user.id);
-  } else if (profile.role === 'admin') {
+  } else if ((profile as any)?.role === 'admin') {
     query = query.eq('store_id', profile.store_id);
   } else if (profile.role === 'superadmin') {
     // No filtramos nada
