@@ -101,9 +101,9 @@ export async function createDirectChatWith(userId: string): Promise<string> {
   const { data: me } = await supabase.auth.getUser();
   if (!me.user) throw new Error('Not authenticated');
 
-  const { data, error } = await supabase.rpc('create_direct_chat', {
-    other_user: userId,
-  });
+  const { data, error } = await (supabase as any).rpc('create_direct_chat', {
+  other_user: userId,
+});
 
   if (error) throw error;
 
