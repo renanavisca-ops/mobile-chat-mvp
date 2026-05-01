@@ -6,7 +6,6 @@ import type { ChatSummary, MessageRow } from '@/lib/db/types';
 export async function listChats(): Promise<ChatSummary[]> {
   const supabase = browserSupabase();
 
-  // 1. Obtener usuario y perfil
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return [];
 
@@ -18,23 +17,19 @@ export async function listChats(): Promise<ChatSummary[]> {
 
   if (!profile) return [];
 
-  // 2. Construir query base
   let query = supabase
     .from('chats')
     .select('id, kind, title, created_at, store_id, assigned_to, status');
 
-
-  // 3. Aplicar filtros según rol
   if ((profile as any)?.role === 'agent') {
     query = query.eq('assigned_to', user.id);
   } else if ((profile as any)?.role === 'admin') {
     query = query.eq('store_id', (profile as any)?.store_id);
   } else if ((profile as any)?.role === 'superadmin') {
-    // No filtramos nada
+    // sin filtro
   }
 
   const { data: chats, error } = await query.order('created_at', { ascending: false });
-
   if (error) throw error;
 
   const chatList = (chats ?? []) as Array<Pick<ChatSummary, 'id' | 'kind' | 'title' | 'created_at'>>;
@@ -52,21 +47,24 @@ export async function listChats(): Promise<ChatSummary[]> {
   if (msgErr) throw msgErr;
 
   const latestByChat = new Map<string, { created_at: string; content: string | null }>();
+
   for (const m of lastMsgs ?? []) {
     if (!latestByChat.has(m.chat_id)) {
       let preview = m.content || '';
+
       if (!preview && m.ciphertext) {
-         try {
-           const parsed = JSON.parse(m.ciphertext);
-           if (parsed.text) preview = parsed.text;
-           else if (parsed.imagePath || (parsed.imagePaths && parsed.imagePaths.length > 0)) preview = '📷 Imagen';
-           else if (parsed.videoPath) preview = '📹 Video';
-           else if (parsed.audioPath) preview = '🎵 Audio';
-           else if (parsed.is_deleted) preview = '🚫 Mensaje eliminado';
-         } catch {}
+        try {
+          const parsed = JSON.parse(m.ciphertext);
+          if (parsed.text) preview = parsed.text;
+          else if (parsed.imagePath || (parsed.imagePaths?.length > 0)) preview = '📷 Imagen';
+          else if (parsed.videoPath) preview = '📹 Video';
+          else if (parsed.audioPath) preview = '🎵 Audio';
+          else if (parsed.is_deleted) preview = '🚫 Mensaje eliminado';
+        } catch {}
       }
-      latestByChat.set(m.chat_id, { 
-        created_at: m.created_at, 
+
+      latestByChat.set(m.chat_id, {
+        created_at: m.created_at,
         content: preview || null
       });
     }
@@ -78,8 +76,6 @@ export async function listChats(): Promise<ChatSummary[]> {
     last_ciphertext: latestByChat.get(c.id)?.content ?? null
   }));
 }
-
-
 
 export async function createDirectChatWith(userId: string): Promise<string> {
   const supabase = browserSupabase();
@@ -103,7 +99,6 @@ export async function createGroupChat(title: string, memberIds: string[]): Promi
   });
 
   if (error) throw error;
-
   return data as string;
 }
 
@@ -121,16 +116,6 @@ export async function listMessages(chatId: string, limit = 50, offset = 0): Prom
   return (data ?? []).reverse() as MessageRow[];
 }
 
-/**
- * Payload MVP:
- * - text
- * - single imagePath (legacy)
- * - multi imagePaths (new)
- * - videoPath
- * - audioPath (voice notes)
- * - reply_to (message id)
- * - is_deleted
- */
 export type MessagePayload = {
   text?: string;
   imagePath?: string;
@@ -151,15 +136,17 @@ export async function sendMessage(chatId: string, payload: MessagePayload) {
   const ciphertext = JSON.stringify({ v: 1, ...payload });
   const nonce = crypto.randomUUID();
 
-  const { error } = await supabase.from('messages').insert({
-    chat_id: chatId,
-    sender_device_id: deviceId,
-    message_type: 'whisper',
-    ciphertext,
-    content: payload.text || null,
-    sender_type: 'agent',
-    nonce
-  });
+  const { error } = await supabase.from('messages').insert([
+    {
+      chat_id: chatId,
+      sender_device_id: deviceId,
+      message_type: 'whisper',
+      ciphertext,
+      content: payload.text || null,
+      sender_type: 'agent',
+      nonce
+    }
+  ] as any);
 
   if (error) throw error;
 }
@@ -169,7 +156,6 @@ export async function deleteMessage(messageId: string, chatId: string) {
   const { data: me } = await supabase.auth.getUser();
   if (!me.user) throw new Error('Not authenticated');
 
-  // Recuperar el mensaje original
   const { data: msg } = await supabase.from('messages').select('ciphertext').eq('id', messageId).single();
   if (!msg) throw new Error('Message not found');
 
@@ -178,10 +164,21 @@ export async function deleteMessage(messageId: string, chatId: string) {
     currentPayload = JSON.parse(msg.ciphertext);
   } catch {}
 
-  // Hacer soft delete: conservar el tipo y ID, pero cambiar el contenido
-  const deletedPayload = JSON.stringify({ ...currentPayload, text: '', imagePaths: [], imagePath: null, videoPath: null, audioPath: null, is_deleted: true });
+  const deletedPayload = JSON.stringify({
+    ...currentPayload,
+    text: '',
+    imagePaths: [],
+    imagePath: null,
+    videoPath: null,
+    audioPath: null,
+    is_deleted: true
+  });
 
-  const { error } = await supabase.from('messages').update({ ciphertext: deletedPayload, content: null }).eq('id', messageId);
+  const { error } = await supabase.from('messages').update({
+    ciphertext: deletedPayload,
+    content: null
+  }).eq('id', messageId);
+
   if (error) throw error;
 }
 
@@ -190,19 +187,16 @@ export async function markMessagesAsRead(chatId: string) {
   const { data: me } = await supabase.auth.getUser();
   if (!me.user) return;
 
-  // Marcamos como leídos los mensajes que NO son nuestros y pertenecen a este chat
   const { error } = await supabase
     .from('messages')
     .update({ read: true })
     .eq('chat_id', chatId)
     .eq('read', false);
-    // .neq('sender_device_id', ...) // Opcional: solo marcar los del otro
 
-  if (error) console.error('Error marking messages as read:', error);
+  if (error) console.error(error);
 }
 
 async function ensureLocalDevice(userId: string): Promise<string> {
-
   const supabase = browserSupabase();
 
   const cached = window.localStorage.getItem('active_device_id');
@@ -220,20 +214,22 @@ async function ensureLocalDevice(userId: string): Promise<string> {
 
   const { data: created, error: cErr } = await supabase
     .from('devices')
-    .insert({
-      user_id: userId,
-      device_label: label,
-      registration_id: 1,
-      identity_public_key: 'mvp',
-      signed_prekey_id: 1,
-      signed_prekey_public: 'mvp',
-      signed_prekey_signature: 'mvp'
-    })
+    .insert([
+      {
+        user_id: userId,
+        device_label: label,
+        registration_id: 1,
+        identity_public_key: 'mvp',
+        signed_prekey_id: 1,
+        signed_prekey_public: 'mvp',
+        signed_prekey_signature: 'mvp'
+      }
+    ] as any)
     .select('id')
     .single();
 
   if (cErr) throw cErr;
 
-  window.localStorage.setItem('active_device_id', created.id);
-  return created.id as string;
+  window.localStorage.setItem('active_device_id', (created as any)?.id);
+  return (created as any)?.id as string;
 }
