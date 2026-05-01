@@ -28,8 +28,8 @@ export async function listChats(): Promise<ChatSummary[]> {
   if ((profile as any)?.role === 'agent') {
     query = query.eq('assigned_to', user.id);
   } else if ((profile as any)?.role === 'admin') {
-    query = query.eq('store_id', profile.store_id);
-  } else if (profile.role === 'superadmin') {
+    query = query.eq('store_id', (profile as any)?.store_id);
+  } else if ((profile as any)?.role === 'superadmin') {
     // No filtramos nada
   }
 
