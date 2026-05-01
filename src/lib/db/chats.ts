@@ -116,10 +116,10 @@ export async function createGroupChat(title: string, memberIds: string[]): Promi
   const { data: me } = await supabase.auth.getUser();
   if (!me.user) throw new Error('Not authenticated');
 
-  const { data, error } = await supabase.rpc('create_group_chat', {
-    title,
-    member_ids: memberIds,
-  });
+  const { data, error } = await (supabase as any).rpc('create_group_chat', {
+  title,
+  member_ids: memberIds,
+});
 
   if (error) throw error;
 
