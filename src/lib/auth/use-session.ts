@@ -3,53 +3,80 @@ import type { User, AuthChangeEvent, Session } from '@supabase/supabase-js';
 import { browserSupabase } from '@/lib/supabase/client';
 import type { ProfileRow } from '@/types/chat';
 
+type QueryResult<T> = {
+  data: T | null;
+  error: any;
+};
+
+function fallbackProfile(userId: string): ProfileRow {
+  return {
+    id: userId,
+    username: null,
+    store_id: null,
+    role: 'agent',
+    created_at: new Date().toISOString(),
+  };
+}
+
+function timeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((resolve) => {
+      window.setTimeout(() => resolve(fallback), ms);
+    }),
+  ]);
+}
+
 /**
  * Loads or auto-creates a profile for the given user.
- * This guarantees profile always exists after session is established.
+ * This always returns a safe fallback instead of blocking the app.
  */
-async function loadOrCreateProfile(userId: string): Promise<ProfileRow | null> {
+async function loadOrCreateProfile(userId: string): Promise<ProfileRow> {
   const supabase = browserSupabase();
+  const fallback = fallbackProfile(userId);
 
-  // 1. Try to fetch existing profile
-  const { data: prof, error } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', userId)
-    .single();
-
-  if (prof) return prof as ProfileRow;
-
-  // 2. Profile doesn't exist — auto-create with defaults
-  if (error?.code === 'PGRST116' || !prof) {
-    console.warn('Profile not found, auto-creating for user:', userId);
-
-    const { data: created, error: createErr } = await supabase
-  .from('profiles')
-  .upsert(
-    [{ id: userId, username: null, role: 'agent' }] as any,
-    { onConflict: 'id' }
-  )
+  const fetchProfile = async (): Promise<QueryResult<ProfileRow[]>> => {
+    const result = await supabase
+      .from('profiles')
       .select('*')
-      .single();
+      .eq('id', userId)
+      .limit(1);
 
-    if (createErr) {
-      console.error('Failed to auto-create profile:', createErr);
-      // Return a fallback so the app doesn't freeze
-      return {
-        id: userId,
-        username: null,
-        store_id: null,
-        role: 'agent',
-        created_at: new Date().toISOString(),
-      } as ProfileRow;
-    }
+    return result as QueryResult<ProfileRow[]>;
+  };
 
-    return (created as ProfileRow) ?? null;
+  const existing = await timeout(fetchProfile(), 2500, {
+    data: null,
+    error: new Error('Profile fetch timeout'),
+  });
+
+  if (existing.data?.[0]) return existing.data[0] as ProfileRow;
+
+  if (existing.error) {
+    console.warn('Profile fetch failed, using fallback:', existing.error);
   }
 
-  // 3. Some other error
-  console.error('Error loading profile:', error);
-  return null;
+  const createProfile = async (): Promise<QueryResult<ProfileRow[]>> => {
+    const result = await supabase
+      .from('profiles')
+      .upsert([{ id: userId, username: null, role: 'agent' }] as any, { onConflict: 'id' })
+      .select('*')
+      .limit(1);
+
+    return result as QueryResult<ProfileRow[]>;
+  };
+
+  const created = await timeout(createProfile(), 2500, {
+    data: null,
+    error: new Error('Profile create timeout'),
+  });
+
+  if (created.error) {
+    console.warn('Profile auto-create failed, using fallback:', created.error);
+    return fallback;
+  }
+
+  return (created.data?.[0] as ProfileRow | undefined) ?? fallback;
 }
 
 export function useSession() {
@@ -59,35 +86,36 @@ export function useSession() {
 
   useEffect(() => {
     const supabase = browserSupabase();
+    let mounted = true;
 
     const load = async () => {
       try {
-        const { data, error } = await supabase.auth.getSession();
+        const sessionData = await timeout(
+          supabase.auth.getSession().then((result) => result.data),
+          2500,
+          { session: null }
+        );
 
-        console.log('RAW SESSION:', data.session); // 👈 ESTE ES EL DEBUG
+        if (!mounted) return;
 
-        if (error) {
-          console.error('getSession error:', error);
-          setUser(null);
-          setProfile(null);
-          setLoading(false);
-          return;
-        }
-
-        const currentUser = data.session?.user ?? null;
+        const currentUser = sessionData.session?.user ?? null;
         setUser(currentUser);
 
         if (currentUser) {
           const prof = await loadOrCreateProfile(currentUser.id);
+          if (!mounted) return;
           setProfile(prof);
+        } else {
+          setProfile(null);
         }
       } catch (e) {
         console.error('Session load failed:', e);
-        setUser(null);
-        setProfile(null);
+        if (mounted) {
+          setUser(null);
+          setProfile(null);
+        }
       } finally {
-        // ALWAYS resolve loading
-        setLoading(false);
+        if (mounted) setLoading(false);
       }
     };
 
@@ -95,23 +123,27 @@ export function useSession() {
 
     const { data: sub } = supabase.auth.onAuthStateChange(
       async (_evt: AuthChangeEvent, session: Session | null) => {
-        console.log('AUTH CHANGE SESSION:', session); // 👈 EXTRA DEBUG
+        try {
+          const currentUser = session?.user ?? null;
+          setUser(currentUser);
 
-        const currentUser = session?.user ?? null;
-        setUser(currentUser);
-
-        if (currentUser) {
-          const prof = await loadOrCreateProfile(currentUser.id);
-          setProfile(prof);
-        } else {
+          if (currentUser) {
+            const prof = await loadOrCreateProfile(currentUser.id);
+            setProfile(prof);
+          } else {
+            setProfile(null);
+          }
+        } catch (e) {
+          console.error('Auth state change failed:', e);
           setProfile(null);
+        } finally {
+          setLoading(false);
         }
-
-        setLoading(false);
       }
     );
 
     return () => {
+      mounted = false;
       sub.subscription.unsubscribe();
     };
   }, []);
