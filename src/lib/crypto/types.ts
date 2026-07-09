@@ -2,6 +2,8 @@ export type LocalDeviceBundle = {
   registrationId: number;
   identityKey: string;
   signedPreKeyId: number;
+  signedPreKeyPublic: string;
+  signedPreKeySignature: string;
   preKeyStartId: number;
   generatedAt: string;
 };
