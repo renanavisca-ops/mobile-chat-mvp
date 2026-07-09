@@ -3,14 +3,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { PageShell } from '@/components/page-shell';
 import { useRequireAuth } from '@/lib/auth/use-require-auth';
-import { browserSupabase } from '@/lib/supabase/client';
 import { createDirectChatWith } from '@/lib/db/chats';
 import { addContact, listMyContacts, searchUsers } from '@/lib/db/contacts';
 import type { ProfileLite } from '@/lib/db/types';
 
 export default function ContactsPage() {
-  const { loading } = useRequireAuth();
-  const supabase = browserSupabase();
+  const { loading, user } = useRequireAuth();
 
   const [contacts, setContacts] = useState<ProfileLite[]>([]);
   const [err, setErr] = useState('');
@@ -23,16 +21,17 @@ export default function ContactsPage() {
 
   const canSearch = useMemo(() => q.trim().length >= 2, [q]);
 
-  async function refreshContacts() {
-    const list = await listMyContacts();
+  async function refreshContacts(ownerId = user?.id) {
+    if (!ownerId) return;
+    const list = await listMyContacts(ownerId);
     setContacts(list);
   }
 
   useEffect(() => {
-    if (loading) return;
-    refreshContacts().catch((e) => setErr(e?.message ?? String(e)));
+    if (loading || !user?.id) return;
+    refreshContacts(user.id).catch((e) => setErr(e?.message ?? String(e)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading]);
+  }, [loading, user?.id]);
 
   useEffect(() => {
     if (!openAdd) return;
@@ -48,9 +47,19 @@ export default function ContactsPage() {
       return;
     }
 
+    let cancelled = false;
+
     searchUsers(q)
-      .then(setResults)
-      .catch((e) => setErr(e?.message ?? String(e)));
+      .then((rows) => {
+        if (!cancelled) setResults(rows);
+      })
+      .catch((e) => {
+        if (!cancelled) setErr(e?.message ?? String(e));
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [q, canSearch, openAdd]);
 
   function openModal() {
@@ -69,8 +78,9 @@ export default function ContactsPage() {
   async function onAdd(userId: string) {
     setErr('');
     try {
-      await addContact(userId);
-      await refreshContacts();
+      if (!user?.id) throw new Error('Not authenticated');
+      await addContact(user.id, userId);
+      await refreshContacts(user.id);
     } catch (e: any) {
       setErr(e?.message ?? String(e));
     }
@@ -79,9 +89,7 @@ export default function ContactsPage() {
   async function onChat(userId: string) {
     setErr('');
     try {
-      const { data } = await supabase.auth.getUser();
-      if (!data.user) throw new Error('Not authenticated');
-
+      if (!user?.id) throw new Error('Not authenticated');
       const chatId = await createDirectChatWith(userId);
       window.location.href = `/chats/${chatId}`;
     } catch (e: any) {
@@ -106,7 +114,9 @@ export default function ContactsPage() {
       <div className="rounded-xl border border-slate-900 bg-slate-950/40 p-3">
         <div className="text-sm text-slate-300">My contacts</div>
 
-        {contacts.length === 0 ? (
+        {loading ? (
+          <p className="mt-2 text-sm text-slate-400">Loading contacts…</p>
+        ) : contacts.length === 0 ? (
           <p className="mt-2 text-sm text-slate-400">No contacts yet. Click “Add contact”.</p>
         ) : (
           <ul className="mt-2 divide-y divide-slate-900 rounded-lg border border-slate-900">
