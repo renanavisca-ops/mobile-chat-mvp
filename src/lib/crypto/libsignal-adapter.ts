@@ -7,6 +7,8 @@ export async function generateDeviceBundle(): Promise<LocalDeviceBundle> {
   const identityKeyPair = await libsignal.KeyHelper.generateIdentityKeyPair();
   const registrationId = await libsignal.KeyHelper.generateRegistrationId();
   const signedPreKey = await libsignal.KeyHelper.generateSignedPreKey(identityKeyPair, 1);
+  const signedPreKeyAny = signedPreKey as any;
+
   for (let i = 0; i < PREKEY_BATCH; i += 1) {
     await libsignal.KeyHelper.generatePreKey(i + 1);
   }
@@ -15,8 +17,10 @@ export async function generateDeviceBundle(): Promise<LocalDeviceBundle> {
     registrationId,
     identityKey: Buffer.from(identityKeyPair.pubKey).toString('base64'),
     signedPreKeyId: signedPreKey.keyId,
+    signedPreKeyPublic: Buffer.from(signedPreKeyAny.keyPair.pubKey).toString('base64'),
+    signedPreKeySignature: Buffer.from(signedPreKeyAny.signature).toString('base64'),
     preKeyStartId: 1,
-    generatedAt: new Date().toISOString()
+    generatedAt: new Date().toISOString(),
   };
 }
 
@@ -27,6 +31,6 @@ export async function encryptForSession(
   const result = await sessionCipher.encrypt(plainText);
   return {
     type: result.type === 3 ? 'prekey' : 'whisper',
-    ciphertext: result.body
+    ciphertext: result.body,
   };
 }
