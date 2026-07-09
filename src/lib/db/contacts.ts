@@ -21,26 +21,24 @@ export async function searchUsers(query: string): Promise<ProfileLite[]> {
 
   return (data ?? []).map((row: any) => ({
     id: row.id,
-    username: row.username ?? null
+    username: row.username ?? null,
   }));
 }
 
 /**
- * List my contacts WITHOUT using embed/join
- * (avoids PostgREST relationship cache issues)
+ * List contacts for a known authenticated user.
+ * The caller passes ownerId to avoid extra Supabase auth calls.
  */
-export async function listMyContacts(): Promise<ProfileLite[]> {
+export async function listMyContacts(ownerId: string): Promise<ProfileLite[]> {
   const supabase = browserSupabase();
 
-  const { data: me, error: authError } = await supabase.auth.getUser();
-  if (authError) throw authError;
-  if (!me.user) throw new Error('Not authenticated');
+  if (!ownerId) throw new Error('Not authenticated');
 
   // 1) Get contact IDs only
   const { data: contactRows, error } = await supabase
     .from('contacts')
     .select('contact_id')
-    .eq('owner_id', me.user.id)
+    .eq('owner_id', ownerId)
     .order('created_at', { ascending: false });
 
   if (error) throw error;
@@ -64,7 +62,7 @@ export async function listMyContacts(): Promise<ProfileLite[]> {
   for (const p of profiles ?? []) {
     map.set((p as any).id, {
       id: (p as any).id,
-      username: (p as any).username ?? null
+      username: (p as any).username ?? null,
     });
   }
 
@@ -80,22 +78,20 @@ export async function listMyContacts(): Promise<ProfileLite[]> {
 }
 
 /**
- * Add a contact
+ * Add a contact for a known authenticated user.
+ * The caller passes ownerId to avoid extra Supabase auth calls.
  */
-export async function addContact(contactId: string): Promise<void> {
+export async function addContact(ownerId: string, contactId: string): Promise<void> {
   const supabase = browserSupabase();
 
-  const { data: me, error: authError } = await supabase.auth.getUser();
-  if (authError) throw authError;
-  if (!me.user) throw new Error('Not authenticated');
-
-  if (contactId === me.user.id) return;
+  if (!ownerId) throw new Error('Not authenticated');
+  if (contactId === ownerId) return;
 
   const { error } = await supabase
     .from('contacts')
     .insert({
-      owner_id: me.user.id,
-      contact_id: contactId
+      owner_id: ownerId,
+      contact_id: contactId,
     });
 
   if (error) {
