@@ -8,7 +8,7 @@ import { createGroupChat } from '@/lib/db/chats';
 import type { ProfileLite } from '@/lib/db/types';
 
 export default function NewGroupPage() {
-  const { loading: authLoading } = useRequireAuth();
+  const { loading: authLoading, user } = useRequireAuth();
 
   const [title, setTitle] = useState('');
   const [contacts, setContacts] = useState<ProfileLite[]>([]);
@@ -17,11 +17,11 @@ export default function NewGroupPage() {
   const [err, setErr] = useState('');
 
   useEffect(() => {
-    if (authLoading) return;
-    listMyContacts()
+    if (authLoading || !user?.id) return;
+    listMyContacts(user.id)
       .then(setContacts)
       .catch((e) => setErr(e?.message ?? String(e)));
-  }, [authLoading]);
+  }, [authLoading, user?.id]);
 
   function toggle(id: string) {
     setSelected((prev) => {
@@ -49,6 +49,7 @@ export default function NewGroupPage() {
     setBusy(true);
 
     try {
+      if (!user?.id) throw new Error('Not authenticated');
       const chatId = await createGroupChat(trimmed, Array.from(selected));
       window.location.href = `/chats/${chatId}`;
     } catch (e: any) {
