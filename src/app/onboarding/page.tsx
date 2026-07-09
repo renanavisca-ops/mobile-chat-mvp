@@ -50,12 +50,13 @@ export default function OnboardingPage() {
       if (uname) window.localStorage.setItem('username', uname);
 
       setStatus('Guardando perfil…');
-     const { error: profErr } = await supabase
-  .from('profiles')
-  .upsert(
-    [{ id: userId, username: uname || null, role: 'agent' }] as any,
-    { onConflict: 'id', ignoreDuplicates: false }
-  );
+      const { error: profErr } = await supabase
+        .from('profiles')
+        .upsert(
+          [{ id: userId, username: uname || null, role: 'agent' }] as any,
+          { onConflict: 'id', ignoreDuplicates: false }
+        );
+
       if (profErr) throw profErr;
 
       setStatus('Registrando device…');
@@ -64,12 +65,16 @@ export default function OnboardingPage() {
       const { data: deviceRow, error: devErr } = await supabase
         .from('devices')
         .insert([
-  {
-    user_id: userId,
-    device_label: deviceLabel,
-    registration_id: bundle.registrationId,
-  }
-] as any)
+          {
+            user_id: userId,
+            device_label: deviceLabel,
+            registration_id: bundle.registrationId,
+            identity_public_key: bundle.identityKey,
+            signed_prekey_id: bundle.signedPreKeyId,
+            signed_prekey_public: bundle.signedPreKeyPublic,
+            signed_prekey_signature: bundle.signedPreKeySignature,
+          },
+        ] as any)
         .select('id')
         .single();
 
