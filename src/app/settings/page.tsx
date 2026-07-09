@@ -4,10 +4,11 @@ import { useEffect, useState } from 'react';
 import { PageShell } from '@/components/page-shell';
 import { browserSupabase } from '@/lib/supabase/client';
 
+const DEFAULT_PROFILE = { username: 'Usuario', role: 'agent' };
+
 export default function SettingsPage() {
   const [user, setUser] = useState<any>(null);
-  const [profile, setProfile] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const [profile, setProfile] = useState<any>(DEFAULT_PROFILE);
   const [status, setStatus] = useState<string>('');
   const [activeDeviceId, setActiveDeviceId] = useState<string | null>(null);
 
@@ -32,57 +33,58 @@ export default function SettingsPage() {
   useEffect(() => {
     let mounted = true;
 
+    const timeout = <T,>(promise: Promise<T>, ms: number, fallback: T): Promise<T> => {
+      return Promise.race([
+        promise,
+        new Promise<T>((resolve) => {
+          window.setTimeout(() => resolve(fallback), ms);
+        }),
+      ]);
+    };
+
     const load = async () => {
       try {
-        setLoading(true);
         const supabase = browserSupabase();
 
-        // Get current user
-        const { data: sessionData } = await supabase.auth.getSession();
-        const currentUser = sessionData.session?.user ?? null;
+        const sessionData = await timeout(
+          supabase.auth.getSession().then((result) => result.data),
+          2500,
+          { session: null }
+        );
 
-        if (mounted) {
-          setUser(currentUser);
-        }
+        const currentUser = sessionData.session?.user ?? null;
+        if (!mounted) return;
+
+        setUser(currentUser);
 
         if (!currentUser) {
-          if (mounted) {
-            setProfile({ username: 'Usuario', role: 'agent' });
-            setLoading(false);
-          }
+          setProfile(DEFAULT_PROFILE);
           return;
         }
 
-        // Load profile — use .limit(1) instead of .single() to avoid throws
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', currentUser.id)
-          .limit(1);
+        const profileResult = await timeout(
+          supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', currentUser.id)
+            .limit(1),
+          2500,
+          { data: [DEFAULT_PROFILE], error: null } as any
+        );
 
-        if (error) {
-          console.error('Profile load error:', error);
+        if (!mounted) return;
+
+        if (profileResult.error) {
+          console.error('Profile load error:', profileResult.error);
+          setProfile(DEFAULT_PROFILE);
+          return;
         }
 
-        if (mounted) {
-          const prof = data?.[0] ?? {
-            username: 'Usuario',
-            role: 'agent',
-          };
-          setProfile(prof);
-        }
+        setProfile(profileResult.data?.[0] ?? DEFAULT_PROFILE);
       } catch (e) {
-        console.error('Unexpected error:', e);
-
+        console.error('Unexpected settings load error:', e);
         if (mounted) {
-          setProfile({
-            username: 'Usuario',
-            role: 'agent',
-          });
-        }
-      } finally {
-        if (mounted) {
-          setLoading(false);
+          setProfile(DEFAULT_PROFILE);
         }
       }
     };
@@ -138,96 +140,100 @@ export default function SettingsPage() {
 
   return (
     <PageShell title="Settings">
-      {loading ? (
-        <div className="flex items-center justify-center p-8">
-          <p className="text-sm text-slate-300 animate-pulse">Cargando...</p>
-        </div>
-      ) : (
-        <div className="space-y-6">
-          <section className="space-y-3">
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500 ml-1">Cuenta</h2>
-            <div className="rounded-xl border border-slate-900 bg-slate-950/50 p-4 shadow-sm">
-              <div className="text-sm font-medium text-slate-200">Email</div>
-              <div className="text-xs text-slate-400 mt-1">{user?.email ?? user?.id ?? 'No disponible'}</div>
-            </div>
-          </section>
-
-          <section className="space-y-3">
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500 ml-1">Dispositivo</h2>
-            <div className="rounded-xl border border-slate-900 bg-slate-950/50 p-4 shadow-sm">
-              <div className="text-sm font-medium text-slate-200">ID de dispositivo activo</div>
-              <div className="text-xs text-slate-400 mt-1">{activeDeviceId ?? '(ninguno) — ejecuta /onboarding'}</div>
-            </div>
-          </section>
-
-          <section className="space-y-3">
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500 ml-1">Seguridad</h2>
-            <div className="rounded-xl border border-slate-900 bg-slate-950/50 p-4 shadow-sm">
-              <form onSubmit={handleUpdatePassword} className="space-y-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs text-slate-400 block ml-1">Contraseña actual (opcional)</label>
-                  <input
-                    type="password"
-                    value={currentPassword}
-                    onChange={(e) => setCurrentPassword(e.target.value)}
-                    className="w-full rounded-lg bg-slate-900 border border-slate-800 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all"
-                    placeholder="••••••••"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs text-slate-400 block ml-1">Nueva contraseña</label>
-                  <input
-                    type="password"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    className="w-full rounded-lg bg-slate-900 border border-slate-800 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all"
-                    placeholder="Mínimo 6 caracteres"
-                    required
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs text-slate-400 block ml-1">Confirmar nueva contraseña</label>
-                  <input
-                    type="password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="w-full rounded-lg bg-slate-900 border border-slate-800 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all"
-                    placeholder="••••••••"
-                    required
-                  />
-                </div>
-
-                {passwordStatus.message && (
-                  <div className={`text-xs p-2 rounded ${passwordStatus.type === 'success' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'}`}>
-                    {passwordStatus.type === 'success' ? '✅ ' : '❌ '}
-                    {passwordStatus.message}
-                  </div>
-                )}
-
-                <button
-                  type="submit"
-                  disabled={isUpdating}
-                  className="w-full rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isUpdating ? 'Actualizando...' : 'Cambiar contraseña'}
-                </button>
-              </form>
-            </div>
-          </section>
-
-          <div className="pt-4 border-t border-slate-900">
-            <button
-              className="w-full rounded-lg border border-slate-800 bg-slate-900/50 px-4 py-2 text-sm text-slate-300 hover:bg-slate-800 hover:text-white transition-colors"
-              onClick={signOut}
-            >
-              Cerrar sesión
-            </button>
-            {status && <p className="text-xs text-center mt-3 text-slate-500 italic">{status}</p>}
+      <div className="space-y-6">
+        <section className="space-y-3">
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500 ml-1">Cuenta</h2>
+          <div className="rounded-xl border border-slate-900 bg-slate-950/50 p-4 shadow-sm">
+            <div className="text-sm font-medium text-slate-200">Email</div>
+            <div className="text-xs text-slate-400 mt-1">{user?.email ?? user?.id ?? 'No disponible'}</div>
           </div>
+        </section>
+
+        <section className="space-y-3">
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500 ml-1">Perfil</h2>
+          <div className="rounded-xl border border-slate-900 bg-slate-950/50 p-4 shadow-sm">
+            <div className="text-sm font-medium text-slate-200">Usuario</div>
+            <div className="text-xs text-slate-400 mt-1">{profile?.username ?? 'Usuario'}</div>
+            <div className="mt-3 text-sm font-medium text-slate-200">Rol</div>
+            <div className="text-xs text-slate-400 mt-1">{profile?.role ?? 'agent'}</div>
+          </div>
+        </section>
+
+        <section className="space-y-3">
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500 ml-1">Dispositivo</h2>
+          <div className="rounded-xl border border-slate-900 bg-slate-950/50 p-4 shadow-sm">
+            <div className="text-sm font-medium text-slate-200">ID de dispositivo activo</div>
+            <div className="text-xs text-slate-400 mt-1">{activeDeviceId ?? '(ninguno) — ejecuta /onboarding'}</div>
+          </div>
+        </section>
+
+        <section className="space-y-3">
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500 ml-1">Seguridad</h2>
+          <div className="rounded-xl border border-slate-900 bg-slate-950/50 p-4 shadow-sm">
+            <form onSubmit={handleUpdatePassword} className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs text-slate-400 block ml-1">Contraseña actual (opcional)</label>
+                <input
+                  type="password"
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  className="w-full rounded-lg bg-slate-900 border border-slate-800 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all"
+                  placeholder="••••••••"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs text-slate-400 block ml-1">Nueva contraseña</label>
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="w-full rounded-lg bg-slate-900 border border-slate-800 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all"
+                  placeholder="Mínimo 6 caracteres"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs text-slate-400 block ml-1">Confirmar nueva contraseña</label>
+                <input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="w-full rounded-lg bg-slate-900 border border-slate-800 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all"
+                  placeholder="••••••••"
+                  required
+                />
+              </div>
+
+              {passwordStatus.message && (
+                <div className={`text-xs p-2 rounded ${passwordStatus.type === 'success' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'}`}>
+                  {passwordStatus.type === 'success' ? '✅ ' : '❌ '}
+                  {passwordStatus.message}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={isUpdating}
+                className="w-full rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isUpdating ? 'Actualizando...' : 'Cambiar contraseña'}
+              </button>
+            </form>
+          </div>
+        </section>
+
+        <div className="pt-4 border-t border-slate-900">
+          <button
+            className="w-full rounded-lg border border-slate-800 bg-slate-900/50 px-4 py-2 text-sm text-slate-300 hover:bg-slate-800 hover:text-white transition-colors"
+            onClick={signOut}
+          >
+            Cerrar sesión
+          </button>
+          {status && <p className="text-xs text-center mt-3 text-slate-500 italic">{status}</p>}
         </div>
-      )}
+      </div>
     </PageShell>
   );
 }
