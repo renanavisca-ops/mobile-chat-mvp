@@ -5,14 +5,12 @@ import { PageShell } from '@/components/page-shell';
 import { browserSupabase } from '@/lib/supabase/client';
 
 export default function SettingsPage() {
-  const supabase = browserSupabase();
-
   const [user, setUser] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState<string>('');
   const [activeDeviceId, setActiveDeviceId] = useState<string | null>(null);
-  
+
   // Password change state
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -24,7 +22,11 @@ export default function SettingsPage() {
   const [isUpdating, setIsUpdating] = useState(false);
 
   useEffect(() => {
-    setActiveDeviceId(localStorage.getItem('active_device_id'));
+    try {
+      setActiveDeviceId(window.localStorage.getItem('active_device_id'));
+    } catch {
+      setActiveDeviceId(null);
+    }
   }, []);
 
   useEffect(() => {
@@ -33,6 +35,7 @@ export default function SettingsPage() {
     const load = async () => {
       try {
         setLoading(true);
+        const supabase = browserSupabase();
 
         // Get current user
         const { data: sessionData } = await supabase.auth.getSession();
@@ -64,21 +67,19 @@ export default function SettingsPage() {
         if (mounted) {
           const prof = data?.[0] ?? {
             username: 'Usuario',
-            role: 'agent'
+            role: 'agent',
           };
           setProfile(prof);
         }
-
       } catch (e) {
         console.error('Unexpected error:', e);
 
         if (mounted) {
           setProfile({
             username: 'Usuario',
-            role: 'agent'
+            role: 'agent',
           });
         }
-
       } finally {
         if (mounted) {
           setLoading(false);
@@ -86,7 +87,7 @@ export default function SettingsPage() {
       }
     };
 
-    load();
+    void load();
 
     return () => {
       mounted = false;
@@ -95,7 +96,9 @@ export default function SettingsPage() {
 
   async function signOut() {
     setStatus('');
+    const supabase = browserSupabase();
     await supabase.auth.signOut();
+    setUser(null);
     setStatus('✅ Signed out');
   }
 
@@ -115,6 +118,7 @@ export default function SettingsPage() {
 
     setIsUpdating(true);
     try {
+      const supabase = browserSupabase();
       const { error } = await supabase.auth.updateUser({
         password: newPassword,
       });
@@ -214,8 +218,8 @@ export default function SettingsPage() {
           </section>
 
           <div className="pt-4 border-t border-slate-900">
-            <button 
-              className="w-full rounded-lg border border-slate-800 bg-slate-900/50 px-4 py-2 text-sm text-slate-300 hover:bg-slate-800 hover:text-white transition-colors" 
+            <button
+              className="w-full rounded-lg border border-slate-800 bg-slate-900/50 px-4 py-2 text-sm text-slate-300 hover:bg-slate-800 hover:text-white transition-colors"
               onClick={signOut}
             >
               Cerrar sesión
