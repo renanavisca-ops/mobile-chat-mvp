@@ -6,6 +6,11 @@ import { browserSupabase } from '@/lib/supabase/client';
 
 const DEFAULT_PROFILE = { username: 'Usuario', role: 'agent' };
 
+type ProfileResult = {
+  data: any[] | null;
+  error: any;
+};
+
 export default function SettingsPage() {
   const [user, setUser] = useState<any>(null);
   const [profile, setProfile] = useState<any>(DEFAULT_PROFILE);
@@ -62,15 +67,20 @@ export default function SettingsPage() {
           return;
         }
 
-        const profileResult = await timeout(
-          supabase
+        const loadProfile = async (): Promise<ProfileResult> => {
+          const result = await supabase
             .from('profiles')
             .select('*')
             .eq('id', currentUser.id)
-            .limit(1),
-          2500,
-          { data: [DEFAULT_PROFILE], error: null } as any
-        );
+            .limit(1);
+
+          return result as ProfileResult;
+        };
+
+        const profileResult = await timeout(loadProfile(), 2500, {
+          data: [DEFAULT_PROFILE],
+          error: null,
+        });
 
         if (!mounted) return;
 
