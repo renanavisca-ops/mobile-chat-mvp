@@ -1,33 +1,48 @@
 'use client';
 
 import { browserSupabase } from '@/lib/supabase/client';
+import { createLocalDeviceBundle } from '@/lib/crypto/device';
 import type { ChatSummary, MessageRow } from '@/lib/db/types';
 
-export async function listChats(): Promise<ChatSummary[]> {
+type ProfileForChats = {
+  role?: 'agent' | 'admin' | 'superadmin' | string | null;
+  store_id?: string | null;
+};
+
+export async function listChats(userId?: string, profileInput?: ProfileForChats | null): Promise<ChatSummary[]> {
   const supabase = browserSupabase();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  let currentUserId = userId ?? '';
 
-  if (!user) return [];
+  if (!currentUserId) {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
-  const { data: profile, error: profileErr } = await supabase
-    .from('profiles')
-    .select('store_id, role')
-    .eq('id', user.id)
-    .single();
+    currentUserId = user?.id ?? '';
+  }
 
-  if (profileErr || !profile) return [];
+  if (!currentUserId) return [];
 
-  const p = profile as any;
+  let p: any = profileInput ?? null;
+
+  if (!p) {
+    const { data: profile, error: profileErr } = await supabase
+      .from('profiles')
+      .select('store_id, role')
+      .eq('id', currentUserId)
+      .single();
+
+    if (profileErr || !profile) return [];
+    p = profile as any;
+  }
 
   let query = supabase
     .from('chats')
     .select('id, kind, title, created_at, store_id, assigned_to, status');
 
   if (p.role === 'agent') {
-    query = query.eq('assigned_to', user.id);
+    query = query.eq('assigned_to', currentUserId);
   } else if (p.role === 'admin') {
     query = query.eq('store_id', p.store_id);
   } else if (p.role === 'superadmin') {
@@ -151,13 +166,19 @@ export type MessagePayload = {
   is_deleted?: boolean;
 };
 
-export async function sendMessage(chatId: string, payload: MessagePayload) {
+export async function sendMessage(chatId: string, payload: MessagePayload, senderUserId?: string) {
   const supabase = browserSupabase();
 
-  const { data: me } = await supabase.auth.getUser();
-  if (!me.user) throw new Error('Not authenticated');
+  let userId = senderUserId ?? '';
 
-  const deviceId = await ensureLocalDevice(me.user.id);
+  if (!userId) {
+    const { data: me } = await supabase.auth.getUser();
+    userId = me.user?.id ?? '';
+  }
+
+  if (!userId) throw new Error('Not authenticated');
+
+  const deviceId = await ensureLocalDevice(userId);
 
   const ciphertext = JSON.stringify({ v: 1, ...payload });
   const nonce = crypto.randomUUID();
@@ -170,6 +191,7 @@ export async function sendMessage(chatId: string, payload: MessagePayload) {
       ciphertext,
       content: payload.text || null,
       sender_type: 'agent',
+      sender_id: userId,
       nonce,
     },
   ] as any);
@@ -177,11 +199,17 @@ export async function sendMessage(chatId: string, payload: MessagePayload) {
   if (error) throw error;
 }
 
-export async function deleteMessage(messageId: string, chatId: string) {
+export async function deleteMessage(messageId: string, chatId: string, senderUserId?: string) {
   const supabase = browserSupabase();
 
-  const { data: me } = await supabase.auth.getUser();
-  if (!me.user) throw new Error('Not authenticated');
+  let userId = senderUserId ?? '';
+
+  if (!userId) {
+    const { data: me } = await supabase.auth.getUser();
+    userId = me.user?.id ?? '';
+  }
+
+  if (!userId) throw new Error('Not authenticated');
 
   const { data: msg } = await supabase
     .from('messages')
@@ -222,9 +250,6 @@ export async function deleteMessage(messageId: string, chatId: string) {
 export async function markMessagesAsRead(chatId: string) {
   const supabase = browserSupabase();
 
-  const { data: me } = await supabase.auth.getUser();
-  if (!me.user) return;
-
   const { error } = await supabase
     .from('messages')
     .update({ read: true } as any)
@@ -234,7 +259,7 @@ export async function markMessagesAsRead(chatId: string) {
   if (error) console.error(error);
 }
 
-async function ensureLocalDevice(userId: string): Promise<string> {
+export async function ensureLocalDevice(userId: string): Promise<string> {
   const supabase = browserSupabase();
 
   const cached = window.localStorage.getItem('active_device_id');
@@ -243,6 +268,8 @@ async function ensureLocalDevice(userId: string): Promise<string> {
   const { data: devices, error } = await supabase
     .from('devices')
     .select('id')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
     .limit(1);
 
   if (error) throw error;
@@ -254,6 +281,7 @@ async function ensureLocalDevice(userId: string): Promise<string> {
     return deviceList[0].id as string;
   }
 
+  const bundle = await createLocalDeviceBundle();
   const label = `Web-${new Date().toISOString().slice(0, 10)}`;
 
   const { data: created, error: cErr } = await supabase
@@ -262,11 +290,11 @@ async function ensureLocalDevice(userId: string): Promise<string> {
       {
         user_id: userId,
         device_label: label,
-        registration_id: 1,
-        identity_public_key: 'mvp',
-        signed_prekey_id: 1,
-        signed_prekey_public: 'mvp',
-        signed_prekey_signature: 'mvp',
+        registration_id: bundle.registrationId,
+        identity_public_key: bundle.identityKey,
+        signed_prekey_id: bundle.signedPreKeyId,
+        signed_prekey_public: bundle.signedPreKeyPublic,
+        signed_prekey_signature: bundle.signedPreKeySignature,
       },
     ] as any)
     .select('id')
