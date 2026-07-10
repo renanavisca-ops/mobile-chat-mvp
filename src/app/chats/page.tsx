@@ -28,22 +28,16 @@ export default function ChatsPage() {
   }, []);
 
   useEffect(() => {
-    // Carga inicial — always attempt, even if session is still loading
-    // (listChats() internally gets user from supabase.auth and returns [] if none)
+    if (loading || !user?.id || !profile) return;
+
     const load = () => {
-      listChats()
+      listChats(user.id, profile as any)
         .then(setChats)
         .catch((e) => setErr(e?.message ?? String(e)));
     };
 
-    // If still loading session, try once anyway (may return [])
-    // When loading finishes, this effect re-runs with user/profile populated
     load();
 
-    // Don't set up realtime channels until we have the user info
-    if (loading || !user || !profile) return;
-
-    // Configuración de Suscripción Realtime con filtrado manual y notificaciones
     const supabase = browserSupabase();
 
     const channel = supabase
@@ -55,30 +49,24 @@ export default function ChatsPage() {
           const newRow = payload.new;
           if (!newRow) return;
 
-          // Notificar solo cuando el chat es creado
           if (payload.eventType !== 'INSERT') return;
 
-          // 1. Lógica para Agente
           if (profile.role === 'agent') {
             if (newRow.assigned_to === user.id) {
               setUnreadCount(prev => prev + 1);
               audioRef.current?.play().catch(() => {});
-              console.log('Nuevo chat asignado');
               load();
             }
             return;
           }
 
-          // 2. Lógica para Admin
           if (profile.role === 'admin') {
             if (newRow.store_id === profile.store_id) {
-              console.log('Nuevo chat en tienda');
               load();
             }
             return;
           }
 
-          // 3. Superadmin
           load();
         }
       )
@@ -89,19 +77,17 @@ export default function ChatsPage() {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'messages' },
-        (payload: any) => {
+        () => {
           load();
         }
       )
       .subscribe();
 
     return () => {
-      void browserSupabase().removeChannel(channel);
-      void browserSupabase().removeChannel(messagesChannel);
+      void supabase.removeChannel(channel);
+      void supabase.removeChannel(messagesChannel);
     };
   }, [loading, user, profile]);
-
-
 
   return (
     <PageShell title="Chats" right={<Link className="text-sm text-slate-200 hover:text-white" href="/contacts">New chat</Link>}>
