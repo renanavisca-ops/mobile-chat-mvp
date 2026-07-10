@@ -8,7 +8,7 @@ import { addContact, listMyContacts, searchUsers } from '@/lib/db/contacts';
 import type { ProfileLite } from '@/lib/db/types';
 
 export default function ContactsPage() {
-  const { loading, user } = useRequireAuth();
+  const { loading, user, profile } = useRequireAuth();
 
   const [contacts, setContacts] = useState<ProfileLite[]>([]);
   const [err, setErr] = useState('');
@@ -20,6 +20,7 @@ export default function ContactsPage() {
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   const canSearch = useMemo(() => q.trim().length >= 2, [q]);
+  const hasUsableProfile = Boolean(profile?.username && profile.username.trim().length > 0);
 
   async function refreshContacts(ownerId = user?.id) {
     if (!ownerId) return;
@@ -42,14 +43,14 @@ export default function ContactsPage() {
   useEffect(() => {
     if (!openAdd) return;
 
-    if (!canSearch) {
+    if (!canSearch || !user?.id) {
       setResults([]);
       return;
     }
 
     let cancelled = false;
 
-    searchUsers(q)
+    searchUsers(q, user.id)
       .then((rows) => {
         if (!cancelled) setResults(rows);
       })
@@ -60,7 +61,7 @@ export default function ContactsPage() {
     return () => {
       cancelled = true;
     };
-  }, [q, canSearch, openAdd]);
+  }, [q, canSearch, openAdd, user?.id]);
 
   function openModal() {
     setErr('');
@@ -102,14 +103,21 @@ export default function ContactsPage() {
       title="Contacts"
       right={
         <button
-          className="rounded-full bg-blue-600 px-4 py-2 text-sm hover:bg-blue-500"
+          className="rounded-full bg-blue-600 px-4 py-2 text-sm hover:bg-blue-500 disabled:opacity-50"
           onClick={openModal}
+          disabled={!hasUsableProfile}
         >
           + Add contact
         </button>
       }
     >
       {err ? <p className="mb-3 text-sm text-red-300">{err}</p> : null}
+
+      {!loading && !hasUsableProfile ? (
+        <div className="mb-3 rounded-xl border border-amber-800 bg-amber-950/30 p-3 text-sm text-amber-200">
+          Tu perfil no tiene username público. Ve a /onboarding y guarda un username para poder usar Contacts.
+        </div>
+      ) : null}
 
       <div className="rounded-xl border border-slate-900 bg-slate-950/40 p-3">
         <div className="text-sm text-slate-300">My contacts</div>
@@ -148,7 +156,7 @@ export default function ContactsPage() {
               <div>
                 <div className="text-base font-semibold">Add contact</div>
                 <div className="text-xs text-slate-400">
-                  Search by <b>username</b> (set in <b>/onboarding</b>). Min 2 chars.
+                  Search by <b>username</b>. Contacts are users, not devices.
                 </div>
               </div>
               <button
