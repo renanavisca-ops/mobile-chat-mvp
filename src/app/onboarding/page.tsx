@@ -65,14 +65,23 @@ export default function OnboardingPage() {
       window.localStorage.setItem('device_bundle', JSON.stringify(bundle));
 
       setStatus('Guardando perfil…');
-      const { error: profErr } = await supabase
-        .from('profiles')
-        .upsert(
-          [{ id: userId, username: uname, role: 'agent' }] as any,
-          { onConflict: 'id', ignoreDuplicates: false }
-        );
 
-      if (profErr) throw profErr;
+      const { data: updatedProfile, error: updateErr } = await supabase
+        .from('profiles')
+        .update({ username: uname } as any)
+        .eq('id', userId)
+        .select('id')
+        .maybeSingle();
+
+      if (updateErr) throw updateErr;
+
+      if (!updatedProfile) {
+        const { error: insertErr } = await supabase
+          .from('profiles')
+          .insert([{ id: userId, username: uname, role: 'agent' }] as any);
+
+        if (insertErr) throw insertErr;
+      }
 
       setStatus('Registrando device…');
       const deviceLabel = `Web-${new Date().toISOString().slice(0, 10)}`;
@@ -99,7 +108,11 @@ export default function OnboardingPage() {
 
       setStatus(`✅ Listo. Perfil: ${uname}. Device registrado: ${(deviceRow as any)?.id}`);
     } catch (e: any) {
-      setStatus(`❌ Error: ${e?.message ?? String(e)}`);
+      const raw = String(e?.message ?? e ?? '');
+      const msg = raw.toLowerCase().includes('duplicate') || raw.toLowerCase().includes('unique')
+        ? 'Ese username ya está en uso. Escoge otro.'
+        : raw;
+      setStatus(`❌ Error: ${msg}`);
     } finally {
       setBusy(false);
     }
