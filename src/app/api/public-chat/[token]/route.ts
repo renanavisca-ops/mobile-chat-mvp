@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
+import crypto from 'crypto';
 
 export async function GET(req: Request, { params }: { params: { token: string } }) {
   try {
@@ -61,6 +62,7 @@ export async function POST(req: Request, { params }: { params: { token: string }
     }
 
     // 2. Guardar mensaje
+    // sender_device_id debe permitir null para mensajes enviados desde chat público sin auth/device local.
     const ciphertext = JSON.stringify({ v: 1, ...payload });
     const content = payload.text || null;
     const nonce = crypto.randomUUID();
@@ -74,9 +76,10 @@ export async function POST(req: Request, { params }: { params: { token: string }
         message_type: 'whisper',
         sender_type: 'customer',
         sender_id: session.customer_id,
+        sender_device_id: null,
         nonce,
         read: false
-      })
+      } as any)
       .select()
       .single();
 
