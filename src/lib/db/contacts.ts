@@ -4,25 +4,34 @@ import { browserSupabase } from '@/lib/supabase/client';
 import type { ProfileLite } from '@/lib/db/types';
 
 /**
- * Search users by username
+ * Search users by username. Profiles without username are not usable contacts.
  */
-export async function searchUsers(query: string): Promise<ProfileLite[]> {
+export async function searchUsers(query: string, excludeUserId?: string): Promise<ProfileLite[]> {
   const supabase = browserSupabase();
   const q = query.trim();
   if (!q) return [];
 
-  const { data, error } = await supabase
+  let request = supabase
     .from('profiles')
     .select('id, username')
+    .not('username', 'is', null)
     .ilike('username', `%${q}%`)
     .limit(20);
 
+  if (excludeUserId) {
+    request = request.neq('id', excludeUserId);
+  }
+
+  const { data, error } = await request;
+
   if (error) throw error;
 
-  return (data ?? []).map((row: any) => ({
-    id: row.id,
-    username: row.username ?? null,
-  }));
+  return (data ?? [])
+    .filter((row: any) => typeof row.username === 'string' && row.username.trim().length > 0)
+    .map((row: any) => ({
+      id: row.id,
+      username: row.username,
+    }));
 }
 
 /**
@@ -60,9 +69,10 @@ export async function listMyContacts(ownerId: string): Promise<ProfileLite[]> {
   const map = new Map<string, ProfileLite>();
 
   for (const p of profiles ?? []) {
+    const username = (p as any).username;
     map.set((p as any).id, {
       id: (p as any).id,
-      username: (p as any).username ?? null,
+      username: typeof username === 'string' && username.trim() ? username : null,
     });
   }
 
