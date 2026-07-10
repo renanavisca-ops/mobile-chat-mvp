@@ -31,7 +31,7 @@ export async function POST(req: Request) {
       .select('id')
       .eq('store_id', store.id)
       .eq('role', 'agent')
-      .order('id', { ascending: true }); // Orden consistente para el índice
+      .order('id', { ascending: true });
 
     // 4. Obtener último chat asignado para Round-Robin
     const { data: lastChats } = await supabaseAdmin
@@ -46,7 +46,7 @@ export async function POST(req: Request) {
 
     if (agents && agents.length > 0) {
       const lastAssignedId = lastChats?.[0]?.assigned_to;
-      
+
       if (!lastAssignedId) {
         assignedAgentId = agents[0].id;
       } else {
@@ -100,6 +100,7 @@ export async function POST(req: Request) {
     if (sessionError) throw sessionError;
 
     // 8. Insertar mensaje inicial simple
+    // sender_device_id debe permitir null para mensajes system/customer públicos.
     const initialContent = 'Cliente inició conversación';
     const ciphertext = JSON.stringify({ v: 1, text: initialContent });
 
@@ -111,13 +112,15 @@ export async function POST(req: Request) {
         ciphertext,
         message_type: 'system',
         sender_type: 'system',
+        sender_device_id: null,
+        nonce: crypto.randomUUID(),
         read: false
-      });
+      } as any);
 
     if (msgError) throw msgError;
 
     // 9. Retornar token para redirigir
-    return NextResponse.json({ 
+    return NextResponse.json({
       chat_id: chat.id,
       token: publicToken,
       customer_id: customer.id
