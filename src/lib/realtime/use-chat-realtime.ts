@@ -9,12 +9,12 @@ import { useNotifications } from '@/lib/hooks/useNotifications';
 
 const PAGE_SIZE = 50;
 
-export function useChatRealtime(chatId: string) {
+export function useChatRealtime(chatId: string, userId?: string | null) {
   const [messages, setMessages] = useState<MessageRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
-  
+
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const [meTyping, setMeTyping] = useState(false);
   const [channelPresence, setChannelPresence] = useState<any>(null);
@@ -32,10 +32,11 @@ export function useChatRealtime(chatId: string) {
         setMessages(rows);
         setHasMore(rows.length === PAGE_SIZE);
         setLoading(false);
-        // Marcar leídos
         markMessagesAsRead(chatId).catch(console.error);
       })
-      .catch(() => setLoading(false));
+      .catch(() => {
+        if (alive) setLoading(false);
+      });
 
     return () => {
       alive = false;
@@ -45,7 +46,7 @@ export function useChatRealtime(chatId: string) {
   const loadMore = useCallback(async () => {
     if (loadingMore || !hasMore || loading) return;
     setLoadingMore(true);
-    
+
     try {
       const rows = await listMessages(chatId, PAGE_SIZE, messages.length);
       if (rows.length < PAGE_SIZE) setHasMore(false);
@@ -60,11 +61,7 @@ export function useChatRealtime(chatId: string) {
   // realtime inserts, updates, deletes & presence
   useEffect(() => {
     const supabase = browserSupabase();
-    let userId = '';
-    
-    supabase.auth.getUser().then((res: { data: any }) => {
-      if (res.data.user) userId = res.data.user.id;
-    });
+    const currentUserId = userId ?? '';
 
     const channel = supabase
       .channel(`chat:${chatId}`)
@@ -83,7 +80,7 @@ export function useChatRealtime(chatId: string) {
               if (current.some((m) => m.id === newMsg.id)) return current;
               return [...current, newMsg];
             });
-            // Notificar si la app está en background
+
             if (document.hidden && newMsg.sender_type !== 'agent') {
               try {
                 let txt = 'Nuevo mensaje';
@@ -96,15 +93,14 @@ export function useChatRealtime(chatId: string) {
                 notify('Nuevo mensaje', { body: txt });
               } catch {}
             }
-            // Si el mensaje no es del agente local, marcar como leído
+
             if (newMsg.sender_type !== 'agent') {
               markMessagesAsRead(chatId).catch(console.error);
             }
           } else if (payload.eventType === 'UPDATE') {
             const updatedMsg = payload.new as MessageRow;
             setMessages((current) => current.map(m => m.id === updatedMsg.id ? updatedMsg : m));
-          }
-          else if (payload.eventType === 'DELETE') {
+          } else if (payload.eventType === 'DELETE') {
             const deletedId = payload.old.id;
             setMessages((current) => current.filter(m => m.id !== deletedId));
           }
@@ -116,7 +112,7 @@ export function useChatRealtime(chatId: string) {
         for (const id in state) {
           const presences = state[id];
           for (const p of presences) {
-            if (p.typing && p.userId !== userId) {
+            if (p.typing && p.userId !== currentUserId) {
               typing.push(p.userId);
             }
           }
@@ -125,29 +121,25 @@ export function useChatRealtime(chatId: string) {
       })
       .subscribe(async (status: REALTIME_SUBSCRIBE_STATES) => {
         if (status === 'SUBSCRIBED') {
-          await channel.track({ typing: false, userId });
+          await channel.track({ typing: false, userId: currentUserId });
         }
       });
-      
+
     setChannelPresence(channel);
 
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [chatId, notify]);
+  }, [chatId, notify, userId]);
 
   // Update presence typing status
   useEffect(() => {
-    if (!channelPresence) return;
-    const updateTyping = async () => {
-      const supabase = browserSupabase();
-      const { data } = await supabase.auth.getUser();
-      if (data.user) {
-        await channelPresence.track({ typing: meTyping, userId: data.user.id }).catch(console.error);
-      }
-    };
-    updateTyping();
-  }, [meTyping, channelPresence]);
+    if (!channelPresence || !userId) return;
+
+    channelPresence
+      .track({ typing: meTyping, userId })
+      .catch(console.error);
+  }, [meTyping, channelPresence, userId]);
 
   // para pintar “optimista” al enviar (sin esperar realtime)
   function appendLocal(row: MessageRow) {
@@ -157,12 +149,12 @@ export function useChatRealtime(chatId: string) {
     });
   }
 
-  return { 
-    messages, 
-    loading, 
-    appendLocal, 
-    loadMore, 
-    hasMore, 
+  return {
+    messages,
+    loading,
+    appendLocal,
+    loadMore,
+    hasMore,
     loadingMore,
     typingUsers,
     setMeTyping
