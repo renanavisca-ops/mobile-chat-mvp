@@ -130,11 +130,26 @@ async function loadOrCreateProfile(user: User): Promise<ProfileRow> {
 export function useSession() {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<ProfileRow | null>(null);
+  const [accessToken, setAccessToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const supabase = browserSupabase();
     let mounted = true;
+
+    const applySession = async (session: Session | null) => {
+      const currentUser = session?.user ?? null;
+      setUser(currentUser);
+      setAccessToken(session?.access_token ?? null);
+
+      if (currentUser) {
+        const prof = await loadOrCreateProfile(currentUser);
+        if (!mounted) return;
+        setProfile(prof);
+      } else {
+        setProfile(null);
+      }
+    };
 
     const load = async () => {
       try {
@@ -145,22 +160,13 @@ export function useSession() {
         );
 
         if (!mounted) return;
-
-        const currentUser = sessionData.session?.user ?? null;
-        setUser(currentUser);
-
-        if (currentUser) {
-          const prof = await loadOrCreateProfile(currentUser);
-          if (!mounted) return;
-          setProfile(prof);
-        } else {
-          setProfile(null);
-        }
+        await applySession(sessionData.session);
       } catch (e) {
         console.error('Session load failed:', e);
         if (mounted) {
           setUser(null);
           setProfile(null);
+          setAccessToken(null);
         }
       } finally {
         if (mounted) setLoading(false);
@@ -172,15 +178,7 @@ export function useSession() {
     const { data: sub } = supabase.auth.onAuthStateChange(
       async (_evt: AuthChangeEvent, session: Session | null) => {
         try {
-          const currentUser = session?.user ?? null;
-          setUser(currentUser);
-
-          if (currentUser) {
-            const prof = await loadOrCreateProfile(currentUser);
-            setProfile(prof);
-          } else {
-            setProfile(null);
-          }
+          await applySession(session);
         } catch (e) {
           console.error('Auth state change failed:', e);
           setProfile(null);
@@ -196,5 +194,5 @@ export function useSession() {
     };
   }, []);
 
-  return { user, profile, loading };
+  return { user, profile, accessToken, loading };
 }
