@@ -42,14 +42,14 @@ export default function ContactsPage() {
   useEffect(() => {
     if (!openAdd) return;
 
-    if (!canSearch || !user?.id) {
+    if (!canSearch || !accessToken) {
       setResults([]);
       return;
     }
 
     let cancelled = false;
 
-    searchUsers(q, user.id)
+    searchUsers(q, accessToken)
       .then((rows) => {
         if (!cancelled) setResults(rows);
       })
@@ -60,7 +60,7 @@ export default function ContactsPage() {
     return () => {
       cancelled = true;
     };
-  }, [q, canSearch, openAdd, user?.id]);
+  }, [q, canSearch, openAdd, accessToken]);
 
   function openModal() {
     setErr('');
