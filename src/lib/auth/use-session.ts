@@ -19,25 +19,30 @@ function timeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
   ]);
 }
 
-async function loadProfile(userId: string): Promise<ProfileRow | null> {
-  const supabase = browserSupabase();
-
-  const result = await timeout(
-    supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .maybeSingle(),
-    2500,
-    { data: null, error: new Error('Profile fetch timeout') }
+async function ensureProfile(accessToken: string): Promise<ProfileRow | null> {
+  const response = await timeout(
+    fetch('/api/profiles/me', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({}),
+    }),
+    4000,
+    null as any
   );
 
-  if ((result as any).error) {
-    console.warn('Profile load failed:', (result as any).error);
+  if (!response) return null;
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    console.warn('Profile ensure failed:', data?.error ?? response.statusText);
     return null;
   }
 
-  return ((result as any).data as ProfileRow | null) ?? null;
+  return (data?.profile as ProfileRow | undefined) ?? null;
 }
 
 export function useSession(): SessionState {
@@ -52,17 +57,18 @@ export function useSession(): SessionState {
 
     async function applySession(session: Session | null) {
       const currentUser = session?.user ?? null;
+      const token = session?.access_token ?? null;
 
       if (!mounted) return;
       setUser(currentUser);
-      setAccessToken(session?.access_token ?? null);
+      setAccessToken(token);
 
-      if (!currentUser) {
+      if (!currentUser || !token) {
         setProfile(null);
         return;
       }
 
-      const prof = await loadProfile(currentUser.id);
+      const prof = await ensureProfile(token);
       if (!mounted) return;
       setProfile(prof);
     }
