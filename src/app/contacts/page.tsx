@@ -3,12 +3,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { PageShell } from '@/components/page-shell';
 import { useRequireAuth } from '@/lib/auth/use-require-auth';
-import { createDirectChatWith } from '@/lib/db/chats';
 import { addContact, listMyContacts, searchUsers } from '@/lib/db/contacts';
 import type { ProfileLite } from '@/lib/db/types';
 
 export default function ContactsPage() {
-  const { loading, user, profile } = useRequireAuth();
+  const { loading, user, profile, accessToken } = useRequireAuth();
 
   const [contacts, setContacts] = useState<ProfileLite[]>([]);
   const [err, setErr] = useState('');
@@ -91,8 +90,28 @@ export default function ContactsPage() {
     setErr('');
     try {
       if (!user?.id) throw new Error('Not authenticated');
-      const chatId = await createDirectChatWith(userId);
-      window.location.href = `/chats/${chatId}`;
+      if (!accessToken) throw new Error('Session token not ready. Refresh and try again.');
+
+      const res = await fetch('/api/chats/direct', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({ other_user: userId }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        throw new Error(data?.error ?? 'Could not create direct chat');
+      }
+
+      if (!data?.chatId) {
+        throw new Error('Direct chat API did not return chatId');
+      }
+
+      window.location.href = `/chats/${data.chatId}`;
     } catch (e: any) {
       setErr(e?.message ?? String(e));
     }
