@@ -13,6 +13,7 @@ export type ChatSummary = {
 export type ProfileLite = {
   id: string;
   username: string | null;
+  email?: string | null;
 };
 
 export type MessageRow = {
