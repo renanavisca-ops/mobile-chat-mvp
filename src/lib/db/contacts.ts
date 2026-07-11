@@ -4,7 +4,7 @@ import { browserSupabase } from '@/lib/supabase/client';
 import type { ProfileLite } from '@/lib/db/types';
 
 /**
- * Search users by username through the server API.
+ * Search users by username or email through the server API.
  * This avoids client-side RLS/profile visibility issues.
  */
 export async function searchUsers(query: string, accessToken: string): Promise<ProfileLite[]> {
@@ -37,25 +37,26 @@ export async function listMyContacts(ownerId: string): Promise<ProfileLite[]> {
 
   if (!ownerId) throw new Error('Not authenticated');
 
-  // 1) Get contact IDs only
+  // 1) Get contact IDs only. Never return the owner as their own contact.
   const { data: contactRows, error } = await supabase
     .from('contacts')
     .select('contact_id')
     .eq('owner_id', ownerId)
+    .neq('contact_id', ownerId)
     .order('created_at', { ascending: false });
 
   if (error) throw error;
 
   const ids = (contactRows ?? [])
     .map((r: any) => r.contact_id)
-    .filter(Boolean);
+    .filter((id: string) => Boolean(id) && id !== ownerId);
 
   if (ids.length === 0) return [];
 
   // 2) Fetch profiles separately
   const { data: profiles, error: pErr } = await supabase
     .from('profiles')
-    .select('id, username')
+    .select('id, username, email')
     .in('id', ids);
 
   if (pErr) throw pErr;
@@ -64,9 +65,15 @@ export async function listMyContacts(ownerId: string): Promise<ProfileLite[]> {
 
   for (const p of profiles ?? []) {
     const username = (p as any).username;
-    map.set((p as any).id, {
-      id: (p as any).id,
+    const email = (p as any).email;
+    const id = (p as any).id;
+
+    if (!id || id === ownerId) continue;
+
+    map.set(id, {
+      id,
       username: typeof username === 'string' && username.trim() ? username : null,
+      email: typeof email === 'string' && email.trim() ? email : null,
     });
   }
 
@@ -89,7 +96,8 @@ export async function addContact(ownerId: string, contactId: string): Promise<vo
   const supabase = browserSupabase();
 
   if (!ownerId) throw new Error('Not authenticated');
-  if (contactId === ownerId) return;
+  if (!contactId) throw new Error('Missing contact id');
+  if (contactId === ownerId) throw new Error('No puedes agregarte a ti mismo como contacto.');
 
   const { error } = await supabase
     .from('contacts')
