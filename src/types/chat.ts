@@ -9,6 +9,7 @@ export type StoreRow = {
 export type ProfileRow = {
   id: string;
   username: string | null;
+  email?: string | null;
   store_id: string | null;
   role: 'agent' | 'admin' | 'superadmin';
   created_at: string;
