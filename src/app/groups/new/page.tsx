@@ -8,7 +8,7 @@ import { createGroupChat } from '@/lib/db/chats';
 import type { ProfileLite } from '@/lib/db/types';
 
 export default function NewGroupPage() {
-  const { loading: authLoading, user } = useRequireAuth();
+  const { loading: authLoading, user, accessToken } = useRequireAuth();
 
   const [title, setTitle] = useState('');
   const [contacts, setContacts] = useState<ProfileLite[]>([]);
@@ -50,7 +50,9 @@ export default function NewGroupPage() {
 
     try {
       if (!user?.id) throw new Error('Not authenticated');
-      const chatId = await createGroupChat(trimmed, Array.from(selected));
+      if (!accessToken) throw new Error('Session token not ready. Refresh and try again.');
+
+      const chatId = await createGroupChat(trimmed, Array.from(selected), accessToken);
       window.location.href = `/chats/${chatId}`;
     } catch (e: any) {
       setErr(e?.message ?? String(e));
@@ -64,8 +66,6 @@ export default function NewGroupPage() {
       {err && <p className="mb-3 text-sm text-red-400">{err}</p>}
 
       <div className="flex flex-col gap-4">
-
-        {/* Title */}
         <div>
           <label className="block text-sm text-slate-300 mb-1">Group name</label>
           <input
@@ -76,7 +76,6 @@ export default function NewGroupPage() {
           />
         </div>
 
-        {/* Contacts */}
         <div>
           <div className="text-sm text-slate-300 mb-2">Select members</div>
 
@@ -91,9 +90,7 @@ export default function NewGroupPage() {
                   key={c.id}
                   className="flex items-center justify-between rounded border border-slate-900 bg-slate-950/60 p-2"
                 >
-                  <span className="text-sm">
-                    {c.username ?? c.id}
-                  </span>
+                  <span className="text-sm">{c.username ?? c.id}</span>
 
                   <input
                     type="checkbox"
@@ -106,15 +103,13 @@ export default function NewGroupPage() {
           )}
         </div>
 
-        {/* Button */}
         <button
           className="rounded bg-blue-600 px-4 py-2 text-sm hover:bg-blue-500 disabled:opacity-60"
           onClick={onCreate}
-          disabled={busy}
+          disabled={busy || authLoading || !accessToken}
         >
           {busy ? 'Creating…' : 'Create group'}
         </button>
-
       </div>
     </PageShell>
   );
