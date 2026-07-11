@@ -6,7 +6,7 @@ import { useSession } from '@/lib/auth/use-session';
 
 export function useRequireAuth() {
   const router = useRouter();
-  const { user, profile, loading } = useSession();
+  const { user, profile, accessToken, loading } = useSession();
 
   useEffect(() => {
     // Only redirect when we are DONE loading and there is no user
@@ -15,5 +15,5 @@ export function useRequireAuth() {
     }
   }, [loading, user, router]);
 
-  return { user, profile, loading };
+  return { user, profile, accessToken, loading };
 }
