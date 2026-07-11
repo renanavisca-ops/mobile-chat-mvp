@@ -11,23 +11,13 @@ export type ForwardPayload = {
   audioPath?: string;
 };
 
-export async function forwardMessageToChats(chatIds: string[], payload: ForwardPayload, senderUserId?: string) {
+export async function forwardMessageToChats(chatIds: string[], payload: ForwardPayload, senderUserId: string) {
   if (!chatIds.length) return;
+  if (!senderUserId) throw new Error('Not authenticated');
 
   const supabase = browserSupabase();
+  const deviceId = await ensureLocalDevice(senderUserId);
 
-  let userId = senderUserId ?? '';
-
-  if (!userId) {
-    const { data: me } = await supabase.auth.getUser();
-    userId = me.user?.id ?? '';
-  }
-
-  if (!userId) throw new Error('Not authenticated');
-
-  const deviceId = await ensureLocalDevice(userId);
-
-  // En MVP reenviamos el payload tal cual (no re-subimos media)
   const ciphertext = JSON.stringify({ v: 1, ...payload });
 
   const rows = chatIds.map((chatId) => ({
@@ -37,8 +27,9 @@ export async function forwardMessageToChats(chatIds: string[], payload: ForwardP
     ciphertext,
     content: payload.text || null,
     sender_type: 'agent',
-    sender_id: userId,
+    sender_id: senderUserId,
     nonce: crypto.randomUUID(),
+    read: false,
   }));
 
   const { error } = await supabase.from('messages').insert(rows as any);
