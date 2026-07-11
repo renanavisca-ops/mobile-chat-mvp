@@ -38,10 +38,11 @@ export async function POST(req: Request) {
     const body = await req.json().catch(() => ({}));
     const requestedUsername = sanitizeUsername(String(body?.username ?? '').trim());
     const user = userData.user;
+    const email = user.email?.trim().toLowerCase() || null;
 
     const { data: existingProfile, error: existingErr } = await supabaseAdmin
       .from('profiles')
-      .select('id, username, role, store_id, created_at')
+      .select('id, username, email, role, store_id, created_at')
       .eq('id', user.id)
       .maybeSingle();
 
@@ -59,10 +60,10 @@ export async function POST(req: Request) {
     const { data: profile, error: profileErr } = await supabaseAdmin
       .from('profiles')
       .upsert(
-        [{ id: user.id, username, role }],
+        [{ id: user.id, username, email, role }],
         { onConflict: 'id' }
       )
-      .select('id, username, role, store_id, created_at')
+      .select('id, username, email, role, store_id, created_at')
       .single();
 
     if (profileErr) throw profileErr;
@@ -97,7 +98,7 @@ export async function POST(req: Request) {
   } catch (e: any) {
     const raw = String(e?.message ?? e ?? 'Profile upsert failed');
     const msg = raw.toLowerCase().includes('duplicate') || raw.toLowerCase().includes('unique')
-      ? 'Ese username ya está en uso. Escoge otro.'
+      ? 'Ese username o email ya está en uso. Escoge otro username.'
       : raw;
 
     console.error('Profile upsert failed:', e);
