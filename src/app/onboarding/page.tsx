@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { PageShell } from '@/components/page-shell';
 import { createLocalDeviceBundle } from '@/lib/crypto/device';
-import { browserSupabase } from '@/lib/supabase/client';
+import { useRequireAuth } from '@/lib/auth/use-require-auth';
 
 function sanitizeUsername(value: string): string {
   return value
@@ -15,6 +15,7 @@ function sanitizeUsername(value: string): string {
 }
 
 export default function OnboardingPage() {
+  const { loading, user, profile, accessToken } = useRequireAuth();
   const [status, setStatus] = useState<string>('');
   const [busy, setBusy] = useState(false);
 
@@ -24,33 +25,25 @@ export default function OnboardingPage() {
   useEffect(() => {
     try {
       const saved = window.localStorage.getItem('username');
-      if (saved) setUsername(saved);
+      if (saved) {
+        setUsername(saved);
+        return;
+      }
     } catch {
       // ignore
     }
-  }, []);
+
+    if (profile?.username) setUsername(profile.username);
+  }, [profile?.username]);
 
   async function runOnboarding() {
     setBusy(true);
     setStatus('Generando llaves locales…');
 
     try {
-      const supabase = browserSupabase();
-
-      let userId: string;
-      try {
-        const { data: userData, error: userErr } = await supabase.auth.getUser();
-        if (userErr || !userData.user) {
-          setStatus('❌ No estás autenticado. Ve a /login primero.');
-          setBusy(false);
-          return;
-        }
-        userId = userData.user.id;
-      } catch {
-        setStatus('❌ Error al verificar sesión. Intenta recargar la página.');
-        setBusy(false);
-        return;
-      }
+      if (loading) throw new Error('Session still loading. Try again.');
+      if (!user?.id) throw new Error('No estás autenticado. Ve a /login primero.');
+      if (!accessToken) throw new Error('Session token not ready. Refresh and try again.');
 
       const uname = sanitizeUsername(username.trim());
       if (!uname || uname.length < 3) {
@@ -64,49 +57,32 @@ export default function OnboardingPage() {
       const bundle = await createLocalDeviceBundle();
       window.localStorage.setItem('device_bundle', JSON.stringify(bundle));
 
-      setStatus('Guardando perfil…');
+      setStatus('Guardando perfil y registrando device…');
 
-      const { data: updatedProfile, error: updateErr } = await supabase
-        .from('profiles')
-        .update({ username: uname } as any)
-        .eq('id', userId)
-        .select('id')
-        .maybeSingle();
+      const res = await fetch('/api/profiles/me', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          username: uname,
+          deviceBundle: bundle,
+          deviceLabel: `Web-${new Date().toISOString().slice(0, 10)}`,
+        }),
+      });
 
-      if (updateErr) throw updateErr;
+      const data = await res.json().catch(() => ({}));
 
-      if (!updatedProfile) {
-        const { error: insertErr } = await supabase
-          .from('profiles')
-          .insert([{ id: userId, username: uname, role: 'agent' }] as any);
-
-        if (insertErr) throw insertErr;
+      if (!res.ok) {
+        throw new Error(data?.error ?? 'No se pudo guardar perfil/device');
       }
 
-      setStatus('Registrando device…');
-      const deviceLabel = `Web-${new Date().toISOString().slice(0, 10)}`;
+      if (data?.deviceId) {
+        window.localStorage.setItem('active_device_id', data.deviceId);
+      }
 
-      const { data: deviceRow, error: devErr } = await supabase
-        .from('devices')
-        .insert([
-          {
-            user_id: userId,
-            device_label: deviceLabel,
-            registration_id: bundle.registrationId,
-            identity_public_key: bundle.identityKey,
-            signed_prekey_id: bundle.signedPreKeyId,
-            signed_prekey_public: bundle.signedPreKeyPublic,
-            signed_prekey_signature: bundle.signedPreKeySignature,
-          },
-        ] as any)
-        .select('id')
-        .single();
-
-      if (devErr) throw devErr;
-
-      window.localStorage.setItem('active_device_id', (deviceRow as any)?.id);
-
-      setStatus(`✅ Listo. Perfil: ${uname}. Device registrado: ${(deviceRow as any)?.id}`);
+      setStatus(`✅ Listo. Perfil: ${data?.profile?.username ?? uname}. Device registrado: ${data?.deviceId ?? 'existente'}`);
     } catch (e: any) {
       const raw = String(e?.message ?? e ?? '');
       const msg = raw.toLowerCase().includes('duplicate') || raw.toLowerCase().includes('unique')
@@ -140,7 +116,7 @@ export default function OnboardingPage() {
         <button
           className="w-fit rounded bg-blue-600 px-3 py-2 disabled:opacity-60"
           onClick={runOnboarding}
-          disabled={busy}
+          disabled={busy || loading || !accessToken}
         >
           {busy ? 'Procesando…' : 'Guardar perfil + crear device'}
         </button>
