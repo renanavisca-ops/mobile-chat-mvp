@@ -11,6 +11,8 @@ export type ProfileRow = {
   username: string | null;
   store_id: string | null;
   role: 'agent' | 'admin' | 'superadmin';
+  last_seen: string | null;
+  show_online: boolean;
   created_at: string;
 };
 

@@ -12,6 +12,7 @@ import { forwardMessageToChats, type ForwardPayload } from '@/lib/db/forward';
 import { uploadChatImage, uploadChatMedia, uploadChatAudio, createSignedChatMediaUrl } from '@/lib/storage/upload';
 import { useChatRealtime } from '@/lib/realtime/use-chat-realtime';
 import { browserSupabase } from '@/lib/supabase/client';
+import { useOnlineUsers } from '@/components/presence-provider';
 import type { ChatSummary, MessageRow } from '@/lib/db/types';
 
 type Payload = { v?: number; text?: string; imagePath?: string; imagePaths?: string[]; videoPath?: string; audioPath?: string; reply_to?: string; is_deleted?: boolean; };
@@ -54,7 +55,8 @@ function toForwardPayload(body: Payload): ForwardPayload {
 }
 
 export default function ChatPage({ params }: { params: { chatId: string } }) {
-  const { loading: authLoading } = useRequireAuth();
+  const { loading: authLoading, user } = useRequireAuth();
+  const myId = user?.id ?? null;
   const chatId = params.chatId;
 
   const supabase = browserSupabase();
@@ -66,7 +68,10 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
 
   // members
   const [members, setMembers] = useState<string[]>([]);
+  const [memberProfiles, setMemberProfiles] = useState<{ id: string; username: string | null }[]>([]);
   const [membersLoading, setMembersLoading] = useState(true);
+
+  const onlineUsers = useOnlineUsers();
 
   // ... (rest of states)
 
@@ -85,7 +90,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
       if (error) {
         setErr(error.message);
       } else {
-        setChat(data as ChatSummary);
+        setChat(data as unknown as ChatSummary);
       }
       setChatLoading(false);
     }
@@ -238,6 +243,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
       for (const p of profs ?? []) byId.set((p as any).id, (p as any).username ?? '');
 
       setMembers(userIds.map((id: string) => byId.get(id) || shortId(id)));
+      setMemberProfiles((profs ?? []).map((p: any) => ({ id: p.id, username: p.username ?? null })));
       setMembersLoading(false);
     }
 
@@ -248,6 +254,27 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
   }, [chatId, supabase]);
 
   const items = useMemo(() => messages.map((m) => ({ ...m, body: getMessagePayload(m) })), [messages]);
+
+  const usernameById = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const p of memberProfiles) if (p.username) m.set(p.id, p.username);
+    return m;
+  }, [memberProfiles]);
+
+  const otherMemberIds = useMemo(
+    () => memberProfiles.map((p) => p.id).filter((id) => id !== myId),
+    [memberProfiles, myId]
+  );
+  const someoneOnline = otherMemberIds.some((id) => onlineUsers.has(id));
+  const isGroup = chat?.kind === 'group';
+
+  function isMine(m: MessageRow) {
+    return (!!myId && m.sender_id === myId) || m.sender_device_id === 'local';
+  }
+  function senderName(m: MessageRow) {
+    if (!m.sender_id) return '';
+    return usernameById.get(m.sender_id) || shortId(m.sender_id);
+  }
 
   // autoscroll (solo si estamos al final)
   useEffect(() => {
@@ -781,8 +808,15 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
       ) : (
         <div className="flex flex-col gap-3">
           <div className="flex items-center justify-between gap-2 text-xs text-slate-400">
-            <div>
-              Members: {membersLoading ? 'Loading…' : members.length ? members.join(', ') : '—'}
+            <div className="flex items-center gap-2">
+              <span>Members: {membersLoading ? 'Loading…' : members.length ? members.join(', ') : '—'}</span>
+              {!membersLoading && otherMemberIds.length > 0 && (
+                someoneOnline ? (
+                  <span className="text-emerald-400">● En línea</span>
+                ) : (
+                  <span className="text-slate-500">● Desconectado</span>
+                )
+              )}
             </div>
             {chat && (
               <div className="flex items-center gap-2">
@@ -836,7 +870,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
                       key={m.id}
                       className={`flex flex-col mb-2 p-2 rounded-lg max-w-[80%] ${
                         m.sender_type === 'system' ? 'mx-auto bg-slate-800 text-center text-xs text-slate-400 border border-slate-700' :
-                        (m.sender_type === 'agent' || m.sender_device_id === 'local') ? 'ml-auto bg-blue-900/40 border border-blue-800' :
+                        isMine(m) ? 'ml-auto bg-blue-900/40 border border-blue-800' :
                         'mr-auto bg-slate-900 border border-slate-800'
                       }`}
                       onContextMenu={(e) => {
@@ -853,9 +887,12 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
                         if (!m.body.is_deleted) openActions(m.id, m.body);
                       }}
                     >
+                      {isGroup && !isMine(m) && m.sender_type !== 'system' && (
+                        <div className="text-[10px] font-semibold text-blue-300 mb-0.5">{senderName(m)}</div>
+                      )}
                       <div className="text-[10px] text-slate-500 flex items-center justify-between mb-1">
                         <span>{new Date(m.created_at).toLocaleString()}</span>
-                        {(m.sender_type === 'agent' || m.sender_device_id === 'local') ? (
+                        {isMine(m) ? (
                           <span className={m.read ? 'text-blue-400 ml-2' : 'text-slate-600 ml-2'}>
                             {m.read ? '✓✓' : '✓'}
                           </span>
@@ -966,7 +1003,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
 
           {typingUsers.length > 0 && (
             <div className="text-xs text-blue-400 animate-pulse ml-2">
-              Alguien está escribiendo...
+              {typingUsers.map((id) => usernameById.get(id) || 'Alguien').join(', ')} escribiendo…
             </div>
           )}
 

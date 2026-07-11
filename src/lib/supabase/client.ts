@@ -1,11 +1,12 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import type { Database } from '@/lib/db/database.types'
 
-let supabaseInstance: ReturnType<typeof createClient> | null = null
+let supabaseInstance: SupabaseClient<Database> | null = null
 
-export function browserSupabase() {
+export function browserSupabase(): SupabaseClient<Database> {
   if (supabaseInstance) return supabaseInstance
 
-  supabaseInstance = createClient(
+  supabaseInstance = createClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {

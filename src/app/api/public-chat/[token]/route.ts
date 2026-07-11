@@ -15,7 +15,7 @@ export async function GET(req: Request, { params }: { params: { token: string } 
       .eq('public_token', token)
       .single();
 
-    if (sessionError || !session) {
+    if (sessionError || !session || !session.chat_id) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
@@ -56,7 +56,7 @@ export async function POST(req: Request, { params }: { params: { token: string }
       .eq('public_token', token)
       .single();
 
-    if (sessionError || !session) {
+    if (sessionError || !session || !session.chat_id) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 

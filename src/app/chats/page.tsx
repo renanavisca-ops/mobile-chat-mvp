@@ -7,6 +7,7 @@ import { PageShell } from '@/components/page-shell';
 import { useRequireAuth } from '@/lib/auth/use-require-auth';
 import { browserSupabase } from '@/lib/supabase/client';
 import { listChats } from '@/lib/db/chats';
+import { useIsOnline } from '@/components/presence-provider';
 
 import type { ChatSummary } from '@/lib/db/types';
 
@@ -14,6 +15,17 @@ function fmt(ts: string | null) {
   if (!ts) return '';
   const d = new Date(ts);
   return d.toLocaleString();
+}
+
+function OnlineDot({ userId }: { userId: string | null | undefined }) {
+  const online = useIsOnline(userId);
+  if (!userId || !online) return null;
+  return (
+    <span
+      className="ml-2 inline-block h-2 w-2 rounded-full bg-emerald-500 align-middle"
+      title="En línea"
+    />
+  );
 }
 
 export default function ChatsPage() {
@@ -123,7 +135,8 @@ export default function ChatsPage() {
               <Link href={`/chats/${c.id}`} className="block rounded-lg p-2 hover:bg-slate-950/60">
                 <div className="flex items-center justify-between gap-3">
                   <div className="font-medium">
-                    {c.kind === 'group' ? c.title ?? 'Group' : 'Direct chat'}
+                    {c.kind === 'group' ? c.title ?? 'Group' : c.title ?? 'Direct chat'}
+                    {c.kind === 'direct' && <OnlineDot userId={c.other_user_id} />}
                     {c.status && (
                       <span className={`ml-2 rounded px-1.5 py-0.5 text-[10px] uppercase ${
                         c.status === 'open' ? 'bg-green-900/40 text-green-400' :

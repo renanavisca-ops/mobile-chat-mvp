@@ -1,8 +1,6 @@
 'use client';
 
 import { useEffect, useState, useRef, useMemo } from 'react';
-import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
-import { browserSupabase } from '@/lib/supabase/client';
 import { createSignedChatMediaUrl } from '@/lib/storage/upload';
 
 type Payload = { v?: number; text?: string; imagePath?: string; imagePaths?: string[]; videoPath?: string; audioPath?: string; reply_to?: string; is_deleted?: boolean; };
@@ -61,37 +59,39 @@ export default function PublicChatPage({ params }: { params: { token: string } }
     return () => { alive = false; };
   }, [token]);
 
-  // Realtime subscription
+  // Poll for new messages via the token-scoped server API.
+  // (Customer clients are unauthenticated, so we don't rely on RLS-scoped
+  // Realtime here; the API uses the service role and validates the token.)
   useEffect(() => {
     if (!sessionData?.chat_id) return;
-    const supabase = browserSupabase();
-    
-    // We subscribe using standard anon key, assuming RLS allows reading if the user has the token or we just rely on channel.
-    // Wait, realtime requires RLS or public access. If RLS blocks it, we won't get messages. 
-    // We can just poll, or use realtime if RLS allows it. Since it's a prototype, we'll try realtime.
-    const channel = supabase.channel(`public:chat:${sessionData.chat_id}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'messages', filter: `chat_id=eq.${sessionData.chat_id}` },
-        (payload: RealtimePostgresChangesPayload<any>) => {
-          if (payload.eventType === 'INSERT') {
-            setMessages(prev => {
-              if (prev.some(m => m.id === payload.new.id)) return prev;
-              return [...prev, payload.new];
-            });
-          } else if (payload.eventType === 'UPDATE') {
-            setMessages(prev => prev.map(m => m.id === payload.new.id ? payload.new : m));
-          } else if (payload.eventType === 'DELETE') {
-            setMessages(prev => prev.filter(m => m.id !== payload.old.id));
-          }
-        }
-      )
-      .subscribe();
+    let alive = true;
 
-    return () => {
-      supabase.removeChannel(channel);
+    const poll = async () => {
+      try {
+        const res = await fetch(`/api/public-chat/${token}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!alive) return;
+        setMessages((prev) => {
+          const serverMsgs = data.messages || [];
+          // keep optimistic local- messages that haven't come back yet
+          const localOnly = prev.filter(
+            (m) => String(m.id).startsWith('local-') &&
+              !serverMsgs.some((s: any) => s.content === m.content && s.sender_type === m.sender_type)
+          );
+          return [...serverMsgs, ...localOnly];
+        });
+      } catch {
+        // ignore transient errors
+      }
     };
-  }, [sessionData?.chat_id]);
+
+    const interval = setInterval(poll, 4000);
+    return () => {
+      alive = false;
+      clearInterval(interval);
+    };
+  }, [sessionData?.chat_id, token]);
 
   const items = useMemo(() => messages.map((m) => ({ ...m, body: getMessagePayload(m) })), [messages]);
 

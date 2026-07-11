@@ -8,6 +8,10 @@ export type ChatSummary = {
   store_id?: string | null;
   assigned_to?: string | null;
   status?: 'open' | 'in_progress' | 'closed';
+  /** For direct chats: the other participant's user id (for online status). */
+  other_user_id?: string | null;
+  /** All member user ids (excluding me). */
+  member_ids?: string[];
 };
 
 export type ProfileLite = {

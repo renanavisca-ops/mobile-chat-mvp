@@ -3,6 +3,12 @@
 import { browserSupabase } from '@/lib/supabase/client';
 import type { ChatSummary, MessageRow } from '@/lib/db/types';
 
+/**
+ * List the chats the current user can see.
+ * RLS already scopes `chats` to (a) chats where the user is a member and
+ * (b) store chats visible to admins/agents, so we can select directly.
+ * For direct chats we derive a display title from the other member's username.
+ */
 export async function listChats(): Promise<ChatSummary[]> {
   const supabase = browserSupabase();
 
@@ -12,87 +18,91 @@ export async function listChats(): Promise<ChatSummary[]> {
 
   if (!user) return [];
 
-  const { data: profile, error: profileErr } = await supabase
-    .from('profiles')
-    .select('store_id, role')
-    .eq('id', user.id)
-    .single();
-
-  if (profileErr || !profile) return [];
-
-  const p = profile as any;
-
-  let query = supabase
+  const { data: chats, error } = await supabase
     .from('chats')
-    .select('id, kind, title, created_at, store_id, assigned_to, status');
-
-  if (p.role === 'agent') {
-    query = query.eq('assigned_to', user.id);
-  } else if (p.role === 'admin') {
-    query = query.eq('store_id', p.store_id);
-  } else if (p.role === 'superadmin') {
-    // sin filtro
-  }
-
-  const { data: chats, error } = await query.order('created_at', {
-    ascending: false,
-  });
+    .select('id, kind, title, created_at, store_id, assigned_to, status')
+    .order('created_at', { ascending: false });
 
   if (error) throw error;
 
-  const chatList = (chats ?? []) as any[];
-
+  const chatList = chats ?? [];
   if (chatList.length === 0) return [];
 
   const chatIds = chatList.map((c) => c.id);
 
-  const { data: lastMsgs, error: msgErr } = await supabase
-    .from('messages')
-    .select('id, chat_id, content, ciphertext, created_at')
-    .in('chat_id', chatIds)
-    .order('created_at', { ascending: false })
-    .limit(200);
+  // Members (for direct-chat titles) + last messages, in parallel
+  const [membersRes, msgsRes] = await Promise.all([
+    supabase.from('chat_members').select('chat_id, user_id').in('chat_id', chatIds),
+    supabase
+      .from('messages')
+      .select('id, chat_id, content, ciphertext, created_at')
+      .in('chat_id', chatIds)
+      .order('created_at', { ascending: false })
+      .limit(300),
+  ]);
 
-  if (msgErr) throw msgErr;
-
-  const latestByChat = new Map<string, { created_at: string; content: string | null }>();
-
-  for (const rawMsg of lastMsgs ?? []) {
-    const m = rawMsg as any;
-
-    if (!latestByChat.has(m.chat_id)) {
-      let preview = m.content || '';
-
-      if (!preview && m.ciphertext) {
-        try {
-          const parsed = JSON.parse(m.ciphertext);
-
-          if (parsed.text) preview = parsed.text;
-          else if (parsed.imagePath || (parsed.imagePaths?.length > 0)) preview = '📷 Imagen';
-          else if (parsed.videoPath) preview = '📹 Video';
-          else if (parsed.audioPath) preview = '🎵 Audio';
-          else if (parsed.is_deleted) preview = '🚫 Mensaje eliminado';
-        } catch {}
-      }
-
-      latestByChat.set(m.chat_id, {
-        created_at: m.created_at,
-        content: preview || null,
-      });
-    }
+  // Map chat -> other user ids
+  const otherIdsByChat = new Map<string, string[]>();
+  const allOtherIds = new Set<string>();
+  for (const row of membersRes.data ?? []) {
+    if (row.user_id === user.id) continue;
+    const arr = otherIdsByChat.get(row.chat_id) ?? [];
+    arr.push(row.user_id);
+    otherIdsByChat.set(row.chat_id, arr);
+    allOtherIds.add(row.user_id);
   }
 
-  return chatList.map((c) => ({
-    id: c.id,
-    kind: c.kind,
-    title: c.title,
-    created_at: c.created_at,
-    store_id: c.store_id,
-    assigned_to: c.assigned_to,
-    status: c.status,
-    last_message_at: latestByChat.get(c.id)?.created_at ?? null,
-    last_ciphertext: latestByChat.get(c.id)?.content ?? null,
-  })) as ChatSummary[];
+  // Resolve usernames for those users
+  const usernameById = new Map<string, string>();
+  if (allOtherIds.size > 0) {
+    const { data: profs } = await supabase
+      .from('profiles')
+      .select('id, username')
+      .in('id', Array.from(allOtherIds));
+    for (const p of profs ?? []) usernameById.set(p.id, p.username ?? '');
+  }
+
+  // Latest message preview per chat
+  const latestByChat = new Map<string, { created_at: string; content: string | null }>();
+  for (const m of msgsRes.data ?? []) {
+    if (latestByChat.has(m.chat_id)) continue;
+    let preview = m.content || '';
+    if (!preview && m.ciphertext) {
+      try {
+        const parsed = JSON.parse(m.ciphertext);
+        if (parsed.text) preview = parsed.text;
+        else if (parsed.imagePath || parsed.imagePaths?.length > 0) preview = '📷 Imagen';
+        else if (parsed.videoPath) preview = '📹 Video';
+        else if (parsed.audioPath) preview = '🎵 Audio';
+        else if (parsed.is_deleted) preview = '🚫 Mensaje eliminado';
+      } catch {}
+    }
+    latestByChat.set(m.chat_id, { created_at: m.created_at, content: preview || null });
+  }
+
+  return chatList.map((c) => {
+    let title = c.title;
+    if (c.kind === 'direct') {
+      const others = (otherIdsByChat.get(c.id) ?? [])
+        .map((id) => usernameById.get(id))
+        .filter((n): n is string => !!n);
+      if (others.length) title = others.join(', ');
+    }
+    const otherIds = otherIdsByChat.get(c.id) ?? [];
+    return {
+      id: c.id,
+      kind: c.kind as 'direct' | 'group',
+      title,
+      created_at: c.created_at,
+      store_id: c.store_id,
+      assigned_to: c.assigned_to,
+      status: c.status as ChatSummary['status'],
+      last_message_at: latestByChat.get(c.id)?.created_at ?? null,
+      last_ciphertext: latestByChat.get(c.id)?.content ?? null,
+      other_user_id: c.kind === 'direct' ? otherIds[0] ?? null : null,
+      member_ids: otherIds,
+    };
+  });
 }
 
 export async function createDirectChatWith(userId: string): Promise<string> {
@@ -101,9 +111,9 @@ export async function createDirectChatWith(userId: string): Promise<string> {
   const { data: me } = await supabase.auth.getUser();
   if (!me.user) throw new Error('Not authenticated');
 
-  const { data, error } = await (supabase as any).rpc('create_direct_chat', {
-  other_user: userId,
-});
+  const { data, error } = await supabase.rpc('create_direct_chat', {
+    other_user: userId,
+  });
 
   if (error) throw error;
 
@@ -116,10 +126,10 @@ export async function createGroupChat(title: string, memberIds: string[]): Promi
   const { data: me } = await supabase.auth.getUser();
   if (!me.user) throw new Error('Not authenticated');
 
-  const { data, error } = await (supabase as any).rpc('create_group_chat', {
-  title,
-  member_ids: memberIds,
-});
+  const { data, error } = await supabase.rpc('create_group_chat', {
+    title,
+    member_ids: memberIds,
+  });
 
   if (error) throw error;
 
@@ -144,7 +154,7 @@ export async function listMessages(
 
   if (error) throw error;
 
-  return ((data ?? []) as any[]).reverse() as MessageRow[];
+  return ((data ?? []) as unknown as MessageRow[]).reverse();
 }
 
 export type MessagePayload = {
@@ -168,17 +178,16 @@ export async function sendMessage(chatId: string, payload: MessagePayload) {
   const ciphertext = JSON.stringify({ v: 1, ...payload });
   const nonce = crypto.randomUUID();
 
-  const { error } = await supabase.from('messages').insert([
-    {
-      chat_id: chatId,
-      sender_device_id: deviceId,
-      message_type: 'whisper',
-      ciphertext,
-      content: payload.text || null,
-      sender_type: 'agent',
-      nonce,
-    },
-  ] as any);
+  const { error } = await supabase.from('messages').insert({
+    chat_id: chatId,
+    sender_device_id: deviceId,
+    sender_id: me.user.id,
+    message_type: 'whisper',
+    ciphertext,
+    content: payload.text || null,
+    sender_type: 'agent',
+    nonce,
+  });
 
   if (error) throw error;
 }
@@ -197,11 +206,9 @@ export async function deleteMessage(messageId: string, chatId: string) {
 
   if (!msg) throw new Error('Message not found');
 
-  const m = msg as any;
-
-  let currentPayload = {};
+  let currentPayload: Record<string, unknown> = {};
   try {
-    currentPayload = JSON.parse(m.ciphertext);
+    currentPayload = JSON.parse(msg.ciphertext);
   } catch {}
 
   const deletedPayload = JSON.stringify({
@@ -216,15 +223,16 @@ export async function deleteMessage(messageId: string, chatId: string) {
 
   const { error } = await supabase
     .from('messages')
-    .update({
-      ciphertext: deletedPayload,
-      content: null,
-    } as any)
+    .update({ ciphertext: deletedPayload, content: null })
     .eq('id', messageId);
 
   if (error) throw error;
 }
 
+/**
+ * Mark the OTHER participants' unread messages as read.
+ * Never marks your own messages (that's what makes ✓ vs ✓✓ meaningful).
+ */
 export async function markMessagesAsRead(chatId: string) {
   const supabase = browserSupabase();
 
@@ -233,9 +241,10 @@ export async function markMessagesAsRead(chatId: string) {
 
   const { error } = await supabase
     .from('messages')
-    .update({ read: true } as any)
+    .update({ read: true })
     .eq('chat_id', chatId)
-    .eq('read', false);
+    .eq('read', false)
+    .neq('sender_id', me.user.id);
 
   if (error) console.error(error);
 }
@@ -249,39 +258,36 @@ async function ensureLocalDevice(userId: string): Promise<string> {
   const { data: devices, error } = await supabase
     .from('devices')
     .select('id')
+    .eq('user_id', userId)
     .limit(1);
 
   if (error) throw error;
 
-  const deviceList = (devices ?? []) as any[];
+  const deviceList = devices ?? [];
 
   if (deviceList.length > 0) {
     window.localStorage.setItem('active_device_id', deviceList[0].id);
-    return deviceList[0].id as string;
+    return deviceList[0].id;
   }
 
   const label = `Web-${new Date().toISOString().slice(0, 10)}`;
 
   const { data: created, error: cErr } = await supabase
     .from('devices')
-    .insert([
-      {
-        user_id: userId,
-        device_label: label,
-        registration_id: 1,
-        identity_public_key: 'mvp',
-        signed_prekey_id: 1,
-        signed_prekey_public: 'mvp',
-        signed_prekey_signature: 'mvp',
-      },
-    ] as any)
+    .insert({
+      user_id: userId,
+      device_label: label,
+      registration_id: 1,
+      identity_public_key: 'mvp',
+      signed_prekey_id: 1,
+      signed_prekey_public: 'mvp',
+      signed_prekey_signature: 'mvp',
+    })
     .select('id')
     .single();
 
   if (cErr) throw cErr;
 
-  const createdDevice = created as any;
-
-  window.localStorage.setItem('active_device_id', createdDevice.id);
-  return createdDevice.id as string;
+  window.localStorage.setItem('active_device_id', created.id);
+  return created.id;
 }

@@ -4,52 +4,27 @@ import { browserSupabase } from '@/lib/supabase/client';
 import type { ProfileRow } from '@/types/chat';
 
 /**
- * Loads or auto-creates a profile for the given user.
- * This guarantees profile always exists after session is established.
+ * Loads the current user's profile.
+ * Returns null when no profile exists yet (the user still needs to claim a
+ * username in /onboarding). We intentionally do NOT auto-insert a blank
+ * profile — `profiles.username` has a not-blank + unique constraint, so a
+ * null-username insert would fail and leave the account without a profile.
  */
-async function loadOrCreateProfile(userId: string): Promise<ProfileRow | null> {
+async function loadProfile(userId: string): Promise<ProfileRow | null> {
   const supabase = browserSupabase();
 
-  // 1. Try to fetch existing profile
-  const { data: prof, error } = await supabase
+  const { data, error } = await supabase
     .from('profiles')
     .select('*')
     .eq('id', userId)
-    .single();
+    .maybeSingle();
 
-  if (prof) return prof as ProfileRow;
-
-  // 2. Profile doesn't exist — auto-create with defaults
-  if (error?.code === 'PGRST116' || !prof) {
-    console.warn('Profile not found, auto-creating for user:', userId);
-
-    const { data: created, error: createErr } = await supabase
-  .from('profiles')
-  .upsert(
-    [{ id: userId, username: null, role: 'agent' }] as any,
-    { onConflict: 'id' }
-  )
-      .select('*')
-      .single();
-
-    if (createErr) {
-      console.error('Failed to auto-create profile:', createErr);
-      // Return a fallback so the app doesn't freeze
-      return {
-        id: userId,
-        username: null,
-        store_id: null,
-        role: 'agent',
-        created_at: new Date().toISOString(),
-      } as ProfileRow;
-    }
-
-    return (created as ProfileRow) ?? null;
+  if (error) {
+    console.error('Error loading profile:', error);
+    return null;
   }
 
-  // 3. Some other error
-  console.error('Error loading profile:', error);
-  return null;
+  return (data as ProfileRow | null) ?? null;
 }
 
 export function useSession() {
@@ -64,8 +39,6 @@ export function useSession() {
       try {
         const { data, error } = await supabase.auth.getSession();
 
-        console.log('RAW SESSION:', data.session); // 👈 ESTE ES EL DEBUG
-
         if (error) {
           console.error('getSession error:', error);
           setUser(null);
@@ -78,15 +51,13 @@ export function useSession() {
         setUser(currentUser);
 
         if (currentUser) {
-          const prof = await loadOrCreateProfile(currentUser.id);
-          setProfile(prof);
+          setProfile(await loadProfile(currentUser.id));
         }
       } catch (e) {
         console.error('Session load failed:', e);
         setUser(null);
         setProfile(null);
       } finally {
-        // ALWAYS resolve loading
         setLoading(false);
       }
     };
@@ -95,14 +66,11 @@ export function useSession() {
 
     const { data: sub } = supabase.auth.onAuthStateChange(
       async (_evt: AuthChangeEvent, session: Session | null) => {
-        console.log('AUTH CHANGE SESSION:', session); // 👈 EXTRA DEBUG
-
         const currentUser = session?.user ?? null;
         setUser(currentUser);
 
         if (currentUser) {
-          const prof = await loadOrCreateProfile(currentUser.id);
-          setProfile(prof);
+          setProfile(await loadProfile(currentUser.id));
         } else {
           setProfile(null);
         }

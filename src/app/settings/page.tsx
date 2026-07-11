@@ -12,7 +12,9 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState<string>('');
   const [activeDeviceId, setActiveDeviceId] = useState<string | null>(null);
-  
+  const [showOnline, setShowOnline] = useState<boolean>(true);
+  const [savingPrivacy, setSavingPrivacy] = useState(false);
+
   // Password change state
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -67,6 +69,7 @@ export default function SettingsPage() {
             role: 'agent'
           };
           setProfile(prof);
+          setShowOnline((prof as any)?.show_online ?? true);
         }
 
       } catch (e) {
@@ -97,6 +100,27 @@ export default function SettingsPage() {
     setStatus('');
     await supabase.auth.signOut();
     setStatus('✅ Signed out');
+  }
+
+  async function toggleShowOnline() {
+    if (!user) return;
+    const next = !showOnline;
+    setShowOnline(next);
+    setSavingPrivacy(true);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ show_online: next })
+        .eq('id', user.id);
+      if (error) throw error;
+      // Reload so the global presence channel re-evaluates (start/stop broadcasting)
+      setTimeout(() => window.location.reload(), 250);
+    } catch (e: any) {
+      setShowOnline(!next); // revert on failure
+      setStatus(`❌ ${e?.message ?? String(e)}`);
+    } finally {
+      setSavingPrivacy(false);
+    }
   }
 
   async function handleUpdatePassword(e: React.FormEvent) {
@@ -153,6 +177,43 @@ export default function SettingsPage() {
             <div className="rounded-xl border border-slate-900 bg-slate-950/50 p-4 shadow-sm">
               <div className="text-sm font-medium text-slate-200">ID de dispositivo activo</div>
               <div className="text-xs text-slate-400 mt-1">{activeDeviceId ?? '(ninguno) — ejecuta /onboarding'}</div>
+            </div>
+          </section>
+
+          <section className="space-y-3">
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500 ml-1">Perfil</h2>
+            <div className="rounded-xl border border-slate-900 bg-slate-950/50 p-4 shadow-sm">
+              <div className="text-sm font-medium text-slate-200">Username</div>
+              <div className="text-xs text-slate-400 mt-1">
+                {profile?.username ?? '(sin username) — ve a /onboarding'}
+              </div>
+            </div>
+          </section>
+
+          <section className="space-y-3">
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500 ml-1">Privacidad</h2>
+            <div className="rounded-xl border border-slate-900 bg-slate-950/50 p-4 shadow-sm flex items-center justify-between gap-3">
+              <div>
+                <div className="text-sm font-medium text-slate-200">Mostrar mi estado en línea</div>
+                <div className="text-xs text-slate-400 mt-1">
+                  Si lo desactivas, los demás no verán cuándo estás conectado.
+                </div>
+              </div>
+              <button
+                onClick={toggleShowOnline}
+                disabled={savingPrivacy}
+                role="switch"
+                aria-checked={showOnline}
+                className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors disabled:opacity-50 ${
+                  showOnline ? 'bg-emerald-600' : 'bg-slate-700'
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    showOnline ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
             </div>
           </section>
 

@@ -87,6 +87,14 @@ export async function POST(req: Request) {
 
     if (chatError || !chat) throw chatError;
 
+    // 6b. Add the assigned agent as a chat member so they can see the chat
+    //     under membership-based RLS (in addition to store-level visibility).
+    if (assignedAgentId) {
+      await supabaseAdmin
+        .from('chat_members')
+        .insert({ chat_id: chat.id, user_id: assignedAgentId });
+    }
+
     // 7. Crear Session
     const publicToken = crypto.randomBytes(32).toString('hex');
     const { error: sessionError } = await supabaseAdmin

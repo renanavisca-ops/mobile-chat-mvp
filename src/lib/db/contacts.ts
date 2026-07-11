@@ -11,6 +11,8 @@ export async function searchUsers(query: string): Promise<ProfileLite[]> {
   const q = query.trim();
   if (!q) return [];
 
+  const { data: me } = await supabase.auth.getUser();
+
   const { data, error } = await supabase
     .from('profiles')
     .select('id, username')
@@ -19,10 +21,12 @@ export async function searchUsers(query: string): Promise<ProfileLite[]> {
 
   if (error) throw error;
 
-  return (data ?? []).map((row: any) => ({
-    id: row.id,
-    username: row.username ?? null
-  }));
+  return (data ?? [])
+    .filter((row: any) => row.id !== me.user?.id) // exclude myself
+    .map((row: any) => ({
+      id: row.id,
+      username: row.username ?? null
+    }));
 }
 
 /**

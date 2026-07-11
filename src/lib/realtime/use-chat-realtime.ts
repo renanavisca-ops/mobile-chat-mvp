@@ -83,8 +83,8 @@ export function useChatRealtime(chatId: string) {
               if (current.some((m) => m.id === newMsg.id)) return current;
               return [...current, newMsg];
             });
-            // Notificar si la app está en background
-            if (document.hidden && newMsg.sender_type !== 'agent') {
+            // Notificar si la app está en background y el mensaje no es mío
+            if (document.hidden && newMsg.sender_id && newMsg.sender_id !== userId) {
               try {
                 let txt = 'Nuevo mensaje';
                 if (newMsg.content) {
@@ -96,8 +96,8 @@ export function useChatRealtime(chatId: string) {
                 notify('Nuevo mensaje', { body: txt });
               } catch {}
             }
-            // Si el mensaje no es del agente local, marcar como leído
-            if (newMsg.sender_type !== 'agent') {
+            // Si el mensaje no es mío, marcar como leído
+            if (newMsg.sender_id && newMsg.sender_id !== userId) {
               markMessagesAsRead(chatId).catch(console.error);
             }
           } else if (payload.eventType === 'UPDATE') {
