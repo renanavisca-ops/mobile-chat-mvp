@@ -16,6 +16,12 @@ function fmt(ts: string | null) {
   return d.toLocaleString();
 }
 
+function chatTitle(chat: ChatSummary) {
+  if (chat.kind === 'group') return chat.title ?? 'Group';
+  if (chat.kind === 'customer') return chat.title ?? 'Customer chat';
+  return chat.title ?? 'Direct chat';
+}
+
 export default function ChatsPage() {
   const { loading, profile, user } = useRequireAuth();
   const [chats, setChats] = useState<ChatSummary[]>([]);
@@ -49,22 +55,9 @@ export default function ChatsPage() {
           const newRow = payload.new;
           if (!newRow) return;
 
-          if (payload.eventType !== 'INSERT') return;
-
-          if (profile.role === 'agent') {
-            if (newRow.assigned_to === user.id) {
-              setUnreadCount(prev => prev + 1);
-              audioRef.current?.play().catch(() => {});
-              load();
-            }
-            return;
-          }
-
-          if (profile.role === 'admin') {
-            if (newRow.store_id === profile.store_id) {
-              load();
-            }
-            return;
+          if (payload.eventType === 'INSERT' && newRow.assigned_to === user.id) {
+            setUnreadCount((prev) => prev + 1);
+            audioRef.current?.play().catch(() => {});
           }
 
           load();
@@ -87,11 +80,12 @@ export default function ChatsPage() {
       void supabase.removeChannel(channel);
       void supabase.removeChannel(messagesChannel);
     };
-  }, [loading, user, profile]);
+  }, [loading, user?.id, profile]);
 
   return (
     <PageShell title="Chats" right={<Link className="text-sm text-slate-200 hover:text-white" href="/contacts">New chat</Link>}>
       {err ? <p className="text-sm text-red-300">{err}</p> : null}
+      {unreadCount > 0 ? <p className="mb-2 text-xs text-blue-300">Nuevos chats/mensajes: {unreadCount}</p> : null}
 
       {loading ? (
         <p className="text-sm text-slate-300">Loading…</p>
@@ -109,7 +103,7 @@ export default function ChatsPage() {
               <Link href={`/chats/${c.id}`} className="block rounded-lg p-2 hover:bg-slate-950/60">
                 <div className="flex items-center justify-between gap-3">
                   <div className="font-medium">
-                    {c.kind === 'group' ? c.title ?? 'Group' : 'Direct chat'}
+                    {chatTitle(c)}
                     {c.status && (
                       <span className={`ml-2 rounded px-1.5 py-0.5 text-[10px] uppercase ${
                         c.status === 'open' ? 'bg-green-900/40 text-green-400' :
