@@ -9,53 +9,75 @@ type ProfileForChats = {
   store_id?: string | null;
 };
 
-export async function listChats(userId?: string, profileInput?: ProfileForChats | null): Promise<ChatSummary[]> {
+const CHAT_SELECT = 'id, kind, title, created_at, store_id, assigned_to, status';
+
+function mergeChats(target: Map<string, any>, rows: any[] | null | undefined) {
+  for (const row of rows ?? []) {
+    if (row?.id) target.set(row.id, row);
+  }
+}
+
+export async function listChats(userId: string, profileInput?: ProfileForChats | null): Promise<ChatSummary[]> {
   const supabase = browserSupabase();
 
-  let currentUserId = userId ?? '';
+  if (!userId) return [];
 
-  if (!currentUserId) {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+  const profile = profileInput ?? null;
+  const chatsById = new Map<string, any>();
 
-    currentUserId = user?.id ?? '';
+  // 1) Internal direct/group chats are membership-based.
+  const { data: memberships, error: memberErr } = await supabase
+    .from('chat_members')
+    .select('chat_id')
+    .eq('user_id', userId);
+
+  if (memberErr) throw memberErr;
+
+  const memberChatIds = Array.from(
+    new Set((memberships ?? []).map((row: any) => row.chat_id).filter(Boolean))
+  );
+
+  if (memberChatIds.length > 0) {
+    const { data: memberChats, error: memberChatsErr } = await supabase
+      .from('chats')
+      .select(CHAT_SELECT)
+      .in('id', memberChatIds);
+
+    if (memberChatsErr) throw memberChatsErr;
+    mergeChats(chatsById, memberChats as any[]);
   }
 
-  if (!currentUserId) return [];
+  // 2) Customer/support chats are assignment/store based.
+  if (profile?.role === 'agent') {
+    const { data, error } = await supabase
+      .from('chats')
+      .select(CHAT_SELECT)
+      .eq('assigned_to', userId);
 
-  let p: any = profileInput ?? null;
+    if (error) throw error;
+    mergeChats(chatsById, data as any[]);
+  } else if (profile?.role === 'admin' && profile.store_id) {
+    const { data, error } = await supabase
+      .from('chats')
+      .select(CHAT_SELECT)
+      .eq('store_id', profile.store_id);
 
-  if (!p) {
-    const { data: profile, error: profileErr } = await supabase
-      .from('profiles')
-      .select('store_id, role')
-      .eq('id', currentUserId)
-      .single();
+    if (error) throw error;
+    mergeChats(chatsById, data as any[]);
+  } else if (profile?.role === 'superadmin') {
+    const { data, error } = await supabase
+      .from('chats')
+      .select(CHAT_SELECT);
 
-    if (profileErr || !profile) return [];
-    p = profile as any;
+    if (error) throw error;
+    mergeChats(chatsById, data as any[]);
   }
 
-  let query = supabase
-    .from('chats')
-    .select('id, kind, title, created_at, store_id, assigned_to, status');
-
-  if (p.role === 'agent') {
-    query = query.eq('assigned_to', currentUserId);
-  } else if (p.role === 'admin') {
-    query = query.eq('store_id', p.store_id);
-  } else if (p.role === 'superadmin') {
-    // sin filtro
-  }
-
-  const { data: chats, error } = await query.order('created_at', {
-    ascending: false,
+  const chatList = Array.from(chatsById.values()).sort((a, b) => {
+    const at = new Date(a.created_at ?? 0).getTime();
+    const bt = new Date(b.created_at ?? 0).getTime();
+    return bt - at;
   });
-
-  if (error) throw error;
-
-  const chatList = (chats ?? []) as any[];
 
   if (chatList.length === 0) return [];
 
@@ -66,7 +88,7 @@ export async function listChats(userId?: string, profileInput?: ProfileForChats 
     .select('id, chat_id, content, ciphertext, created_at')
     .in('chat_id', chatIds)
     .order('created_at', { ascending: false })
-    .limit(200);
+    .limit(500);
 
   if (msgErr) throw msgErr;
 
@@ -110,29 +132,42 @@ export async function listChats(userId?: string, profileInput?: ProfileForChats 
   })) as ChatSummary[];
 }
 
-export async function createDirectChatWith(userId: string): Promise<string> {
-  const supabase = browserSupabase();
+export async function createDirectChatWith(userId: string, accessToken: string): Promise<string> {
+  if (!accessToken) throw new Error('Session token not ready');
 
-  const { data, error } = await (supabase as any).rpc('create_direct_chat', {
-    other_user: userId,
+  const res = await fetch('/api/chats/direct', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({ other_user: userId }),
   });
 
-  if (error) throw error;
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error ?? 'Could not create direct chat');
+  if (!data?.chatId) throw new Error('Direct chat API did not return chatId');
 
-  return data as string;
+  return data.chatId as string;
 }
 
-export async function createGroupChat(title: string, memberIds: string[]): Promise<string> {
-  const supabase = browserSupabase();
+export async function createGroupChat(title: string, memberIds: string[], accessToken: string): Promise<string> {
+  if (!accessToken) throw new Error('Session token not ready');
 
-  const { data, error } = await (supabase as any).rpc('create_group_chat', {
-    title,
-    member_ids: memberIds,
+  const res = await fetch('/api/chats/group', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({ title, member_ids: memberIds }),
   });
 
-  if (error) throw error;
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error ?? 'Could not create group chat');
+  if (!data?.chatId) throw new Error('Group chat API did not return chatId');
 
-  return data as string;
+  return data.chatId as string;
 }
 
 export async function listMessages(
@@ -166,19 +201,12 @@ export type MessagePayload = {
   is_deleted?: boolean;
 };
 
-export async function sendMessage(chatId: string, payload: MessagePayload, senderUserId?: string) {
+export async function sendMessage(chatId: string, payload: MessagePayload, senderUserId: string) {
   const supabase = browserSupabase();
 
-  let userId = senderUserId ?? '';
+  if (!senderUserId) throw new Error('Not authenticated');
 
-  if (!userId) {
-    const { data: me } = await supabase.auth.getUser();
-    userId = me.user?.id ?? '';
-  }
-
-  if (!userId) throw new Error('Not authenticated');
-
-  const deviceId = await ensureLocalDevice(userId);
+  const deviceId = await ensureLocalDevice(senderUserId);
 
   const ciphertext = JSON.stringify({ v: 1, ...payload });
   const nonce = crypto.randomUUID();
@@ -191,39 +219,36 @@ export async function sendMessage(chatId: string, payload: MessagePayload, sende
       ciphertext,
       content: payload.text || null,
       sender_type: 'agent',
-      sender_id: userId,
+      sender_id: senderUserId,
       nonce,
+      read: false,
     },
   ] as any);
 
   if (error) throw error;
 }
 
-export async function deleteMessage(messageId: string, chatId: string, senderUserId?: string) {
+export async function deleteMessage(messageId: string, chatId: string, senderUserId: string) {
   const supabase = browserSupabase();
 
-  let userId = senderUserId ?? '';
+  if (!senderUserId) throw new Error('Not authenticated');
 
-  if (!userId) {
-    const { data: me } = await supabase.auth.getUser();
-    userId = me.user?.id ?? '';
-  }
-
-  if (!userId) throw new Error('Not authenticated');
-
-  const { data: msg } = await supabase
+  const { data: msg, error: getErr } = await supabase
     .from('messages')
-    .select('ciphertext')
+    .select('ciphertext, sender_id')
     .eq('id', messageId)
+    .eq('chat_id', chatId)
     .single();
 
+  if (getErr) throw getErr;
   if (!msg) throw new Error('Message not found');
-
-  const m = msg as any;
+  if ((msg as any).sender_id && (msg as any).sender_id !== senderUserId) {
+    throw new Error('You can only delete your own messages');
+  }
 
   let currentPayload = {};
   try {
-    currentPayload = JSON.parse(m.ciphertext);
+    currentPayload = JSON.parse((msg as any).ciphertext);
   } catch {}
 
   const deletedPayload = JSON.stringify({
@@ -242,7 +267,8 @@ export async function deleteMessage(messageId: string, chatId: string, senderUse
       ciphertext: deletedPayload,
       content: null,
     } as any)
-    .eq('id', messageId);
+    .eq('id', messageId)
+    .eq('chat_id', chatId);
 
   if (error) throw error;
 }
@@ -259,11 +285,43 @@ export async function markMessagesAsRead(chatId: string) {
   if (error) console.error(error);
 }
 
+async function validateCachedDevice(userId: string, deviceId: string): Promise<string | null> {
+  const supabase = browserSupabase();
+
+  const { data, error } = await supabase
+    .from('devices')
+    .select('id')
+    .eq('id', deviceId)
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (error || !data) return null;
+  return (data as any).id as string;
+}
+
 export async function ensureLocalDevice(userId: string): Promise<string> {
   const supabase = browserSupabase();
 
-  const cached = window.localStorage.getItem('active_device_id');
-  if (cached) return cached;
+  if (!userId) throw new Error('Not authenticated');
+
+  const cacheKey = `active_device_id:${userId}`;
+  const cached = window.localStorage.getItem(cacheKey);
+
+  if (cached) {
+    const valid = await validateCachedDevice(userId, cached);
+    if (valid) return valid;
+    window.localStorage.removeItem(cacheKey);
+  }
+
+  const legacyCached = window.localStorage.getItem('active_device_id');
+  if (legacyCached) {
+    const valid = await validateCachedDevice(userId, legacyCached);
+    if (valid) {
+      window.localStorage.setItem(cacheKey, valid);
+      return valid;
+    }
+    window.localStorage.removeItem('active_device_id');
+  }
 
   const { data: devices, error } = await supabase
     .from('devices')
@@ -277,7 +335,7 @@ export async function ensureLocalDevice(userId: string): Promise<string> {
   const deviceList = (devices ?? []) as any[];
 
   if (deviceList.length > 0) {
-    window.localStorage.setItem('active_device_id', deviceList[0].id);
+    window.localStorage.setItem(cacheKey, deviceList[0].id);
     return deviceList[0].id as string;
   }
 
@@ -304,6 +362,7 @@ export async function ensureLocalDevice(userId: string): Promise<string> {
 
   const createdDevice = created as any;
 
+  window.localStorage.setItem(cacheKey, createdDevice.id);
   window.localStorage.setItem('active_device_id', createdDevice.id);
   return createdDevice.id as string;
 }
