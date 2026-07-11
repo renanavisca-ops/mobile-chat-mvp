@@ -6,6 +6,10 @@ import { useRequireAuth } from '@/lib/auth/use-require-auth';
 import { addContact, listMyContacts, searchUsers } from '@/lib/db/contacts';
 import type { ProfileLite } from '@/lib/db/types';
 
+function displayName(profile: ProfileLite): string {
+  return profile.username || profile.email || profile.id;
+}
+
 export default function ContactsPage() {
   const { loading, user, profile, accessToken } = useRequireAuth();
 
@@ -24,7 +28,7 @@ export default function ContactsPage() {
   async function refreshContacts(ownerId = user?.id) {
     if (!ownerId) return;
     const list = await listMyContacts(ownerId);
-    setContacts(list);
+    setContacts(list.filter((contact) => contact.id !== ownerId));
   }
 
   useEffect(() => {
@@ -42,7 +46,7 @@ export default function ContactsPage() {
   useEffect(() => {
     if (!openAdd) return;
 
-    if (!canSearch || !accessToken) {
+    if (!canSearch || !accessToken || !user?.id) {
       setResults([]);
       return;
     }
@@ -51,7 +55,7 @@ export default function ContactsPage() {
 
     searchUsers(q, accessToken)
       .then((rows) => {
-        if (!cancelled) setResults(rows);
+        if (!cancelled) setResults(rows.filter((row) => row.id !== user.id));
       })
       .catch((e) => {
         if (!cancelled) setErr(e?.message ?? String(e));
@@ -60,7 +64,7 @@ export default function ContactsPage() {
     return () => {
       cancelled = true;
     };
-  }, [q, canSearch, openAdd, accessToken]);
+  }, [q, canSearch, openAdd, accessToken, user?.id]);
 
   function openModal() {
     setErr('');
@@ -79,6 +83,7 @@ export default function ContactsPage() {
     setErr('');
     try {
       if (!user?.id) throw new Error('Not authenticated');
+      if (userId === user.id) throw new Error('No puedes agregarte a ti mismo como contacto.');
       await addContact(user.id, userId);
       await refreshContacts(user.id);
     } catch (e: any) {
@@ -90,6 +95,7 @@ export default function ContactsPage() {
     setErr('');
     try {
       if (!user?.id) throw new Error('Not authenticated');
+      if (userId === user.id) throw new Error('No puedes abrir chat contigo mismo. Busca o agrega otro usuario.');
       if (!accessToken) throw new Error('Session token not ready. Refresh and try again.');
 
       const res = await fetch('/api/chats/direct', {
@@ -149,7 +155,10 @@ export default function ContactsPage() {
           <ul className="mt-2 divide-y divide-slate-900 rounded-lg border border-slate-900">
             {contacts.map((c) => (
               <li key={c.id} className="flex items-center justify-between gap-3 p-2">
-                <div className="text-sm">{c.username ?? c.id}</div>
+                <div>
+                  <div className="text-sm">{displayName(c)}</div>
+                  {c.email && c.email !== c.username ? <div className="text-xs text-slate-500">{c.email}</div> : null}
+                </div>
                 <button
                   className="rounded bg-blue-600 px-3 py-1.5 text-sm hover:bg-blue-500"
                   onClick={() => onChat(c.id)}
@@ -175,7 +184,7 @@ export default function ContactsPage() {
               <div>
                 <div className="text-base font-semibold">Add contact</div>
                 <div className="text-xs text-slate-400">
-                  Search by <b>username</b>. Contacts are users, not devices.
+                  Search by <b>username</b> or <b>email</b>. Contacts are users, not devices.
                 </div>
               </div>
               <button
@@ -191,7 +200,7 @@ export default function ContactsPage() {
               className="mt-3 w-full rounded border border-slate-800 bg-slate-950 px-3 py-2 text-slate-100"
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              placeholder="e.g. ana, jose, tienda01…"
+              placeholder="username o email"
             />
 
             {canSearch ? (
@@ -199,7 +208,10 @@ export default function ContactsPage() {
                 <ul className="mt-3 divide-y divide-slate-900 rounded-lg border border-slate-900">
                   {results.map((r) => (
                     <li key={r.id} className="flex items-center justify-between gap-3 p-2">
-                      <div className="text-sm">{r.username ?? r.id}</div>
+                      <div>
+                        <div className="text-sm">{displayName(r)}</div>
+                        {r.email && r.email !== r.username ? <div className="text-xs text-slate-500">{r.email}</div> : null}
+                      </div>
                       <div className="flex gap-2">
                         <button
                           className="rounded bg-slate-800 px-3 py-1.5 text-sm hover:bg-slate-700"
