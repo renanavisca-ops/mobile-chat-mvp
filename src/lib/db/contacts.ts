@@ -4,34 +4,28 @@ import { browserSupabase } from '@/lib/supabase/client';
 import type { ProfileLite } from '@/lib/db/types';
 
 /**
- * Search users by username. Profiles without username are not usable contacts.
+ * Search users by username through the server API.
+ * This avoids client-side RLS/profile visibility issues.
  */
-export async function searchUsers(query: string, excludeUserId?: string): Promise<ProfileLite[]> {
-  const supabase = browserSupabase();
+export async function searchUsers(query: string, accessToken: string): Promise<ProfileLite[]> {
   const q = query.trim();
-  if (!q) return [];
+  if (!q || q.length < 2) return [];
+  if (!accessToken) throw new Error('Session token not ready. Refresh and try again.');
 
-  let request = supabase
-    .from('profiles')
-    .select('id, username')
-    .not('username', 'is', null)
-    .ilike('username', `%${q}%`)
-    .limit(20);
+  const res = await fetch(`/api/profiles/search?q=${encodeURIComponent(q)}`, {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
 
-  if (excludeUserId) {
-    request = request.neq('id', excludeUserId);
+  const data = await res.json().catch(() => ({}));
+
+  if (!res.ok) {
+    throw new Error(data?.error ?? 'Profile search failed');
   }
 
-  const { data, error } = await request;
-
-  if (error) throw error;
-
-  return (data ?? [])
-    .filter((row: any) => typeof row.username === 'string' && row.username.trim().length > 0)
-    .map((row: any) => ({
-      id: row.id,
-      username: row.username,
-    }));
+  return (data?.users ?? []) as ProfileLite[];
 }
 
 /**
