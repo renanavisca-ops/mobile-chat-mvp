@@ -67,7 +67,6 @@ export async function POST(req: Request) {
     const [a, b] = sortPair(currentUserId, otherUserId);
     const directKey = `${a}:${b}`;
 
-    // Prefer a stable direct_key column when the migration has been applied.
     const { data: existingByKey, error: existingKeyErr } = await supabaseAdmin
       .from('chats')
       .select('id')
@@ -76,10 +75,19 @@ export async function POST(req: Request) {
       .maybeSingle();
 
     if (!existingKeyErr && existingByKey?.id) {
-      return NextResponse.json({ chatId: existingByKey.id });
+      const chatId = existingByKey.id;
+      await supabaseAdmin
+        .from('chat_members')
+        .upsert(
+          [
+            { chat_id: chatId, user_id: currentUserId },
+            { chat_id: chatId, user_id: otherUserId },
+          ] as any,
+          { onConflict: 'chat_id,user_id' }
+        );
+      return NextResponse.json({ chatId });
     }
 
-    // Fallback for databases where direct_key has not been added yet.
     if (existingKeyErr) {
       const { data: memberRows, error: memberErr } = await supabaseAdmin
         .from('chat_members')
@@ -111,19 +119,17 @@ export async function POST(req: Request) {
           return NextResponse.json({ chatId: existing[0].id });
         }
       }
-    } else if (existingKeyErr) {
-      throw existingKeyErr;
     }
 
     const insertChat: Record<string, any> = {
       kind: 'direct',
       created_by: currentUserId,
-      title: null,
+      assigned_to: currentUserId,
+      title: (otherProfile as any).username ?? 'Direct chat',
+      status: 'open',
     };
 
-    if (!existingKeyErr) {
-      insertChat.direct_key = directKey;
-    }
+    if (!existingKeyErr) insertChat.direct_key = directKey;
 
     const { data: chat, error: chatErr } = await supabaseAdmin
       .from('chats')
