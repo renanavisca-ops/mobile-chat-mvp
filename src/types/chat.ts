@@ -16,7 +16,7 @@ export type ProfileRow = {
 
 export type ChatRow = {
   id: string;
-  kind: 'direct' | 'group';
+  kind: 'direct' | 'group' | 'customer';
   created_by: string | null;
   title: string | null;
   store_id: string | null;
