@@ -81,7 +81,13 @@ export function useChatRealtime(chatId: string) {
             const newMsg = payload.new as MessageRow;
             setMessages((current) => {
               if (current.some((m) => m.id === newMsg.id)) return current;
-              return [...current, newMsg];
+              // Replace the optimistic local echo (added on send with a
+              // `local-` id but the SAME ciphertext) so our own messages don't
+              // show twice when the realtime INSERT comes back.
+              const withoutEcho = current.filter(
+                (m) => !(m.id.startsWith('local-') && m.ciphertext === newMsg.ciphertext)
+              );
+              return [...withoutEcho, newMsg];
             });
             // Notificar si la app está en background y el mensaje no es mío
             if (document.hidden && newMsg.sender_id && newMsg.sender_id !== userId) {
