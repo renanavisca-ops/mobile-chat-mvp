@@ -4,7 +4,7 @@ import { PresenceProvider } from '@/components/presence-provider';
 
 export const metadata: Metadata = {
   title: 'Toky Chat',
-  description: 'Signal-like E2EE MVP on Next.js + Supabase'
+  description: 'Toky Chat — a fast, modern messaging app.'
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
