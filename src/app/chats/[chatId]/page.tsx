@@ -6,6 +6,7 @@ import { ForwardModal } from '@/components/forward-modal';
 import { MessageActionsSheet } from '@/components/message-actions-sheet';
 import { AttachSheet } from '@/components/attach-sheet';
 import { CameraCapture } from '@/components/camera-capture';
+import { getWallpaperId, wallpaperCss } from '@/lib/wallpaper';
 import { EmojiPicker } from '@/components/emoji-picker';
 import { useRequireAuth } from '@/lib/auth/use-require-auth';
 import { listChats, sendMessage, deleteMessage } from '@/lib/db/chats';
@@ -132,6 +133,11 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
   const [pendingImages, setPendingImages] = useState<File[]>([]);
   const [pendingVideo, setPendingVideo] = useState<File | null>(null);
   const [cameraOpen, setCameraOpen] = useState(false);
+  const [chatWallpaper, setChatWallpaper] = useState('');
+
+  useEffect(() => {
+    setChatWallpaper(wallpaperCss(getWallpaperId()));
+  }, []);
 
   const [isRecording, setIsRecording] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -873,7 +879,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
 
           {err ? <p className="text-sm text-red-300">{err}</p> : null}
 
-          <div ref={scrollRef} onScroll={handleScroll} className="h-[55vh] overflow-auto rounded-xl border border-slate-900 bg-slate-950/40 p-3">
+          <div ref={scrollRef} onScroll={handleScroll} style={chatWallpaper ? { background: chatWallpaper } : undefined} className="h-[55vh] overflow-auto rounded-xl border border-slate-900 bg-slate-950/40 p-3">
             {loadingMore && <div className="text-center text-xs text-slate-500 my-2">Cargando anteriores...</div>}
             {items.length === 0 ? (
               <p className="text-sm text-slate-400">No messages yet.</p>

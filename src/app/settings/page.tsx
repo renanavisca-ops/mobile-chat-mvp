@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { PageShell } from '@/components/page-shell';
 import { browserSupabase } from '@/lib/supabase/client';
+import { WALLPAPERS, getWallpaperId, setWallpaperId as saveWallpaperId } from '@/lib/wallpaper';
 
 export default function SettingsPage() {
   const supabase = browserSupabase();
@@ -25,9 +26,17 @@ export default function SettingsPage() {
   });
   const [isUpdating, setIsUpdating] = useState(false);
 
+  const [wallpaperId, setWpId] = useState('default');
+
   useEffect(() => {
     setActiveDeviceId(localStorage.getItem('active_device_id'));
+    setWpId(getWallpaperId());
   }, []);
+
+  function chooseWallpaper(id: string) {
+    saveWallpaperId(id);
+    setWpId(id);
+  }
 
   useEffect(() => {
     let mounted = true;
@@ -187,6 +196,33 @@ export default function SettingsPage() {
               <div className="text-xs text-slate-400 mt-1">
                 {profile?.username ?? '(sin username) — ve a /onboarding'}
               </div>
+            </div>
+          </section>
+
+          <section className="space-y-3">
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500 ml-1">Fondo de chat</h2>
+            <div className="rounded-xl border border-slate-900 bg-slate-950/50 p-4 shadow-sm">
+              <div className="text-sm font-medium text-slate-200">Elige un fondo para tus chats</div>
+              <div className="mt-3 grid grid-cols-4 gap-3 sm:grid-cols-8">
+                {WALLPAPERS.map((w) => (
+                  <button
+                    key={w.id}
+                    type="button"
+                    onClick={() => chooseWallpaper(w.id)}
+                    title={w.name}
+                    aria-pressed={wallpaperId === w.id}
+                    className={`relative h-14 rounded-lg border-2 transition ${
+                      wallpaperId === w.id ? 'border-indigo-500' : 'border-slate-800 hover:border-slate-600'
+                    }`}
+                    style={{ background: w.css || '#0f1420' }}
+                  >
+                    {wallpaperId === w.id && (
+                      <span className="absolute inset-0 grid place-items-center text-white text-sm">✓</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+              <div className="mt-2 text-xs text-slate-500">Se guarda en este dispositivo.</div>
             </div>
           </section>
 
