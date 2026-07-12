@@ -14,6 +14,15 @@ export function browserSupabase(): SupabaseClient<Database> {
         persistSession: true,
         autoRefreshToken: true,
         detectSessionInUrl: true,
+        // Use a pass-through lock instead of the cross-tab navigator Web-Lock.
+        // supabase-js otherwise serialises every auth call (getUser / getSession
+        // / token refresh) on one Web-Lock; under this app's many concurrent
+        // auth calls that lock is held long enough to be "stolen" on timeout,
+        // throwing "AbortError: Lock broken by another request with the 'steal'
+        // option" and failing whichever query was in flight (e.g. the member
+        // list). Running each auth op directly is fine for a single browser
+        // client and removes that whole class of errors.
+        lock: async (_name: string, _acquireTimeout: number, fn) => fn(),
       },
     }
   )
