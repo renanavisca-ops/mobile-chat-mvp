@@ -253,21 +253,25 @@ async function ensureLocalDevice(userId: string): Promise<string> {
   const supabase = browserSupabase();
 
   const cached = window.localStorage.getItem('active_device_id');
-  if (cached) return cached;
 
+  // NEVER trust the cached id blindly: messages.sender_device_id has a hard
+  // foreign key to devices(id), so a stale cached id (device deleted / from a
+  // previous project) makes every message insert fail. Always reconcile the
+  // cache against the devices that actually exist for this user.
   const { data: devices, error } = await supabase
     .from('devices')
     .select('id')
-    .eq('user_id', userId)
-    .limit(1);
+    .eq('user_id', userId);
 
   if (error) throw error;
 
-  const deviceList = devices ?? [];
+  const ids = (devices ?? []).map((d) => d.id);
 
-  if (deviceList.length > 0) {
-    window.localStorage.setItem('active_device_id', deviceList[0].id);
-    return deviceList[0].id;
+  if (cached && ids.includes(cached)) return cached;
+
+  if (ids.length > 0) {
+    window.localStorage.setItem('active_device_id', ids[0]);
+    return ids[0];
   }
 
   const label = `Web-${new Date().toISOString().slice(0, 10)}`;
