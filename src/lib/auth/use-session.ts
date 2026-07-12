@@ -34,52 +34,56 @@ export function useSession() {
 
   useEffect(() => {
     const supabase = browserSupabase();
+    let active = true;
 
-    const load = async () => {
-      try {
-        const { data, error } = await supabase.auth.getSession();
+    // Apply an auth state and (re)load the profile. The profile query runs
+    // OUTSIDE any Supabase auth-lock context — see the onAuthStateChange note.
+    const applyUser = (currentUser: User | null) => {
+      if (!active) return;
+      setUser(currentUser);
 
-        if (error) {
-          console.error('getSession error:', error);
-          setUser(null);
-          setProfile(null);
-          setLoading(false);
-          return;
-        }
-
-        const currentUser = data.session?.user ?? null;
-        setUser(currentUser);
-
-        if (currentUser) {
-          setProfile(await loadProfile(currentUser.id));
-        }
-      } catch (e) {
-        console.error('Session load failed:', e);
-        setUser(null);
+      if (!currentUser) {
         setProfile(null);
-      } finally {
         setLoading(false);
+        return;
       }
+
+      loadProfile(currentUser.id)
+        .then((p) => {
+          if (active) setProfile(p);
+        })
+        .catch((e) => {
+          console.error('Session load failed:', e);
+          if (active) setProfile(null);
+        })
+        .finally(() => {
+          if (active) setLoading(false);
+        });
     };
 
-    void load();
+    // Initial read.
+    supabase.auth
+      .getSession()
+      .then(({ data }) => applyUser(data.session?.user ?? null))
+      .catch(() => {
+        if (active) setLoading(false);
+      });
 
+    // IMPORTANT: supabase-js holds an internal auth lock while it runs this
+    // callback. Awaiting another Supabase call here (e.g. a `.from(...)`
+    // query, which itself needs getSession) re-enters that lock and DEADLOCKS
+    // the client — every later query/auth call then hangs, which shows up as
+    // the whole app "loading forever". So the callback must stay synchronous
+    // and defer any Supabase work to a microtask via setTimeout(…, 0).
     const { data: sub } = supabase.auth.onAuthStateChange(
-      async (_evt: AuthChangeEvent, session: Session | null) => {
+      (_evt: AuthChangeEvent, session: Session | null) => {
         const currentUser = session?.user ?? null;
-        setUser(currentUser);
-
-        if (currentUser) {
-          setProfile(await loadProfile(currentUser.id));
-        } else {
-          setProfile(null);
-        }
-
-        setLoading(false);
+        setTimeout(() => applyUser(currentUser), 0);
       }
     );
 
     return () => {
+      active = false;
       sub.subscription.unsubscribe();
     };
   }, []);
