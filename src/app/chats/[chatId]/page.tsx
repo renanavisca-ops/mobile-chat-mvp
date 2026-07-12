@@ -5,6 +5,7 @@ import { PageShell } from '@/components/page-shell';
 import { ForwardModal } from '@/components/forward-modal';
 import { MessageActionsSheet } from '@/components/message-actions-sheet';
 import { AttachSheet } from '@/components/attach-sheet';
+import { CameraCapture } from '@/components/camera-capture';
 import { EmojiPicker } from '@/components/emoji-picker';
 import { useRequireAuth } from '@/lib/auth/use-require-auth';
 import { listChats, sendMessage, deleteMessage } from '@/lib/db/chats';
@@ -130,6 +131,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
   const [text, setText] = useState('');
   const [pendingImages, setPendingImages] = useState<File[]>([]);
   const [pendingVideo, setPendingVideo] = useState<File | null>(null);
+  const [cameraOpen, setCameraOpen] = useState(false);
 
   const [isRecording, setIsRecording] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -503,7 +505,17 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
   }
   function cameraPhoto() {
     setErr('');
-    cameraPhotoRef.current?.click();
+    // Live in-page webcam capture (works on desktop too, where the file-input
+    // `capture` attribute is ignored and only opens a file picker).
+    setCameraOpen(true);
+  }
+
+  // Feed a webcam-captured photo through the exact same validation/normalization
+  // path as a picked image file.
+  async function onCapturedPhoto(file: File) {
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    await onImagesChange({ target: { files: dt.files, value: '' } } as any);
   }
   function cameraVideo() {
     setErr('');
@@ -794,6 +806,12 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
           setEmojiOpen(false);
           pickFile();
         }}
+      />
+
+      <CameraCapture
+        open={cameraOpen}
+        onClose={() => setCameraOpen(false)}
+        onCapture={onCapturedPhoto}
       />
 
       {/* Hidden inputs */}
