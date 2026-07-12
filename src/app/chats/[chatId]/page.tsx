@@ -818,7 +818,10 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
                 )
               )}
             </div>
-            {chat && (
+            {/* Support-console status controls only apply to store chats.
+                Personal 1:1 / group chats have no store_id, and hitting the
+                staff-only status API from them returns 403 ("Forbidden"). */}
+            {chat && chat.store_id && (
               <div className="flex items-center gap-2">
                 <span className={`rounded px-1.5 py-0.5 uppercase ${
                   chat.status === 'open' ? 'bg-green-900/40 text-green-400' :
@@ -827,7 +830,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
                 }`}>
                   {chat.status}
                 </span>
-                
+
                 {chat.status === 'open' && (
                   <button 
                     onClick={() => updateStatus('in_progress')}
