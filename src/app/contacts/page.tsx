@@ -6,6 +6,8 @@ import { useRequireAuth } from '@/lib/auth/use-require-auth';
 import { browserSupabase } from '@/lib/supabase/client';
 import { createDirectChatWith } from '@/lib/db/chats';
 import { addContact, listMyContacts, searchUsers } from '@/lib/db/contacts';
+import { blockUser } from '@/lib/db/safety';
+import { ReportModal } from '@/components/report-modal';
 import type { ProfileLite } from '@/lib/db/types';
 
 export default function ContactsPage() {
@@ -84,6 +86,17 @@ export default function ContactsPage() {
 
       const chatId = await createDirectChatWith(userId);
       window.location.href = `/chats/${chatId}`;
+    } catch (e: any) {
+      setErr(e?.message ?? String(e));
+    }
+  }
+
+  const [reportTarget, setReportTarget] = useState<string | null>(null);
+
+  async function onBlock(userId: string) {
+    setErr('');
+    try {
+      await blockUser(userId);
     } catch (e: any) {
       setErr(e?.message ?? String(e));
     }
@@ -176,6 +189,20 @@ export default function ContactsPage() {
                         >
                           Chat
                         </button>
+                        <button
+                          className="rounded bg-slate-800 px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-700"
+                          onClick={() => onBlock(r.id)}
+                          title="Block user"
+                        >
+                          Block
+                        </button>
+                        <button
+                          className="rounded bg-slate-800 px-3 py-1.5 text-sm text-red-400 hover:bg-slate-700"
+                          onClick={() => setReportTarget(r.id)}
+                          title="Report user"
+                        >
+                          Report
+                        </button>
                       </div>
                     </li>
                   ))}
@@ -189,6 +216,12 @@ export default function ContactsPage() {
           </div>
         </div>
       ) : null}
+
+      <ReportModal
+        open={!!reportTarget}
+        onClose={() => setReportTarget(null)}
+        reportedUserId={reportTarget}
+      />
     </PageShell>
   );
 }

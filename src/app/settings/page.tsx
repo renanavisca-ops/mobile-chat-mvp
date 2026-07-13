@@ -37,6 +37,32 @@ export default function SettingsPage() {
   const avatarInputRef = useRef<HTMLInputElement | null>(null);
   const { permission, requestPermission } = useNotifications();
 
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState('');
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteErr, setDeleteErr] = useState('');
+
+  async function deleteAccount() {
+    setDeleteBusy(true);
+    setDeleteErr('');
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch('/api/account/delete', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session?.access_token}` },
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || 'Failed to delete account');
+      }
+      await supabase.auth.signOut();
+      window.location.href = '/login';
+    } catch (e: any) {
+      setDeleteErr(e?.message ?? String(e));
+      setDeleteBusy(false);
+    }
+  }
+
   useEffect(() => {
     setActiveDeviceId(localStorage.getItem('active_device_id'));
     setWpId(getWallpaperId());
@@ -431,6 +457,25 @@ export default function SettingsPage() {
             </div>
           </section>
 
+          <section className="space-y-3">
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-rose-500 ml-1">Zona de peligro</h2>
+            <div className="rounded-xl border border-rose-900/40 bg-rose-950/10 p-4 shadow-sm">
+              <div className="text-sm font-medium text-slate-200">Eliminar cuenta</div>
+              <div className="mt-1 text-xs text-slate-400">
+                Elimina tu perfil, dispositivos y contactos de forma permanente. Los
+                mensajes que enviaste se mantienen visibles para las otras personas del
+                chat. Esta acción no se puede deshacer.
+              </div>
+              <button
+                type="button"
+                onClick={() => setDeleteOpen(true)}
+                className="mt-3 rounded-lg bg-rose-700 px-4 py-2 text-sm font-medium text-white hover:bg-rose-600"
+              >
+                Eliminar mi cuenta
+              </button>
+            </div>
+          </section>
+
           <div className="pt-4 border-t border-slate-900">
             <button
               className="w-full rounded-lg border border-slate-800 bg-slate-900/50 px-4 py-2 text-sm text-slate-300 hover:bg-slate-800 hover:text-white transition-colors"
@@ -439,6 +484,55 @@ export default function SettingsPage() {
               Cerrar sesión
             </button>
             {status && <p className="text-xs text-center mt-3 text-slate-500 italic">{status}</p>}
+          </div>
+        </div>
+      )}
+
+      {deleteOpen && (
+        <div
+          className="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 p-4"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget && !deleteBusy) {
+              setDeleteOpen(false);
+              setDeleteConfirm('');
+              setDeleteErr('');
+            }
+          }}
+        >
+          <div className="w-full max-w-sm rounded-2xl border border-rose-900/50 bg-slate-950 p-4 shadow-xl">
+            <div className="text-base font-semibold text-rose-400">Eliminar cuenta</div>
+            <p className="mt-2 text-sm text-slate-300">
+              Esta acción es permanente. Escribe <b>DELETE</b> para confirmar.
+            </p>
+            <input
+              value={deleteConfirm}
+              onChange={(e) => setDeleteConfirm(e.target.value)}
+              placeholder="DELETE"
+              className="mt-3 w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-rose-500/50"
+            />
+            {deleteErr && <p className="mt-2 text-xs text-red-400">{deleteErr}</p>}
+            <div className="mt-4 flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setDeleteOpen(false);
+                  setDeleteConfirm('');
+                  setDeleteErr('');
+                }}
+                disabled={deleteBusy}
+                className="flex-1 rounded-lg border border-slate-800 bg-slate-900 px-4 py-2 text-sm text-slate-300 hover:bg-slate-800 disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={deleteAccount}
+                disabled={deleteBusy || deleteConfirm !== 'DELETE'}
+                className="flex-1 rounded-lg bg-rose-700 px-4 py-2 text-sm font-medium text-white hover:bg-rose-600 disabled:opacity-50"
+              >
+                {deleteBusy ? 'Eliminando…' : 'Eliminar definitivamente'}
+              </button>
+            </div>
           </div>
         </div>
       )}

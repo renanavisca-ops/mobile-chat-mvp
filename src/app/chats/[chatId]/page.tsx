@@ -6,7 +6,9 @@ import { ForwardModal } from '@/components/forward-modal';
 import { MessageActionsSheet } from '@/components/message-actions-sheet';
 import { AttachSheet } from '@/components/attach-sheet';
 import { CameraCapture } from '@/components/camera-capture';
+import { ReportModal } from '@/components/report-modal';
 import { getWallpaperId, wallpaperCss } from '@/lib/wallpaper';
+import { blockUser, unblockUser, isBlockedByMe } from '@/lib/db/safety';
 import { EmojiPicker } from '@/components/emoji-picker';
 import { useRequireAuth } from '@/lib/auth/use-require-auth';
 import { listChats, sendMessage, deleteMessage } from '@/lib/db/chats';
@@ -138,6 +140,12 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
   useEffect(() => {
     setChatWallpaper(wallpaperCss(getWallpaperId()));
   }, []);
+
+  // Safety: block / report (direct chats only — a "menu" for the other person).
+  const [safetyMenuOpen, setSafetyMenuOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [blocked, setBlocked] = useState(false);
+  const [blockBusy, setBlockBusy] = useState(false);
 
   const [isRecording, setIsRecording] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -275,6 +283,31 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
   );
   const someoneOnline = otherMemberIds.some((id) => onlineUsers.has(id));
   const isGroup = chat?.kind === 'group';
+  const otherUserId = !isGroup ? otherMemberIds[0] ?? null : null;
+
+  useEffect(() => {
+    if (!otherUserId) return;
+    isBlockedByMe(otherUserId).then(setBlocked).catch(() => {});
+  }, [otherUserId]);
+
+  async function toggleBlock() {
+    if (!otherUserId) return;
+    setBlockBusy(true);
+    try {
+      if (blocked) {
+        await unblockUser(otherUserId);
+        setBlocked(false);
+      } else {
+        await blockUser(otherUserId);
+        setBlocked(true);
+      }
+    } catch (e: any) {
+      setErr(e?.message ?? String(e));
+    } finally {
+      setBlockBusy(false);
+      setSafetyMenuOpen(false);
+    }
+  }
 
   function isMine(m: MessageRow) {
     return (!!myId && m.sender_id === myId) || m.sender_device_id === 'local';
@@ -820,6 +853,13 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
         onCapture={onCapturedPhoto}
       />
 
+      <ReportModal
+        open={reportOpen}
+        onClose={() => setReportOpen(false)}
+        reportedUserId={otherUserId}
+        chatId={chatId}
+      />
+
       {/* Hidden inputs */}
       <input ref={imageInputRef} type="file" hidden multiple accept="image/jpeg,image/png,image/webp" onChange={onImagesChange} />
       <input ref={videoInputRef} type="file" hidden accept="video/*" onChange={onVideoChange} />
@@ -840,6 +880,43 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
                 ) : (
                   <span className="text-slate-500">● Desconectado</span>
                 )
+              )}
+              {otherUserId && (
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setSafetyMenuOpen((v) => !v)}
+                    className="rounded px-1.5 py-0.5 text-slate-400 hover:bg-slate-900 hover:text-slate-200"
+                    aria-label="Chat options"
+                  >
+                    ⋯
+                  </button>
+                  {safetyMenuOpen && (
+                    <div
+                      className="absolute left-0 top-6 z-20 w-44 overflow-hidden rounded-lg border border-slate-800 bg-slate-950 text-sm shadow-xl"
+                      onMouseLeave={() => setSafetyMenuOpen(false)}
+                    >
+                      <button
+                        type="button"
+                        onClick={toggleBlock}
+                        disabled={blockBusy}
+                        className="block w-full px-3 py-2 text-left text-slate-200 hover:bg-slate-900 disabled:opacity-50"
+                      >
+                        {blocked ? 'Unblock user' : 'Block user'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSafetyMenuOpen(false);
+                          setReportOpen(true);
+                        }}
+                        className="block w-full px-3 py-2 text-left text-red-400 hover:bg-slate-900"
+                      >
+                        Report
+                      </button>
+                    </div>
+                  )}
+                </div>
               )}
             </div>
             {/* Support-console status controls only apply to store chats.
@@ -1045,6 +1122,12 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
             </div>
           )}
 
+          {blocked && (
+            <p className="rounded-lg border border-red-900/50 bg-red-950/30 px-3 py-2 text-xs text-red-300">
+              You&apos;ve blocked this user. Unblock them (⋯ menu above) to send messages.
+            </p>
+          )}
+
           <div ref={composerRef} className="relative flex items-center gap-2">
             {/* + button */}
             <button
@@ -1095,9 +1178,10 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
               onKeyDown={(e) => {
                 if (e.key === 'Enter') onSend();
               }}
+              disabled={blocked}
             />
 
-            <button className="rounded bg-blue-600 px-3 py-2 text-sm hover:bg-blue-500 disabled:opacity-60" onClick={onSend} disabled={busy || isRecording}>
+            <button className="rounded bg-blue-600 px-3 py-2 text-sm hover:bg-blue-500 disabled:opacity-60" onClick={onSend} disabled={busy || isRecording || blocked}>
               Send
             </button>
             <button 

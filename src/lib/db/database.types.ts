@@ -12,6 +12,48 @@ export type Database = {
   }
   public: {
     Tables: {
+      blocks: {
+        Row: { blocked_id: string; blocker_id: string; created_at: string }
+        Insert: { blocked_id: string; blocker_id: string; created_at?: string }
+        Update: { blocked_id?: string; blocker_id?: string; created_at?: string }
+        Relationships: []
+      }
+      reports: {
+        Row: {
+          chat_id: string | null
+          created_at: string
+          details: string | null
+          id: string
+          message_id: string | null
+          reason: string
+          reported_user_id: string | null
+          reporter_id: string
+          status: string
+        }
+        Insert: {
+          chat_id?: string | null
+          created_at?: string
+          details?: string | null
+          id?: string
+          message_id?: string | null
+          reason: string
+          reported_user_id?: string | null
+          reporter_id: string
+          status?: string
+        }
+        Update: {
+          chat_id?: string | null
+          created_at?: string
+          details?: string | null
+          id?: string
+          message_id?: string | null
+          reason?: string
+          reported_user_id?: string | null
+          reporter_id?: string
+          status?: string
+        }
+        Relationships: []
+      }
       attachments: {
         Row: {
           cipher_blob_path: string
@@ -336,6 +378,10 @@ export type Database = {
       create_group_chat: {
         Args: { member_ids: string[]; title: string }
         Returns: string
+      }
+      is_blocked: {
+        Args: { p_a: string; p_b: string }
+        Returns: boolean
       }
       is_chat_member: {
         Args: { p_chat_id: string; p_user_id: string }
