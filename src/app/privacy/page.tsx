@@ -4,92 +4,204 @@ export const metadata = { title: 'Privacy Policy — Toky Chat' };
 
 export default function PrivacyPage() {
   return (
-    <main className="mx-auto max-w-2xl px-5 py-10 text-slate-200">
+    <main className="mx-auto max-w-3xl px-5 py-10 text-slate-200">
       <div className="mb-6 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-300">
-        DRAFT — starter template. Review with a lawyer and fill in the bracketed
-        details before launch. Not legal advice.
+        DRAFT TEMPLATE — this is a thorough starting point, not legal advice. Have a
+        qualified lawyer review and adapt it, and replace every [BRACKETED] value,
+        before you rely on it in production.
       </div>
 
-      <Link href="/" className="text-sm text-blue-400 hover:text-blue-300">← Back</Link>
-      <h1 className="mt-3 text-2xl font-bold">Privacy Policy</h1>
-      <p className="mt-1 text-xs text-slate-500">Effective date: [DATE] · Last updated: [DATE]</p>
+      <Link href="/" className="text-sm text-blue-400 hover:text-blue-300">← Back to app</Link>
+      <h1 className="mt-3 text-3xl font-bold tracking-tight">Privacy Policy</h1>
+      <p className="mt-1 text-xs text-slate-500">
+        Effective date: [DATE] · Last updated: [DATE]
+      </p>
 
-      <div className="mt-6 space-y-6 text-sm leading-relaxed text-slate-300">
+      <div className="mt-8 space-y-9 text-sm leading-relaxed text-slate-300">
         <section>
           <p>
-            This Privacy Policy explains how [COMPANY NAME] (&quot;we&quot;, &quot;us&quot;)
-            handles information when you use Toky Chat (the &quot;Service&quot;). By using the
-            Service you agree to this policy.
+            This Privacy Policy describes how <b>[COMPANY LEGAL NAME]</b> (&quot;Toky
+            Chat&quot;, &quot;we&quot;, &quot;us&quot;, or &quot;our&quot;) collects,
+            uses, discloses, and safeguards your information when you use our messaging
+            application and related services (collectively, the &quot;Service&quot;).
+            It also explains your rights and choices. For the purposes of the EU/UK
+            General Data Protection Regulation (&quot;GDPR&quot;), the data controller
+            is [COMPANY LEGAL NAME], [REGISTERED ADDRESS]. If you do not agree with this
+            Policy, please do not use the Service.
           </p>
         </section>
 
         <section>
-          <h2 className="mb-2 text-base font-semibold text-slate-100">Information we collect</h2>
+          <h2 className="mb-3 text-lg font-semibold text-slate-100">1. Information we collect</h2>
+
+          <h3 className="mb-1 mt-4 font-semibold text-slate-200">a. Information you provide</h3>
           <ul className="list-disc space-y-1 pl-5">
-            <li><b>Account data:</b> email address, username, display name, and avatar.</li>
-            <li><b>Content:</b> the messages, photos, videos, and voice notes you send.</li>
-            <li><b>Usage &amp; device data:</b> log data, device identifiers, and diagnostics needed to run the Service.</li>
+            <li><b>Account information:</b> your email address and authentication credentials (passwords are handled and stored by our authentication provider, not by us in plaintext).</li>
+            <li><b>Profile information:</b> username, display name, and profile photo (avatar).</li>
+            <li><b>Content you share:</b> the messages, images, videos, and voice notes you send or receive, including any captions or metadata attached to them.</li>
+            <li><b>Relationships:</b> your contacts, the chats and groups you belong to, and who you communicate with.</li>
+            <li><b>Communications with us:</b> information you provide in support requests, reports, or feedback.</li>
           </ul>
+
+          <h3 className="mb-1 mt-4 font-semibold text-slate-200">b. Information collected automatically</h3>
+          <ul className="list-disc space-y-1 pl-5">
+            <li><b>Device &amp; connection data:</b> IP address, browser type, operating system, device identifiers, and language settings.</li>
+            <li><b>Usage &amp; log data:</b> actions taken in the Service, timestamps, message delivery and read status, presence and &quot;last seen&quot; information, and error/diagnostic logs.</li>
+            <li><b>Local storage:</b> we store data on your device (for example, session tokens, your selected chat wallpaper, your consent choice, and an active-device identifier) to keep you signed in and remember preferences.</li>
+          </ul>
+
+          <h3 className="mb-1 mt-4 font-semibold text-slate-200">c. Information from third parties</h3>
+          <p>
+            If you sign in through a third-party provider or our authentication provider,
+            we receive account identifiers and basic profile data necessary to create and
+            secure your account.
+          </p>
+        </section>
+
+        <section>
+          <h2 className="mb-3 text-lg font-semibold text-slate-100">2. How we use information</h2>
+          <ul className="list-disc space-y-1 pl-5">
+            <li>Provide, maintain, and operate the Service — deliver messages and media, show presence and typing indicators, enable search, groups, and profiles.</li>
+            <li>Authenticate you and keep your account secure.</li>
+            <li>Detect, prevent, and respond to abuse, spam, fraud, and safety issues (including handling reports and blocks).</li>
+            <li>Provide customer support and respond to your requests.</li>
+            <li>Send you service-related communications and, where you have opted in, notifications.</li>
+            <li>Maintain, debug, and improve the Service.</li>
+            <li>Comply with legal obligations and enforce our Terms.</li>
+          </ul>
+        </section>
+
+        <section>
+          <h2 className="mb-3 text-lg font-semibold text-slate-100">3. Legal bases for processing (EEA/UK)</h2>
+          <p>Where GDPR applies, we rely on the following legal bases:</p>
+          <ul className="mt-2 list-disc space-y-1 pl-5">
+            <li><b>Performance of a contract</b> — to provide the Service you request.</li>
+            <li><b>Legitimate interests</b> — to secure the Service, prevent abuse, and improve our product, balanced against your rights.</li>
+            <li><b>Consent</b> — for optional features such as browser notifications and camera/microphone access; you may withdraw consent at any time.</li>
+            <li><b>Legal obligation</b> — to comply with applicable law and lawful requests.</li>
+          </ul>
+        </section>
+
+        <section>
+          <h2 className="mb-3 text-lg font-semibold text-slate-100">4. How we share information</h2>
+          <ul className="list-disc space-y-1 pl-5">
+            <li><b>With other users:</b> your profile (username, display name, avatar, presence) and the content you send are visible to the participants of your chats and groups.</li>
+            <li><b>With service providers (processors):</b> we use Supabase (database, authentication, file storage, realtime) and Vercel (application hosting) to run the Service. They process data on our behalf under contractual and security obligations. [List any analytics, email, or push providers you add.]</li>
+            <li><b>For legal reasons &amp; safety:</b> to comply with law, respond to lawful requests, enforce our Terms, or protect the rights, property, and safety of our users and the public.</li>
+            <li><b>Business transfers:</b> in connection with a merger, acquisition, or sale of assets, subject to this Policy.</li>
+          </ul>
+          <p className="mt-2"><b>We do not sell your personal information.</b></p>
+        </section>
+
+        <section>
+          <h2 className="mb-3 text-lg font-semibold text-slate-100">5. International data transfers</h2>
+          <p>
+            Your information may be processed and stored in [COUNTRY/REGION, e.g. the
+            United States] and other countries where we or our providers operate. Where
+            we transfer data out of the EEA/UK, we use appropriate safeguards such as the
+            European Commission&apos;s Standard Contractual Clauses. [Confirm your
+            providers&apos; transfer mechanisms.]
+          </p>
+        </section>
+
+        <section>
+          <h2 className="mb-3 text-lg font-semibold text-slate-100">6. Data retention</h2>
+          <p>
+            We keep personal information for as long as your account is active or as
+            needed to provide the Service, and thereafter only as required for the
+            purposes described here. Indicative periods:
+          </p>
+          <ul className="mt-2 list-disc space-y-1 pl-5">
+            <li><b>Account &amp; profile:</b> until you delete your account, then removed or anonymized within [X days].</li>
+            <li><b>Messages &amp; media:</b> retained until deleted by participants or account deletion; backups purged within [X days]. [Define your policy.]</li>
+            <li><b>Logs &amp; diagnostics:</b> [X days/months].</li>
+          </ul>
+        </section>
+
+        <section>
+          <h2 className="mb-3 text-lg font-semibold text-slate-100">7. Security</h2>
+          <p>
+            We use technical and organizational measures to protect your information,
+            including encryption in transit (HTTPS) and access controls that restrict
+            message and media access to the participants of a chat (enforced at the
+            database level).
+          </p>
           <p className="mt-2">
-            <b>Important:</b> messages are stored on our servers and are <b>not</b>
-            end-to-end encrypted. They are protected in transit (HTTPS) and access
-            is restricted to the participants of a chat.
+            <b>Please note:</b> messages are stored on our servers and are <b>not</b>{' '}
+            end-to-end encrypted. This means that, in principle, they could be accessed
+            by us or by parties with lawful or administrative access to our systems. Do
+            not use the Service to share information you need to be end-to-end encrypted.
+            No method of transmission or storage is completely secure.
           </p>
         </section>
 
         <section>
-          <h2 className="mb-2 text-base font-semibold text-slate-100">How we use information</h2>
-          <ul className="list-disc space-y-1 pl-5">
-            <li>To operate the Service — deliver messages, show presence, enable search.</li>
-            <li>To secure the Service and prevent abuse.</li>
-            <li>To respond to support requests and legal obligations.</li>
+          <h2 className="mb-3 text-lg font-semibold text-slate-100">8. Your rights &amp; choices</h2>
+          <p>
+            Depending on where you live, you may have some or all of the following rights:
+          </p>
+          <ul className="mt-2 list-disc space-y-1 pl-5">
+            <li><b>Access</b> and receive a copy of your personal information.</li>
+            <li><b>Rectify</b> inaccurate or incomplete data (you can edit your profile in Settings).</li>
+            <li><b>Erase</b> your data and delete your account.</li>
+            <li><b>Restrict</b> or <b>object</b> to certain processing.</li>
+            <li><b>Data portability</b> — receive your data in a portable format.</li>
+            <li><b>Withdraw consent</b> at any time (for example, revoke notification or camera permissions).</li>
+            <li><b>Complain</b> to your local data protection authority.</li>
           </ul>
-        </section>
-
-        <section>
-          <h2 className="mb-2 text-base font-semibold text-slate-100">Service providers</h2>
-          <p>
-            We use Supabase (database, authentication, storage) and Vercel (hosting)
-            to run the Service. These providers process data on our behalf under their
-            own terms. [List any others.]
+          <p className="mt-3">
+            <b>California residents (CCPA/CPRA):</b> you have the right to know, delete,
+            and correct personal information, and to be free from discrimination for
+            exercising these rights. We do not sell or &quot;share&quot; personal
+            information as those terms are defined under California law.
+          </p>
+          <p className="mt-3">
+            To exercise any right, contact us at <b>[PRIVACY EMAIL]</b>. We will verify
+            your request and respond within the timeframe required by law.
           </p>
         </section>
 
         <section>
-          <h2 className="mb-2 text-base font-semibold text-slate-100">Your choices &amp; rights</h2>
-          <ul className="list-disc space-y-1 pl-5">
-            <li>Access and update your profile in Settings.</li>
-            <li>Request deletion of your account and associated data.</li>
-            <li>Control camera, microphone, and notification permissions in your browser/OS.</li>
-            <li>[Add GDPR/CCPA rights as applicable to your users.]</li>
-          </ul>
-        </section>
-
-        <section>
-          <h2 className="mb-2 text-base font-semibold text-slate-100">Children</h2>
+          <h2 className="mb-3 text-lg font-semibold text-slate-100">9. Children&apos;s privacy</h2>
           <p>
-            Toky Chat is not directed to children under [13/16]. You must meet the
-            minimum age to use the Service. If we learn we collected data from a child
-            below that age without consent, we will delete it.
+            The Service is not directed to, and we do not knowingly collect personal
+            information from, children under <b>[MINIMUM AGE — e.g. 13, or 16 in parts of
+            the EU]</b>. If you believe a child has provided us information without the
+            required consent, contact us and we will delete it.
           </p>
         </section>
 
         <section>
-          <h2 className="mb-2 text-base font-semibold text-slate-100">Retention</h2>
+          <h2 className="mb-3 text-lg font-semibold text-slate-100">10. Cookies &amp; local storage</h2>
           <p>
-            We keep your information for as long as your account is active or as needed
-            to provide the Service, then delete or anonymize it. [Define retention
-            periods.]
+            We use browser local storage and similar technologies that are necessary to
+            operate the Service (keeping you signed in and remembering your preferences).
+            [If you add analytics or non-essential cookies, describe them and provide a
+            consent mechanism.]
           </p>
         </section>
 
         <section>
-          <h2 className="mb-2 text-base font-semibold text-slate-100">Contact</h2>
-          <p>Questions? Contact us at [PRIVACY EMAIL].</p>
+          <h2 className="mb-3 text-lg font-semibold text-slate-100">11. Changes to this Policy</h2>
+          <p>
+            We may update this Policy from time to time. If changes are material, we will
+            provide notice through the Service or by other reasonable means. The
+            &quot;Last updated&quot; date reflects the latest revision.
+          </p>
+        </section>
+
+        <section>
+          <h2 className="mb-3 text-lg font-semibold text-slate-100">12. Contact us</h2>
+          <p>
+            [COMPANY LEGAL NAME]<br />
+            [REGISTERED ADDRESS]<br />
+            Privacy contact: [PRIVACY EMAIL]<br />
+            [If applicable] Data Protection Officer / EU or UK Representative: [NAME &amp; CONTACT]
+          </p>
         </section>
       </div>
 
-      <p className="mt-8 text-xs text-slate-500">
+      <p className="mt-10 text-xs text-slate-500">
         See also our <Link href="/terms" className="text-blue-400 hover:text-blue-300">Terms of Service</Link>.
       </p>
     </main>
