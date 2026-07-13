@@ -11,7 +11,7 @@ import { getWallpaperId, wallpaperCss } from '@/lib/wallpaper';
 import { blockUser, unblockUser, isBlockedByMe } from '@/lib/db/safety';
 import { EmojiPicker } from '@/components/emoji-picker';
 import { useRequireAuth } from '@/lib/auth/use-require-auth';
-import { listChats, sendMessage, deleteMessage } from '@/lib/db/chats';
+import { listChats, sendMessage, deleteMessage, editMessage, pinMessage, unpinMessage, searchMessages } from '@/lib/db/chats';
 import { forwardMessageToChats, type ForwardPayload } from '@/lib/db/forward';
 import { uploadChatImage, uploadChatMedia, uploadChatAudio, createSignedChatMediaUrl } from '@/lib/storage/upload';
 import { useChatRealtime } from '@/lib/realtime/use-chat-realtime';
@@ -36,6 +36,10 @@ function getMessagePayload(message: MessageRow): Payload {
     parsed.text = message.content;
   }
   return parsed;
+}
+
+function fmtTime(ts: string) {
+  return new Date(ts).toLocaleString();
 }
 
 function shortId(id: string) {
@@ -144,13 +148,51 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
   // Safety: block / report (direct chats only — a "menu" for the other person).
   const [safetyMenuOpen, setSafetyMenuOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
+  const [reportMessageId, setReportMessageId] = useState<string | null>(null);
   const [blocked, setBlocked] = useState(false);
   const [blockBusy, setBlockBusy] = useState(false);
+
+  // In-chat search
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<MessageRow[]>([]);
+  const [searching, setSearching] = useState(false);
+
+  useEffect(() => {
+    if (!searchOpen) return;
+    const q = searchQuery.trim();
+    if (!q) {
+      setSearchResults([]);
+      return;
+    }
+    setSearching(true);
+    const t = setTimeout(() => {
+      searchMessages(chatId, q)
+        .then(setSearchResults)
+        .catch(() => setSearchResults([]))
+        .finally(() => setSearching(false));
+    }, 300);
+    return () => clearTimeout(t);
+  }, [searchQuery, searchOpen, chatId]);
+
+  function scrollToMessage(messageId: string) {
+    setSearchOpen(false);
+    setSearchQuery('');
+    const el = document.getElementById(`msg-${messageId}`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.classList.add('ring-2', 'ring-amber-400');
+      setTimeout(() => el.classList.remove('ring-2', 'ring-amber-400'), 1500);
+    } else {
+      toast('Ese mensaje no está cargado. Desplázate hacia arriba para verlo.');
+    }
+  }
 
   const [isRecording, setIsRecording] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const [replyingTo, setReplyingTo] = useState<MessageRow | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   // Local previews
   const [previewImages, setPreviewImages] = useState<string[]>([]);
@@ -662,6 +704,21 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
     setErr('');
     const t = text.trim();
 
+    if (editingId) {
+      if (!t) return;
+      setBusy(true);
+      try {
+        await editMessage(editingId, t);
+        setEditingId(null);
+        setText('');
+      } catch (e: any) {
+        setErr(e?.message ?? String(e));
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
+
     if (!t && pendingImages.length === 0 && !pendingVideo) return;
 
     setBusy(true);
@@ -777,6 +834,20 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
         onClose={() => setActionsOpen(false)}
         title={actionsMsg?.id}
         actions={[
+          ...(actionsMsg && items.find((m) => m.id === actionsMsg.id)?.sender_id === myId && !actionsMsg.body.imagePath && !actionsMsg.body.imagePaths?.length && !actionsMsg.body.videoPath && !actionsMsg.body.audioPath
+            ? [{
+                key: 'edit',
+                label: 'Edit',
+                icon: '✏️',
+                onClick: () => {
+                  if (!actionsMsg) return;
+                  setEditingId(actionsMsg.id);
+                  setText(actionsMsg.body.text || '');
+                  setReplyingTo(null);
+                  textInputRef.current?.focus();
+                },
+              }]
+            : []),
           { key: 'reply', label: 'Reply', icon: '↩️', onClick: () => {
             const found = items.find(m => m.id === actionsMsg?.id);
             if (found) setReplyingTo(found as any);
@@ -817,8 +888,35 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
           } },
         ]}
         moreActions={[
-          { key: 'pin', label: 'Pin', icon: '📌', onClick: () => toast('Pin: pendiente (siguiente paso).') },
-          { key: 'report', label: 'Report', icon: '🚩', onClick: () => toast('Report: pendiente (siguiente paso).') },
+          {
+            key: 'pin',
+            label: chat?.pinned_message_id === actionsMsg?.id ? 'Unpin' : 'Pin',
+            icon: '📌',
+            onClick: async () => {
+              if (!actionsMsg) return;
+              try {
+                if (chat?.pinned_message_id === actionsMsg.id) {
+                  await unpinMessage(chatId);
+                  setChat((prev) => (prev ? { ...prev, pinned_message_id: null } : prev));
+                } else {
+                  await pinMessage(chatId, actionsMsg.id);
+                  setChat((prev) => (prev ? { ...prev, pinned_message_id: actionsMsg.id } : prev));
+                }
+              } catch (e: any) {
+                setErr(e?.message ?? String(e));
+              }
+            },
+          },
+          {
+            key: 'report',
+            label: 'Report',
+            icon: '🚩',
+            onClick: () => {
+              if (!actionsMsg) return;
+              setReportMessageId(actionsMsg.id);
+              setReportOpen(true);
+            },
+          },
         ]}
       />
 
@@ -855,9 +953,13 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
 
       <ReportModal
         open={reportOpen}
-        onClose={() => setReportOpen(false)}
+        onClose={() => {
+          setReportOpen(false);
+          setReportMessageId(null);
+        }}
         reportedUserId={otherUserId}
         chatId={chatId}
+        messageId={reportMessageId}
       />
 
       {/* Hidden inputs */}
@@ -881,6 +983,15 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
                   <span className="text-slate-500">● Desconectado</span>
                 )
               )}
+              <button
+                type="button"
+                onClick={() => setSearchOpen((v) => !v)}
+                className="rounded px-1.5 py-0.5 text-slate-400 hover:bg-slate-900 hover:text-slate-200"
+                aria-label="Search in chat"
+                title="Buscar en el chat"
+              >
+                🔍
+              </button>
               {otherUserId && (
                 <div className="relative">
                   <button
@@ -956,6 +1067,51 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
 
           {err ? <p className="text-sm text-red-300">{err}</p> : null}
 
+          {searchOpen && (
+            <div className="rounded-xl border border-slate-900 bg-slate-950/60 p-3">
+              <input
+                autoFocus
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Buscar mensajes…"
+                className="w-full rounded border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-100"
+              />
+              {searching ? (
+                <p className="mt-2 text-xs text-slate-500">Buscando…</p>
+              ) : searchQuery.trim() && searchResults.length === 0 ? (
+                <p className="mt-2 text-xs text-slate-500">Sin resultados.</p>
+              ) : searchResults.length > 0 ? (
+                <ul className="mt-2 max-h-52 space-y-1 overflow-auto">
+                  {searchResults.map((r) => (
+                    <li key={r.id}>
+                      <button
+                        type="button"
+                        onClick={() => scrollToMessage(r.id)}
+                        className="block w-full truncate rounded px-2 py-1.5 text-left text-sm text-slate-200 hover:bg-slate-900"
+                      >
+                        {r.content}
+                        <span className="ml-2 text-xs text-slate-500">{fmtTime(r.created_at)}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
+          )}
+
+          {chat?.pinned_message_id && (
+            <button
+              type="button"
+              onClick={() => scrollToMessage(chat.pinned_message_id!)}
+              className="flex items-center gap-2 truncate rounded-lg border border-amber-900/40 bg-amber-950/20 px-3 py-2 text-left text-xs text-amber-200 hover:bg-amber-950/30"
+            >
+              <span>📌</span>
+              <span className="truncate">
+                {items.find((m) => m.id === chat.pinned_message_id)?.body.text || 'Mensaje fijado'}
+              </span>
+            </button>
+          )}
+
           <div ref={scrollRef} onScroll={handleScroll} style={chatWallpaper ? { background: chatWallpaper } : undefined} className="h-[55vh] overflow-auto rounded-xl border border-slate-900 bg-slate-950/40 p-3">
             {loadingMore && <div className="text-center text-xs text-slate-500 my-2">Cargando anteriores...</div>}
             {items.length === 0 ? (
@@ -972,7 +1128,8 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
                   return (
                     <li
                       key={m.id}
-                      className={`flex flex-col mb-2 p-2 rounded-lg max-w-[80%] ${
+                      id={`msg-${m.id}`}
+                      className={`flex flex-col mb-2 p-2 rounded-lg max-w-[80%] transition-shadow ${
                         m.sender_type === 'system' ? 'mx-auto bg-slate-800 text-center text-xs text-slate-400 border border-slate-700' :
                         isMine(m) ? 'ml-auto bg-blue-900/40 border border-blue-800' :
                         'mr-auto bg-slate-900 border border-slate-800'
@@ -995,7 +1152,10 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
                         <div className="text-[10px] font-semibold text-blue-300 mb-0.5">{senderName(m)}</div>
                       )}
                       <div className="text-[10px] text-slate-500 flex items-center justify-between mb-1">
-                        <span>{new Date(m.created_at).toLocaleString()}</span>
+                        <span>
+                          {new Date(m.created_at).toLocaleString()}
+                          {m.edited_at && <span className="ml-1 italic text-slate-600">(editado)</span>}
+                        </span>
                         {isMine(m) ? (
                           <span className={m.read ? 'text-blue-400 ml-2' : 'text-slate-600 ml-2'}>
                             {m.read ? '✓✓' : '✓'}
@@ -1111,6 +1271,23 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
             </div>
           )}
 
+          {editingId && (
+            <div className="flex items-center justify-between rounded border border-amber-900 bg-amber-950/30 p-2 text-xs text-amber-200">
+              <div className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap pr-2 border-l-2 border-amber-500 pl-2">
+                ✏️ Editando mensaje
+              </div>
+              <button
+                className="text-slate-400 hover:text-white"
+                onClick={() => {
+                  setEditingId(null);
+                  setText('');
+                }}
+              >
+                ✕
+              </button>
+            </div>
+          )}
+
           {replyingTo && (
             <div className="flex items-center justify-between rounded border border-blue-900 bg-blue-950/40 p-2 text-xs text-blue-200">
               <div className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap pr-2 border-l-2 border-blue-500 pl-2">
@@ -1182,7 +1359,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
             />
 
             <button className="rounded bg-blue-600 px-3 py-2 text-sm hover:bg-blue-500 disabled:opacity-60" onClick={onSend} disabled={busy || isRecording || blocked}>
-              Send
+              {editingId ? 'Save' : 'Send'}
             </button>
             <button 
               className={`rounded px-3 py-2 text-sm disabled:opacity-60 ${isRecording ? 'bg-red-600 animate-pulse text-white' : 'bg-slate-800 hover:bg-slate-700'}`}

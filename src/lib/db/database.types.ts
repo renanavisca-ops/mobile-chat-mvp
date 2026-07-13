@@ -106,6 +106,7 @@ export type Database = {
           created_by: string | null
           id: string
           kind: string
+          pinned_message_id: string | null
           status: string | null
           store_id: string | null
           title: string | null
@@ -116,6 +117,7 @@ export type Database = {
           created_by?: string | null
           id?: string
           kind: string
+          pinned_message_id?: string | null
           status?: string | null
           store_id?: string | null
           title?: string | null
@@ -126,6 +128,7 @@ export type Database = {
           created_by?: string | null
           id?: string
           kind?: string
+          pinned_message_id?: string | null
           status?: string | null
           store_id?: string | null
           title?: string | null
@@ -244,6 +247,7 @@ export type Database = {
           content: string | null
           created_at: string
           delivery_status: string | null
+          edited_at: string | null
           id: string
           message_type: string
           nonce: string
@@ -258,6 +262,7 @@ export type Database = {
           content?: string | null
           created_at?: string
           delivery_status?: string | null
+          edited_at?: string | null
           id?: string
           message_type: string
           nonce?: string
@@ -272,6 +277,7 @@ export type Database = {
           content?: string | null
           created_at?: string
           delivery_status?: string | null
+          edited_at?: string | null
           id?: string
           message_type?: string
           nonce?: string

@@ -20,7 +20,7 @@ export async function listChats(): Promise<ChatSummary[]> {
 
   const { data: chats, error } = await supabase
     .from('chats')
-    .select('id, kind, title, created_at, store_id, assigned_to, status')
+    .select('id, kind, title, created_at, store_id, assigned_to, status, pinned_message_id')
     .order('created_at', { ascending: false });
 
   if (error) throw error;
@@ -101,6 +101,7 @@ export async function listChats(): Promise<ChatSummary[]> {
       store_id: c.store_id,
       assigned_to: c.assigned_to,
       status: c.status as ChatSummary['status'],
+      pinned_message_id: c.pinned_message_id,
       last_message_at: latestByChat.get(c.id)?.created_at ?? null,
       last_ciphertext: latestByChat.get(c.id)?.content ?? null,
       other_user_id: c.kind === 'direct' ? otherIds[0] ?? null : null,
@@ -151,7 +152,7 @@ export async function listMessages(
   const { data, error } = await supabase
     .from('messages')
     .select(
-      'id, chat_id, sender_device_id, ciphertext, nonce, message_type, created_at, read, content, sender_type, sender_id, delivery_status'
+      'id, chat_id, sender_device_id, ciphertext, nonce, message_type, created_at, read, content, sender_type, sender_id, delivery_status, edited_at'
     )
     .eq('chat_id', chatId)
     .order('created_at', { ascending: false })
@@ -232,6 +233,65 @@ export async function deleteMessage(messageId: string, chatId: string) {
     .eq('id', messageId);
 
   if (error) throw error;
+}
+
+/**
+ * Edit the text of a message you sent. Only updates the plain-text `content`
+ * column and the ciphertext JSON's `text` field, preserving any attached
+ * media on that message.
+ */
+export async function editMessage(messageId: string, newText: string) {
+  const supabase = browserSupabase();
+
+  const { data: msg, error: readErr } = await supabase
+    .from('messages')
+    .select('ciphertext')
+    .eq('id', messageId)
+    .single();
+  if (readErr) throw readErr;
+
+  let payload: Record<string, unknown> = {};
+  try {
+    payload = JSON.parse(msg.ciphertext);
+  } catch {}
+
+  const ciphertext = JSON.stringify({ ...payload, text: newText });
+
+  const { error } = await supabase
+    .from('messages')
+    .update({ content: newText, ciphertext, edited_at: new Date().toISOString() })
+    .eq('id', messageId);
+  if (error) throw error;
+}
+
+export async function pinMessage(chatId: string, messageId: string) {
+  const supabase = browserSupabase();
+  const { error } = await supabase.from('chats').update({ pinned_message_id: messageId }).eq('id', chatId);
+  if (error) throw error;
+}
+
+export async function unpinMessage(chatId: string) {
+  const supabase = browserSupabase();
+  const { error } = await supabase.from('chats').update({ pinned_message_id: null }).eq('id', chatId);
+  if (error) throw error;
+}
+
+/** Best-effort in-chat search over plain-text message content. */
+export async function searchMessages(chatId: string, query: string, limit = 30): Promise<MessageRow[]> {
+  const q = query.trim();
+  if (!q) return [];
+
+  const supabase = browserSupabase();
+  const { data, error } = await supabase
+    .from('messages')
+    .select('id, chat_id, sender_device_id, ciphertext, nonce, message_type, created_at, read, content, sender_type, sender_id, delivery_status, edited_at')
+    .eq('chat_id', chatId)
+    .ilike('content', `%${q}%`)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+
+  if (error) throw error;
+  return (data ?? []) as unknown as MessageRow[];
 }
 
 /**
