@@ -28,6 +28,19 @@ function OnlineDot({ userId }: { userId: string | null | undefined }) {
   );
 }
 
+function Avatar({ url, name }: { url?: string | null; name?: string | null }) {
+  const initial = (name || '?').trim().charAt(0).toUpperCase() || '?';
+  if (url) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={url} alt="" className="h-10 w-10 shrink-0 rounded-full border border-slate-800 object-cover" />;
+  }
+  return (
+    <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-slate-800 text-sm font-semibold text-slate-300">
+      {initial}
+    </span>
+  );
+}
+
 export default function ChatsPage() {
   const { loading, profile, user } = useRequireAuth();
   const [chats, setChats] = useState<ChatSummary[]>([]);
@@ -132,26 +145,29 @@ export default function ChatsPage() {
         <ul className="divide-y divide-slate-900">
           {chats.map((c) => (
             <li key={c.id} className="py-3">
-              <Link href={`/chats/${c.id}`} className="block rounded-lg p-2 hover:bg-slate-950/60">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="font-medium">
-                    {c.kind === 'group' ? c.title ?? 'Group' : c.title ?? 'Direct chat'}
-                    {c.kind === 'direct' && <OnlineDot userId={c.other_user_id} />}
-                    {c.status && (
-                      <span className={`ml-2 rounded px-1.5 py-0.5 text-[10px] uppercase ${
-                        c.status === 'open' ? 'bg-green-900/40 text-green-400' :
-                        c.status === 'in_progress' ? 'bg-blue-900/40 text-blue-400' :
-                        'bg-slate-800 text-slate-400'
-                      }`}>
-                        {c.status}
-                      </span>
-                    )}
-                  </div>
+              <Link href={`/chats/${c.id}`} className="flex items-center gap-3 rounded-lg p-2 hover:bg-slate-950/60">
+                <Avatar url={c.kind === 'direct' ? c.other_user_avatar : null} name={c.title} />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="truncate font-medium">
+                      {c.kind === 'group' ? c.title ?? 'Group' : c.title ?? 'Direct chat'}
+                      {c.kind === 'direct' && <OnlineDot userId={c.other_user_id} />}
+                      {c.store_id && c.status && (
+                        <span className={`ml-2 rounded px-1.5 py-0.5 text-[10px] uppercase ${
+                          c.status === 'open' ? 'bg-green-900/40 text-green-400' :
+                          c.status === 'in_progress' ? 'bg-blue-900/40 text-blue-400' :
+                          'bg-slate-800 text-slate-400'
+                        }`}>
+                          {c.status}
+                        </span>
+                      )}
+                    </div>
 
-                  <div className="text-xs text-slate-500">{fmt(c.last_message_at)}</div>
-                </div>
-                <div className="mt-1 truncate text-xs text-slate-400">
-                  {c.last_ciphertext ? c.last_ciphertext : 'No messages yet'}
+                    <div className="shrink-0 text-xs text-slate-500">{fmt(c.last_message_at)}</div>
+                  </div>
+                  <div className="mt-1 truncate text-xs text-slate-400">
+                    {c.last_ciphertext ? c.last_ciphertext : 'No messages yet'}
+                  </div>
                 </div>
               </Link>
             </li>

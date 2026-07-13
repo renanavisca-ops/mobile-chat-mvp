@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { PageShell } from '@/components/page-shell';
 import { browserSupabase } from '@/lib/supabase/client';
 import { WALLPAPERS, getWallpaperId, setWallpaperId as saveWallpaperId } from '@/lib/wallpaper';
+import { uploadAvatar } from '@/lib/db/avatar';
 
 export default function SettingsPage() {
   const supabase = browserSupabase();
@@ -27,6 +28,11 @@ export default function SettingsPage() {
   const [isUpdating, setIsUpdating] = useState(false);
 
   const [wallpaperId, setWpId] = useState('default');
+  const [displayName, setDisplayName] = useState('');
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [avatarBusy, setAvatarBusy] = useState(false);
+  const avatarInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     setActiveDeviceId(localStorage.getItem('active_device_id'));
@@ -36,6 +42,43 @@ export default function SettingsPage() {
   function chooseWallpaper(id: string) {
     saveWallpaperId(id);
     setWpId(id);
+  }
+
+  async function saveProfile() {
+    if (!user) return;
+    setSavingProfile(true);
+    setStatus('');
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ display_name: displayName.trim() || null })
+        .eq('id', user.id);
+      if (error) throw error;
+      setStatus('✅ Perfil actualizado');
+    } catch (e: any) {
+      setStatus(`❌ ${e?.message ?? String(e)}`);
+    } finally {
+      setSavingProfile(false);
+    }
+  }
+
+  async function onAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || !user) return;
+    setAvatarBusy(true);
+    setStatus('');
+    try {
+      const url = await uploadAvatar(user.id, file);
+      const { error } = await supabase.from('profiles').update({ avatar_url: url }).eq('id', user.id);
+      if (error) throw error;
+      setAvatarUrl(url);
+      setStatus('✅ Foto actualizada');
+    } catch (e: any) {
+      setStatus(`❌ ${e?.message ?? String(e)}`);
+    } finally {
+      setAvatarBusy(false);
+    }
   }
 
   useEffect(() => {
@@ -79,6 +122,8 @@ export default function SettingsPage() {
           };
           setProfile(prof);
           setShowOnline((prof as any)?.show_online ?? true);
+          setDisplayName((prof as any)?.display_name ?? '');
+          setAvatarUrl((prof as any)?.avatar_url ?? null);
         }
 
       } catch (e) {
@@ -191,11 +236,49 @@ export default function SettingsPage() {
 
           <section className="space-y-3">
             <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500 ml-1">Perfil</h2>
-            <div className="rounded-xl border border-slate-900 bg-slate-950/50 p-4 shadow-sm">
-              <div className="text-sm font-medium text-slate-200">Username</div>
-              <div className="text-xs text-slate-400 mt-1">
-                {profile?.username ?? '(sin username) — ve a /onboarding'}
+            <div className="space-y-4 rounded-xl border border-slate-900 bg-slate-950/50 p-4 shadow-sm">
+              <div className="flex items-center gap-4">
+                {avatarUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={avatarUrl} alt="" className="h-16 w-16 rounded-full border border-slate-800 object-cover" />
+                ) : (
+                  <span className="grid h-16 w-16 place-items-center rounded-full bg-slate-800 text-lg font-semibold text-slate-300">
+                    {(displayName || profile?.username || '?').trim().charAt(0).toUpperCase()}
+                  </span>
+                )}
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => avatarInputRef.current?.click()}
+                    disabled={avatarBusy}
+                    className="rounded-lg bg-slate-800 px-3 py-1.5 text-sm text-slate-200 hover:bg-slate-700 disabled:opacity-50"
+                  >
+                    {avatarBusy ? 'Subiendo…' : 'Cambiar foto'}
+                  </button>
+                  <input ref={avatarInputRef} type="file" hidden accept="image/*" onChange={onAvatarChange} />
+                </div>
               </div>
+
+              <div className="space-y-1.5">
+                <label className="ml-1 block text-xs text-slate-400">Nombre a mostrar</label>
+                <input
+                  value={displayName}
+                  onChange={(e) => setDisplayName(e.target.value)}
+                  maxLength={40}
+                  placeholder={profile?.username ?? 'Tu nombre'}
+                  className="w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+                />
+                <div className="ml-1 text-xs text-slate-500">Username: {profile?.username ?? '(sin username)'}</div>
+              </div>
+
+              <button
+                type="button"
+                onClick={saveProfile}
+                disabled={savingProfile}
+                className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50"
+              >
+                {savingProfile ? 'Guardando…' : 'Guardar perfil'}
+              </button>
             </div>
           </section>
 

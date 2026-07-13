@@ -52,14 +52,18 @@ export async function listChats(): Promise<ChatSummary[]> {
     allOtherIds.add(row.user_id);
   }
 
-  // Resolve usernames for those users
-  const usernameById = new Map<string, string>();
+  // Resolve display names + avatars for those users
+  const nameById = new Map<string, string>();
+  const avatarById = new Map<string, string | null>();
   if (allOtherIds.size > 0) {
     const { data: profs } = await supabase
       .from('profiles')
-      .select('id, username')
+      .select('id, username, display_name, avatar_url')
       .in('id', Array.from(allOtherIds));
-    for (const p of profs ?? []) usernameById.set(p.id, p.username ?? '');
+    for (const p of profs ?? []) {
+      nameById.set(p.id, (p.display_name || p.username) ?? '');
+      avatarById.set(p.id, p.avatar_url ?? null);
+    }
   }
 
   // Latest message preview per chat
@@ -84,7 +88,7 @@ export async function listChats(): Promise<ChatSummary[]> {
     let title = c.title;
     if (c.kind === 'direct') {
       const others = (otherIdsByChat.get(c.id) ?? [])
-        .map((id) => usernameById.get(id))
+        .map((id) => nameById.get(id))
         .filter((n): n is string => !!n);
       if (others.length) title = others.join(', ');
     }
@@ -100,6 +104,7 @@ export async function listChats(): Promise<ChatSummary[]> {
       last_message_at: latestByChat.get(c.id)?.created_at ?? null,
       last_ciphertext: latestByChat.get(c.id)?.content ?? null,
       other_user_id: c.kind === 'direct' ? otherIds[0] ?? null : null,
+      other_user_avatar: c.kind === 'direct' ? avatarById.get(otherIds[0]) ?? null : null,
       member_ids: otherIds,
     };
   });

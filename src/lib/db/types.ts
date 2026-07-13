@@ -10,6 +10,8 @@ export type ChatSummary = {
   status?: 'open' | 'in_progress' | 'closed';
   /** For direct chats: the other participant's user id (for online status). */
   other_user_id?: string | null;
+  /** For direct chats: the other participant's avatar URL. */
+  other_user_avatar?: string | null;
   /** All member user ids (excluding me). */
   member_ids?: string[];
 };
@@ -17,6 +19,8 @@ export type ChatSummary = {
 export type ProfileLite = {
   id: string;
   username: string | null;
+  display_name?: string | null;
+  avatar_url?: string | null;
 };
 
 export type MessageRow = {
