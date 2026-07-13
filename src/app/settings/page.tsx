@@ -1,10 +1,12 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import { PageShell } from '@/components/page-shell';
 import { browserSupabase } from '@/lib/supabase/client';
 import { WALLPAPERS, getWallpaperId, setWallpaperId as saveWallpaperId } from '@/lib/wallpaper';
 import { uploadAvatar } from '@/lib/db/avatar';
+import { useNotifications } from '@/lib/hooks/useNotifications';
 
 export default function SettingsPage() {
   const supabase = browserSupabase();
@@ -33,6 +35,7 @@ export default function SettingsPage() {
   const [savingProfile, setSavingProfile] = useState(false);
   const [avatarBusy, setAvatarBusy] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement | null>(null);
+  const { permission, requestPermission } = useNotifications();
 
   useEffect(() => {
     setActiveDeviceId(localStorage.getItem('active_device_id'));
@@ -393,9 +396,44 @@ export default function SettingsPage() {
             </div>
           </section>
 
+          <section className="space-y-3">
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500 ml-1">Notificaciones</h2>
+            <div className="rounded-xl border border-slate-900 bg-slate-950/50 p-4 shadow-sm flex items-center justify-between gap-3">
+              <div>
+                <div className="text-sm font-medium text-slate-200">Notificaciones del navegador</div>
+                <div className="text-xs text-slate-400 mt-1">
+                  {permission === 'granted'
+                    ? 'Activadas.'
+                    : permission === 'denied'
+                    ? 'Bloqueadas — habilítalas en los ajustes del navegador.'
+                    : 'Recibe un aviso cuando llega un mensaje nuevo.'}
+                </div>
+              </div>
+              {permission !== 'granted' && (
+                <button
+                  type="button"
+                  onClick={() => requestPermission()}
+                  disabled={permission === 'denied'}
+                  className="rounded-lg bg-slate-800 px-3 py-1.5 text-sm text-slate-200 hover:bg-slate-700 disabled:opacity-50"
+                >
+                  Activar
+                </button>
+              )}
+            </div>
+          </section>
+
+          <section className="space-y-3">
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500 ml-1">Legal</h2>
+            <div className="rounded-xl border border-slate-900 bg-slate-950/50 p-4 shadow-sm text-sm">
+              <Link href="/privacy" className="text-blue-400 hover:text-blue-300">Política de privacidad</Link>
+              <span className="mx-2 text-slate-600">·</span>
+              <Link href="/terms" className="text-blue-400 hover:text-blue-300">Términos de servicio</Link>
+            </div>
+          </section>
+
           <div className="pt-4 border-t border-slate-900">
-            <button 
-              className="w-full rounded-lg border border-slate-800 bg-slate-900/50 px-4 py-2 text-sm text-slate-300 hover:bg-slate-800 hover:text-white transition-colors" 
+            <button
+              className="w-full rounded-lg border border-slate-800 bg-slate-900/50 px-4 py-2 text-sm text-slate-300 hover:bg-slate-800 hover:text-white transition-colors"
               onClick={signOut}
             >
               Cerrar sesión
