@@ -12,16 +12,36 @@ import { getWallpaperId, wallpaperCss, getCustomWallpaperUrl, CUSTOM_WALLPAPER_I
 import { blockUser, unblockUser, isBlockedByMe } from '@/lib/db/safety';
 import { EmojiPicker } from '@/components/emoji-picker';
 import { useRequireAuth } from '@/lib/auth/use-require-auth';
-import { listChats, sendMessage, deleteMessage, editMessage, pinMessage, unpinMessage, searchMessages, setChatMuted, getChatMuted } from '@/lib/db/chats';
+import { listChats, sendMessage, deleteMessage, editMessage, pinMessage, unpinMessage, searchMessages, setChatMuted, getChatMuted, toggleReaction, createPoll, votePoll, setDisappearingMessages } from '@/lib/db/chats';
 import { forwardMessageToChats, type ForwardPayload } from '@/lib/db/forward';
 import { uploadChatImage, uploadChatMedia, uploadChatAudio, createSignedChatMediaUrl } from '@/lib/storage/upload';
 import { useChatRealtime } from '@/lib/realtime/use-chat-realtime';
 import { browserSupabase } from '@/lib/supabase/client';
 import { useOnlineUsers } from '@/components/presence-provider';
 import { useLanguage } from '@/lib/i18n/context';
+import { PollComposer } from '@/components/poll-composer';
+import { ImageEditor } from '@/components/image-editor';
 import type { ChatSummary, MessageRow } from '@/lib/db/types';
 
-type Payload = { v?: number; text?: string; imagePath?: string; imagePaths?: string[]; videoPath?: string; audioPath?: string; reply_to?: string; is_deleted?: boolean; };
+type Payload = {
+  v?: number;
+  text?: string;
+  imagePath?: string;
+  imagePaths?: string[];
+  videoPath?: string;
+  audioPath?: string;
+  reply_to?: string;
+  is_deleted?: boolean;
+  poll?: { question: string; options: string[] };
+};
+
+const QUICK_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
+const DISAPPEARING_OPTIONS: { seconds: number; labelKey: string }[] = [
+  { seconds: 0, labelKey: 'chat.disappearingOff' },
+  { seconds: 86400, labelKey: 'chat.disappearing24h' },
+  { seconds: 604800, labelKey: 'chat.disappearing7d' },
+  { seconds: 2592000, labelKey: 'chat.disappearing30d' },
+];
 
 function parseCipher(ciphertext: string | undefined | null): Payload {
   if (!ciphertext) return {};
@@ -71,7 +91,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
   }
 
   const supabase = browserSupabase();
-  const { messages, loading: msgLoading, appendLocal, loadMore, hasMore, loadingMore, typingUsers, setMeTyping } = useChatRealtime(chatId);
+  const { messages, loading: msgLoading, appendLocal, loadMore, hasMore, loadingMore, typingUsers, setMeTyping, reactions, pollVotes } = useChatRealtime(chatId);
 
   // chat details
   const [chat, setChat] = useState<ChatSummary | null>(null);
@@ -164,10 +184,26 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
   const [blockBusy, setBlockBusy] = useState(false);
   const [muted, setMuted] = useState(false);
   const [muteBusy, setMuteBusy] = useState(false);
+  const [disappearingMenuOpen, setDisappearingMenuOpen] = useState(false);
+  const [disappearingBusy, setDisappearingBusy] = useState(false);
 
   useEffect(() => {
     getChatMuted(chatId).then(setMuted).catch(() => {});
   }, [chatId]);
+
+  async function chooseDisappearing(seconds: number) {
+    setDisappearingBusy(true);
+    try {
+      await setDisappearingMessages(chatId, seconds);
+      setChat((prev) => (prev ? { ...prev, disappearing_seconds: seconds || null } : prev));
+    } catch (e: any) {
+      setErr(e?.message ?? String(e));
+    } finally {
+      setDisappearingBusy(false);
+      setDisappearingMenuOpen(false);
+      setSafetyMenuOpen(false);
+    }
+  }
 
   async function toggleMute() {
     const next = !muted;
@@ -253,6 +289,15 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
 
   // Emoji picker
   const [emojiOpen, setEmojiOpen] = useState(false);
+
+  // Reactions quick-picker
+  const [reactionPickerFor, setReactionPickerFor] = useState<string | null>(null);
+
+  // Poll composer
+  const [pollComposerOpen, setPollComposerOpen] = useState(false);
+
+  // Image editor (crop/rotate/filter/draw before sending)
+  const [editorIndex, setEditorIndex] = useState<number | null>(null);
 
   // Inputs
   const imageInputRef = useRef<HTMLInputElement | null>(null);
@@ -345,6 +390,60 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
   }, [chatId, supabase, membersReloadKey]);
 
   const items = useMemo(() => messages.map((m) => ({ ...m, body: getMessagePayload(m) })), [messages]);
+
+  const reactionsByMessage = useMemo(() => {
+    const map = new Map<string, { emoji: string; count: number; mine: boolean }[]>();
+    for (const r of reactions) {
+      const list = map.get(r.message_id) ?? [];
+      const existing = list.find((g) => g.emoji === r.emoji);
+      if (existing) {
+        existing.count += 1;
+        if (r.user_id === myId) existing.mine = true;
+      } else {
+        list.push({ emoji: r.emoji, count: 1, mine: r.user_id === myId });
+      }
+      map.set(r.message_id, list);
+    }
+    return map;
+  }, [reactions, myId]);
+
+  const myReactionByMessage = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const r of reactions) if (r.user_id === myId) map.set(r.message_id, r.emoji);
+    return map;
+  }, [reactions, myId]);
+
+  const pollTallyByMessage = useMemo(() => {
+    const map = new Map<string, { counts: number[]; myVote: number | null }>();
+    for (const v of pollVotes) {
+      const entry = map.get(v.message_id) ?? { counts: [], myVote: null };
+      entry.counts[v.option_index] = (entry.counts[v.option_index] ?? 0) + 1;
+      if (v.user_id === myId) entry.myVote = v.option_index;
+      map.set(v.message_id, entry);
+    }
+    return map;
+  }, [pollVotes, myId]);
+
+  async function onToggleReaction(messageId: string, emoji: string) {
+    setReactionPickerFor(null);
+    try {
+      await toggleReaction(messageId, chatId, emoji);
+    } catch (e: any) {
+      setErr(e?.message ?? String(e));
+    }
+  }
+
+  async function onCreatePoll(question: string, options: string[]) {
+    await createPoll(chatId, question, options);
+  }
+
+  async function onVotePoll(messageId: string, optionIndex: number) {
+    try {
+      await votePoll(messageId, chatId, optionIndex);
+    } catch (e: any) {
+      setErr(e?.message ?? String(e));
+    }
+  }
 
   const usernameById = useMemo(() => {
     const m = new Map<string, string>();
@@ -599,6 +698,20 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
     setPreviewImages([]);
     setPendingImages([]);
     if (imageInputRef.current) imageInputRef.current.value = '';
+  }
+
+  function onImageEdited(edited: File) {
+    if (editorIndex === null) return;
+    const idx = editorIndex;
+    setPendingImages((prev) => prev.map((f, i) => (i === idx ? edited : f)));
+    setPreviewImages((prev) => {
+      const old = prev[idx];
+      if (old) URL.revokeObjectURL(old);
+      const next = [...prev];
+      next[idx] = URL.createObjectURL(edited);
+      return next;
+    });
+    setEditorIndex(null);
   }
 
   function clearPendingVideo() {
@@ -977,6 +1090,23 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
           setEmojiOpen(false);
           pickFile();
         }}
+        onPoll={() => {
+          setEmojiOpen(false);
+          setPollComposerOpen(true);
+        }}
+      />
+
+      <PollComposer
+        open={pollComposerOpen}
+        onClose={() => setPollComposerOpen(false)}
+        onCreate={onCreatePoll}
+      />
+
+      <ImageEditor
+        open={editorIndex !== null}
+        file={editorIndex !== null ? pendingImages[editorIndex] ?? null : null}
+        onClose={() => setEditorIndex(null)}
+        onSave={onImageEdited}
       />
 
       <CameraCapture
@@ -1006,6 +1136,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
           avatarUrl={chat?.avatar_url ?? null}
           isCreator={isGroupCreator}
           members={memberProfiles}
+          disappearingSeconds={chat?.disappearing_seconds}
           onUpdated={(patch) => setChat((prev) => (prev ? { ...prev, ...patch } : prev))}
           onMembersChanged={() => setMembersReloadKey((k) => k + 1)}
           onLeft={() => {
@@ -1068,8 +1199,11 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
                   </button>
                   {safetyMenuOpen && (
                     <div
-                      className="absolute left-0 top-6 z-20 w-44 overflow-hidden rounded-lg border border-slate-800 bg-slate-950 text-sm shadow-xl"
-                      onMouseLeave={() => setSafetyMenuOpen(false)}
+                      className="absolute left-0 top-6 z-20 w-52 overflow-hidden rounded-lg border border-slate-800 bg-slate-950 text-sm shadow-xl"
+                      onMouseLeave={() => {
+                        setSafetyMenuOpen(false);
+                        setDisappearingMenuOpen(false);
+                      }}
                     >
                       <button
                         type="button"
@@ -1079,6 +1213,36 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
                       >
                         {muted ? t('common.unmute') : t('common.mute')}
                       </button>
+                      <button
+                        type="button"
+                        onClick={() => setDisappearingMenuOpen((v) => !v)}
+                        disabled={disappearingBusy}
+                        className="flex w-full items-center justify-between px-3 py-2 text-left text-slate-200 hover:bg-slate-900 disabled:opacity-50"
+                      >
+                        <span>{t('chat.disappearingMenu')}</span>
+                        <span className="text-xs text-slate-500">
+                          {DISAPPEARING_OPTIONS.find((o) => o.seconds === (chat?.disappearing_seconds ?? 0))
+                            ? t(DISAPPEARING_OPTIONS.find((o) => o.seconds === (chat?.disappearing_seconds ?? 0))!.labelKey)
+                            : ''}
+                        </span>
+                      </button>
+                      {disappearingMenuOpen && (
+                        <div className="border-t border-slate-900 bg-slate-950/60">
+                          {DISAPPEARING_OPTIONS.map((opt) => (
+                            <button
+                              key={opt.seconds}
+                              type="button"
+                              onClick={() => chooseDisappearing(opt.seconds)}
+                              disabled={disappearingBusy}
+                              className={`block w-full px-4 py-1.5 text-left text-xs hover:bg-slate-900 disabled:opacity-50 ${
+                                (chat?.disappearing_seconds ?? 0) === opt.seconds ? 'text-blue-400' : 'text-slate-300'
+                              }`}
+                            >
+                              {t(opt.labelKey)}
+                            </button>
+                          ))}
+                        </div>
+                      )}
                       <button
                         type="button"
                         onClick={toggleBlock}
@@ -1248,6 +1412,37 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
                           )}
                           {m.body.text ? <div className="text-sm mt-1">{m.body.text}</div> : null}
 
+                      {m.message_type === 'poll' && m.body.poll ? (
+                        <div className="mt-1 space-y-1.5">
+                          <div className="text-sm font-medium">{m.body.poll.question}</div>
+                          {m.body.poll.options.map((opt, idx) => {
+                            const tally = pollTallyByMessage.get(m.id);
+                            const count = tally?.counts[idx] ?? 0;
+                            const total = (tally?.counts ?? []).reduce((a, b) => a + (b ?? 0), 0);
+                            const pct = total > 0 ? Math.round((count / total) * 100) : 0;
+                            const mine = tally?.myVote === idx;
+                            return (
+                              <button
+                                key={idx}
+                                type="button"
+                                onClick={() => onVotePoll(m.id, idx)}
+                                className={`relative block w-full overflow-hidden rounded-lg border px-3 py-1.5 text-left text-xs transition ${
+                                  mine ? 'border-blue-500 bg-blue-950/40' : 'border-slate-800 bg-slate-950/60 hover:bg-slate-900'
+                                }`}
+                              >
+                                <span className="absolute inset-y-0 left-0 bg-blue-900/30" style={{ width: `${pct}%` }} />
+                                <span className="relative flex items-center justify-between gap-2">
+                                  <span>{opt}</span>
+                                  <span className="shrink-0 text-slate-400">
+                                    {count} {count === 1 ? t('poll.vote') : t('poll.votes')}
+                                  </span>
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      ) : null}
+
                       {imgPaths.length ? (
                         <div className="mt-2 grid grid-cols-2 gap-2">
                           {Array.from(new Set(imgPaths)).map((path) => {
@@ -1297,6 +1492,51 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
                           )}
                         </div>
                       ) : null}
+
+                      {m.sender_type !== 'system' && (
+                        <div className="mt-1.5 flex flex-wrap items-center gap-1">
+                          {(reactionsByMessage.get(m.id) ?? []).map((g) => (
+                            <button
+                              key={g.emoji}
+                              type="button"
+                              onClick={() => onToggleReaction(m.id, g.emoji)}
+                              className={`rounded-full border px-1.5 py-0.5 text-[11px] ${
+                                g.mine ? 'border-blue-500 bg-blue-950/40 text-blue-200' : 'border-slate-800 bg-slate-950/60 text-slate-300'
+                              }`}
+                            >
+                              {g.emoji} {g.count}
+                            </button>
+                          ))}
+                          <div className="relative">
+                            <button
+                              type="button"
+                              onClick={() => setReactionPickerFor(reactionPickerFor === m.id ? null : m.id)}
+                              className="rounded-full border border-slate-800 bg-slate-950/60 px-1.5 py-0.5 text-[11px] text-slate-400 hover:bg-slate-900"
+                              aria-label={t('chat.react')}
+                              title={t('chat.react')}
+                            >
+                              {myReactionByMessage.get(m.id) ?? '🙂+'}
+                            </button>
+                            {reactionPickerFor === m.id && (
+                              <div
+                                className="absolute z-20 mt-1 flex gap-1 rounded-full border border-slate-800 bg-slate-950 p-1 shadow-xl"
+                                onMouseLeave={() => setReactionPickerFor(null)}
+                              >
+                                {QUICK_EMOJIS.map((e) => (
+                                  <button
+                                    key={e}
+                                    type="button"
+                                    onClick={() => onToggleReaction(m.id, e)}
+                                    className="rounded-full px-1 text-base hover:bg-slate-900"
+                                  >
+                                    {e}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </>
                   )}
                     </li>
@@ -1311,9 +1551,19 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
             <div className="rounded border border-slate-900 bg-slate-950/40 p-2">
               <div className="mb-2 text-xs text-slate-400">{t('chat.previewImages')}</div>
               <div className="grid grid-cols-3 gap-2">
-                {previewImages.map((u) => (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img key={u} src={u} alt="preview" className="h-24 w-full rounded border border-slate-900 object-cover" />
+                {previewImages.map((u, i) => (
+                  <div key={u} className="group relative">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={u} alt="preview" className="h-24 w-full rounded border border-slate-900 object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => setEditorIndex(i)}
+                      className="absolute bottom-1 right-1 rounded-full bg-black/60 px-2 py-1 text-xs text-white hover:bg-black/80"
+                      title={t('chat.editPhoto')}
+                    >
+                      ✏️
+                    </button>
+                  </div>
                 ))}
               </div>
               <div className="mt-2 flex justify-end">

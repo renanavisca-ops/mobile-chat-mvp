@@ -3,8 +3,8 @@
 import { useEffect, useState, useCallback } from 'react';
 import type { RealtimePostgresChangesPayload, REALTIME_SUBSCRIBE_STATES } from '@supabase/supabase-js';
 import { browserSupabase } from '@/lib/supabase/client';
-import { listMessages, markMessagesAsRead } from '@/lib/db/chats';
-import type { MessageRow } from '@/lib/db/types';
+import { listMessages, markMessagesAsRead, listReactions, listPollVotes } from '@/lib/db/chats';
+import type { MessageRow, MessageReaction, PollVote } from '@/lib/db/types';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 
 const PAGE_SIZE = 50;
@@ -14,12 +14,25 @@ export function useChatRealtime(chatId: string) {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
-  
+
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const [meTyping, setMeTyping] = useState(false);
   const [channelPresence, setChannelPresence] = useState<any>(null);
 
+  const [reactions, setReactions] = useState<MessageReaction[]>([]);
+  const [pollVotes, setPollVotes] = useState<PollVote[]>([]);
+
   const { notify } = useNotifications();
+
+  // initial reactions + poll votes for the whole chat
+  useEffect(() => {
+    let alive = true;
+    listReactions(chatId).then((rows) => alive && setReactions(rows)).catch(() => {});
+    listPollVotes(chatId).then((rows) => alive && setPollVotes(rows)).catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [chatId]);
 
   // carga inicial
   useEffect(() => {
@@ -116,6 +129,47 @@ export function useChatRealtime(chatId: string) {
           }
         }
       )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'message_reactions', filter: `chat_id=eq.${chatId}` },
+        (payload: RealtimePostgresChangesPayload<MessageReaction>) => {
+          if (payload.eventType === 'INSERT') {
+            const row = payload.new as MessageReaction;
+            setReactions((current) => {
+              const withoutSameUser = current.filter(
+                (r) => !(r.message_id === row.message_id && r.user_id === row.user_id)
+              );
+              return [...withoutSameUser, row];
+            });
+          } else if (payload.eventType === 'UPDATE') {
+            const row = payload.new as MessageReaction;
+            setReactions((current) => current.map((r) => (r.id === row.id ? row : r)));
+          } else if (payload.eventType === 'DELETE') {
+            const oldRow = payload.old as Partial<MessageReaction>;
+            setReactions((current) => current.filter((r) => r.id !== oldRow.id));
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'poll_votes', filter: `chat_id=eq.${chatId}` },
+        (payload: RealtimePostgresChangesPayload<PollVote>) => {
+          if (payload.eventType === 'DELETE') {
+            const oldRow = payload.old as Partial<PollVote>;
+            setPollVotes((current) =>
+              current.filter((v) => !(v.message_id === oldRow.message_id && v.user_id === oldRow.user_id))
+            );
+            return;
+          }
+          const row = payload.new as PollVote;
+          setPollVotes((current) => {
+            const withoutSameUser = current.filter(
+              (v) => !(v.message_id === row.message_id && v.user_id === row.user_id)
+            );
+            return [...withoutSameUser, row];
+          });
+        }
+      )
       .on('presence', { event: 'sync' }, () => {
         const state = channel.presenceState() as Record<string, Array<{ typing: boolean; userId: string }>>;
         const typing: string[] = [];
@@ -163,14 +217,16 @@ export function useChatRealtime(chatId: string) {
     });
   }
 
-  return { 
-    messages, 
-    loading, 
-    appendLocal, 
-    loadMore, 
-    hasMore, 
+  return {
+    messages,
+    loading,
+    appendLocal,
+    loadMore,
+    hasMore,
     loadingMore,
     typingUsers,
-    setMeTyping
+    setMeTyping,
+    reactions,
+    pollVotes,
   };
 }

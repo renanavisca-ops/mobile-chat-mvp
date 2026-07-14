@@ -19,6 +19,8 @@ export type ChatSummary = {
   other_user_avatar?: string | null;
   /** All member user ids (excluding me). */
   member_ids?: string[];
+  /** Disappearing-messages timer for this chat, in seconds (null/0 = off). */
+  disappearing_seconds?: number | null;
 };
 
 export type ProfileLite = {
@@ -34,7 +36,7 @@ export type MessageRow = {
   sender_device_id?: string | null;
   ciphertext?: string | null;
   nonce?: string | null;
-  message_type: 'prekey' | 'whisper' | 'system';
+  message_type: 'prekey' | 'whisper' | 'system' | 'poll';
   created_at: string;
   read?: boolean;
   content?: string | null;
@@ -42,4 +44,22 @@ export type MessageRow = {
   sender_id?: string | null;
   delivery_status?: 'sent' | 'delivered' | 'read' | 'failed';
   edited_at?: string | null;
+  expires_at?: string | null;
+};
+
+export type MessageReaction = {
+  id: string;
+  message_id: string;
+  chat_id: string;
+  user_id: string;
+  emoji: string;
+  created_at: string;
+};
+
+export type PollVote = {
+  message_id: string;
+  chat_id: string;
+  user_id: string;
+  option_index: number;
+  created_at: string;
 };

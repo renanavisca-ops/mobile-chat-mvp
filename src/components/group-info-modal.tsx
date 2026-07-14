@@ -2,10 +2,17 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { searchUsers } from '@/lib/db/contacts';
-import { updateGroupInfo, addGroupMembers, removeGroupMember, leaveChat, setChatMuted, getChatMuted } from '@/lib/db/chats';
+import { updateGroupInfo, addGroupMembers, removeGroupMember, leaveChat, setChatMuted, getChatMuted, setDisappearingMessages } from '@/lib/db/chats';
 import { uploadGroupAvatar } from '@/lib/db/groupAvatar';
 import { useT } from '@/lib/i18n/context';
 import type { ProfileLite } from '@/lib/db/types';
+
+const DISAPPEARING_OPTIONS: { seconds: number; labelKey: string }[] = [
+  { seconds: 0, labelKey: 'chat.disappearingOff' },
+  { seconds: 86400, labelKey: 'chat.disappearing24h' },
+  { seconds: 604800, labelKey: 'chat.disappearing7d' },
+  { seconds: 2592000, labelKey: 'chat.disappearing30d' },
+];
 
 export function GroupInfoModal({
   open,
@@ -16,6 +23,7 @@ export function GroupInfoModal({
   avatarUrl,
   isCreator,
   members,
+  disappearingSeconds,
   onUpdated,
   onMembersChanged,
   onLeft,
@@ -28,7 +36,8 @@ export function GroupInfoModal({
   avatarUrl: string | null;
   isCreator: boolean;
   members: { id: string; username: string | null }[];
-  onUpdated: (patch: { title?: string; description?: string; avatar_url?: string }) => void;
+  disappearingSeconds?: number | null;
+  onUpdated: (patch: { title?: string; description?: string; avatar_url?: string; disappearing_seconds?: number | null }) => void;
   onMembersChanged: () => void;
   onLeft: () => void;
 }) {
@@ -43,6 +52,8 @@ export function GroupInfoModal({
 
   const [muted, setMuted] = useState(false);
   const [muteBusy, setMuteBusy] = useState(false);
+  const [disappearing, setDisappearing] = useState(disappearingSeconds ?? 0);
+  const [disappearingBusy, setDisappearingBusy] = useState(false);
 
   const [q, setQ] = useState('');
   const [results, setResults] = useState<ProfileLite[]>([]);
@@ -60,9 +71,10 @@ export function GroupInfoModal({
       setQ('');
       setResults([]);
       setConfirmLeave(false);
+      setDisappearing(disappearingSeconds ?? 0);
       getChatMuted(chatId).then(setMuted).catch(() => {});
     }
-  }, [open, title, description, chatId]);
+  }, [open, title, description, chatId, disappearingSeconds]);
 
   useEffect(() => {
     const query = q.trim();
@@ -123,6 +135,20 @@ export function GroupInfoModal({
       setErr(e?.message ?? String(e));
     } finally {
       setMuteBusy(false);
+    }
+  }
+
+  async function chooseDisappearing(seconds: number) {
+    setDisappearingBusy(true);
+    setErr('');
+    try {
+      await setDisappearingMessages(chatId, seconds);
+      setDisappearing(seconds);
+      onUpdated({ disappearing_seconds: seconds || null });
+    } catch (e: any) {
+      setErr(e?.message ?? String(e));
+    } finally {
+      setDisappearingBusy(false);
     }
   }
 
@@ -262,6 +288,29 @@ export function GroupInfoModal({
             <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${muted ? 'translate-x-6' : 'translate-x-1'}`} />
           </button>
         </div>
+
+        {isCreator && (
+          <div className="mt-3 rounded-lg border border-slate-900 bg-slate-950/60 p-3">
+            <div className="text-sm font-medium text-slate-200">{t('groupInfo.disappearingTitle')}</div>
+            <div className="text-xs text-slate-500">{t('groupInfo.disappearingDesc')}</div>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {DISAPPEARING_OPTIONS.map((opt) => (
+                <button
+                  key={opt.seconds}
+                  type="button"
+                  onClick={() => chooseDisappearing(opt.seconds)}
+                  disabled={disappearingBusy}
+                  aria-pressed={disappearing === opt.seconds}
+                  className={`rounded-lg px-3 py-1.5 text-xs transition disabled:opacity-50 ${
+                    disappearing === opt.seconds ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                  }`}
+                >
+                  {t(opt.labelKey)}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="mt-4">
           <div className="ml-1 text-xs text-slate-400">{t('groupInfo.members')} ({members.length})</div>

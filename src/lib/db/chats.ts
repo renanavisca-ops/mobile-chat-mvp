@@ -20,7 +20,7 @@ export async function listChats(): Promise<ChatSummary[]> {
 
   const { data: chats, error } = await supabase
     .from('chats')
-    .select('id, kind, title, created_at, store_id, assigned_to, status, pinned_message_id, avatar_url, description')
+    .select('id, kind, title, created_at, store_id, assigned_to, status, pinned_message_id, avatar_url, description, disappearing_seconds')
     .order('created_at', { ascending: false });
 
   if (error) throw error;
@@ -117,6 +117,7 @@ export async function listChats(): Promise<ChatSummary[]> {
       pinned_message_id: c.pinned_message_id,
       avatar_url: c.avatar_url,
       description: c.description,
+      disappearing_seconds: c.disappearing_seconds,
       last_message_at: latestByChat.get(c.id)?.created_at ?? null,
       last_ciphertext: latestByChat.get(c.id)?.content ?? null,
       last_message_kind: latestByChat.get(c.id)?.kind ?? null,
@@ -168,7 +169,7 @@ export async function listMessages(
   const { data, error } = await supabase
     .from('messages')
     .select(
-      'id, chat_id, sender_device_id, ciphertext, nonce, message_type, created_at, read, content, sender_type, sender_id, delivery_status, edited_at'
+      'id, chat_id, sender_device_id, ciphertext, nonce, message_type, created_at, read, content, sender_type, sender_id, delivery_status, edited_at, expires_at'
     )
     .eq('chat_id', chatId)
     .order('created_at', { ascending: false })
@@ -176,7 +177,9 @@ export async function listMessages(
 
   if (error) throw error;
 
-  return ((data ?? []) as unknown as MessageRow[]).reverse();
+  const now = Date.now();
+  const rows = (data ?? []) as unknown as MessageRow[];
+  return rows.filter((m) => !m.expires_at || new Date(m.expires_at).getTime() > now).reverse();
 }
 
 export type MessagePayload = {
@@ -189,6 +192,18 @@ export type MessagePayload = {
   is_deleted?: boolean;
 };
 
+/** Fetch the chat's disappearing-messages timer (seconds), or null if off. */
+async function getDisappearingSeconds(chatId: string): Promise<number | null> {
+  const supabase = browserSupabase();
+  const { data, error } = await supabase
+    .from('chats')
+    .select('disappearing_seconds')
+    .eq('id', chatId)
+    .maybeSingle();
+  if (error) throw error;
+  return data?.disappearing_seconds ?? null;
+}
+
 export async function sendMessage(chatId: string, payload: MessagePayload) {
   const supabase = browserSupabase();
 
@@ -200,6 +215,11 @@ export async function sendMessage(chatId: string, payload: MessagePayload) {
   const ciphertext = JSON.stringify({ v: 1, ...payload });
   const nonce = crypto.randomUUID();
 
+  const disappearingSeconds = await getDisappearingSeconds(chatId);
+  const expiresAt = disappearingSeconds
+    ? new Date(Date.now() + disappearingSeconds * 1000).toISOString()
+    : null;
+
   const { error } = await supabase.from('messages').insert({
     chat_id: chatId,
     sender_device_id: deviceId,
@@ -209,8 +229,19 @@ export async function sendMessage(chatId: string, payload: MessagePayload) {
     content: payload.text || null,
     sender_type: 'agent',
     nonce,
+    expires_at: expiresAt,
   });
 
+  if (error) throw error;
+}
+
+/** Set (or clear, with seconds=0) the disappearing-messages timer for a chat. */
+export async function setDisappearingMessages(chatId: string, seconds: number) {
+  const supabase = browserSupabase();
+  const { error } = await supabase.rpc('set_disappearing_messages', {
+    p_chat_id: chatId,
+    p_seconds: seconds,
+  });
   if (error) throw error;
 }
 
@@ -392,6 +423,102 @@ export async function markMessagesAsRead(chatId: string) {
     .neq('sender_id', me.user.id);
 
   if (error) console.error(error);
+}
+
+/* ---------------------------- Reactions ---------------------------- */
+
+/**
+ * Toggle a reaction from the current user on a message. If the user already
+ * reacted with this exact emoji, the reaction is removed; if they reacted
+ * with a different emoji, it's replaced (one reaction per user per message).
+ */
+export async function toggleReaction(messageId: string, chatId: string, emoji: string) {
+  const supabase = browserSupabase();
+  const { data: me } = await supabase.auth.getUser();
+  if (!me.user) throw new Error('Not authenticated');
+
+  const { data: existing, error: readErr } = await supabase
+    .from('message_reactions')
+    .select('id, emoji')
+    .eq('message_id', messageId)
+    .eq('user_id', me.user.id)
+    .maybeSingle();
+  if (readErr) throw readErr;
+
+  if (existing && existing.emoji === emoji) {
+    const { error } = await supabase.from('message_reactions').delete().eq('id', existing.id);
+    if (error) throw error;
+    return;
+  }
+
+  const { error } = await supabase.from('message_reactions').upsert(
+    { message_id: messageId, chat_id: chatId, user_id: me.user.id, emoji },
+    { onConflict: 'message_id,user_id' }
+  );
+  if (error) throw error;
+}
+
+export async function listReactions(chatId: string): Promise<import('@/lib/db/types').MessageReaction[]> {
+  const supabase = browserSupabase();
+  const { data, error } = await supabase
+    .from('message_reactions')
+    .select('id, message_id, chat_id, user_id, emoji, created_at')
+    .eq('chat_id', chatId);
+  if (error) throw error;
+  return (data ?? []) as import('@/lib/db/types').MessageReaction[];
+}
+
+/* ------------------------------ Polls -------------------------------- */
+
+export type PollPayload = { poll: { question: string; options: string[] } };
+
+export async function createPoll(chatId: string, question: string, options: string[]) {
+  const supabase = browserSupabase();
+  const { data: me } = await supabase.auth.getUser();
+  if (!me.user) throw new Error('Not authenticated');
+
+  const deviceId = await ensureLocalDevice(me.user.id);
+
+  const cleanOptions = options.map((o) => o.trim()).filter(Boolean);
+  if (!question.trim() || cleanOptions.length < 2) {
+    throw new Error('A poll needs a question and at least 2 options');
+  }
+
+  const ciphertext = JSON.stringify({ v: 1, poll: { question: question.trim(), options: cleanOptions } });
+  const nonce = crypto.randomUUID();
+
+  const { error } = await supabase.from('messages').insert({
+    chat_id: chatId,
+    sender_device_id: deviceId,
+    sender_id: me.user.id,
+    message_type: 'poll',
+    ciphertext,
+    sender_type: 'agent',
+    nonce,
+  });
+  if (error) throw error;
+}
+
+export async function votePoll(messageId: string, chatId: string, optionIndex: number) {
+  const supabase = browserSupabase();
+  const { data: me } = await supabase.auth.getUser();
+  if (!me.user) throw new Error('Not authenticated');
+
+  const { error } = await supabase.from('poll_votes').upsert(
+    { message_id: messageId, chat_id: chatId, user_id: me.user.id, option_index: optionIndex },
+    { onConflict: 'message_id,user_id' }
+  );
+  if (error) throw error;
+}
+
+export async function listPollVotes(chatId: string): Promise<import('@/lib/db/types').PollVote[]> {
+  const supabase = browserSupabase();
+  const { data, error } = await supabase
+    .from('poll_votes')
+    .select('message_id, chat_id, user_id, option_index, created_at')
+    .eq('chat_id', chatId);
+  if (error) throw error;
+  return (data ?? []) as import('@/lib/db/types').PollVote[];
 }
 
 async function ensureLocalDevice(userId: string): Promise<string> {

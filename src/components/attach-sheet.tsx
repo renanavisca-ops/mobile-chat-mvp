@@ -11,8 +11,9 @@ export function AttachSheet(props: {
   onCameraPhoto: () => void;
   onCameraVideo: () => void;
   onPickFile: () => void;
+  onPoll: () => void;
 }) {
-  const { open, onClose, onPickPhotos, onPickVideo, onCameraPhoto, onCameraVideo, onPickFile } = props;
+  const { open, onClose, onPickPhotos, onPickVideo, onCameraPhoto, onCameraVideo, onPickFile, onPoll } = props;
   const t = useT();
 
   useEffect(() => {
@@ -93,6 +94,7 @@ export function AttachSheet(props: {
             </div>
           </div>
 
+          <Btn icon="📊" label={t('attach.poll')} onClick={onPoll} />
           <Btn icon="📎" label={t('attach.file')} onClick={onPickFile} />
         </div>
 

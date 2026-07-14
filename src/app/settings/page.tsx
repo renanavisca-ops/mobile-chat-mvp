@@ -9,10 +9,21 @@ import { uploadAvatar } from '@/lib/db/avatar';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import { subscribeToPush, pushSupported } from '@/lib/push';
 import { useLanguage, TransBold, type LangPreference } from '@/lib/i18n/context';
+import { useTheme, type Accent } from '@/lib/theme';
 
 export default function SettingsPage() {
   const supabase = browserSupabase();
   const { t, preference, setPreference } = useLanguage();
+  const {
+    theme,
+    setTheme,
+    accent,
+    setAccent,
+    highContrast,
+    setHighContrast,
+    fontScale,
+    setFontScale,
+  } = useTheme();
 
   const [user, setUser] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
@@ -288,6 +299,25 @@ export default function SettingsPage() {
     { key: 'es', label: t('settings.languageSpanish') },
   ];
 
+  const themeOptions: { key: 'auto' | 'dark' | 'light'; label: string }[] = [
+    { key: 'auto', label: t('settings.themeAuto') },
+    { key: 'dark', label: t('settings.themeDark') },
+    { key: 'light', label: t('settings.themeLight') },
+  ];
+
+  const accentOptions: { key: Accent; label: string; swatch: string }[] = [
+    { key: 'blue', label: t('settings.accentBlue'), swatch: '#3b82f6' },
+    { key: 'violet', label: t('settings.accentViolet'), swatch: '#8b5cf6' },
+    { key: 'teal', label: t('settings.accentTeal'), swatch: '#14b8a6' },
+    { key: 'fuchsia', label: t('settings.accentFuchsia'), swatch: '#d946ef' },
+  ];
+
+  const fontScaleOptions: { key: 'normal' | 'lg' | 'xl'; label: string }[] = [
+    { key: 'normal', label: t('settings.fontSizeNormal') },
+    { key: 'lg', label: t('settings.fontSizeLarge') },
+    { key: 'xl', label: t('settings.fontSizeXLarge') },
+  ];
+
   return (
     <PageShell title={t('nav.settings')}>
       {loading ? (
@@ -377,6 +407,91 @@ export default function SettingsPage() {
                     {opt.label}
                   </button>
                 ))}
+              </div>
+            </div>
+          </section>
+
+          <section className="space-y-3">
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500 ml-1">{t('settings.sectionAppearance')}</h2>
+            <div className="space-y-4 rounded-xl border border-slate-900 bg-slate-950/50 p-4 shadow-sm">
+              <div>
+                <div className="mb-2 text-sm font-medium text-slate-200">{t('settings.themeLabel')}</div>
+                <div className="flex flex-wrap gap-2">
+                  {themeOptions.map((opt) => (
+                    <button
+                      key={opt.key}
+                      type="button"
+                      onClick={() => setTheme(opt.key)}
+                      aria-pressed={theme === opt.key}
+                      className={`rounded-lg px-3 py-1.5 text-sm transition ${
+                        theme === opt.key ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <div className="mb-2 text-sm font-medium text-slate-200">{t('settings.accentLabel')}</div>
+                <div className="flex flex-wrap gap-3">
+                  {accentOptions.map((opt) => (
+                    <button
+                      key={opt.key}
+                      type="button"
+                      onClick={() => setAccent(opt.key)}
+                      aria-pressed={accent === opt.key}
+                      title={opt.label}
+                      className={`h-9 w-9 rounded-full border-2 transition ${
+                        accent === opt.key ? 'border-white' : 'border-transparent hover:border-slate-500'
+                      }`}
+                      style={{ background: opt.swatch }}
+                    >
+                      {accent === opt.key && <span className="text-white text-sm">✓</span>}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-sm font-medium text-slate-200">{t('settings.highContrastLabel')}</div>
+                  <div className="mt-1 text-xs text-slate-400">{t('settings.highContrastDesc')}</div>
+                </div>
+                <button
+                  onClick={() => setHighContrast(!highContrast)}
+                  role="switch"
+                  aria-checked={highContrast}
+                  className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
+                    highContrast ? 'bg-emerald-600' : 'bg-slate-700'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      highContrast ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+              </div>
+
+              <div>
+                <div className="mb-2 text-sm font-medium text-slate-200">{t('settings.fontSizeLabel')}</div>
+                <div className="flex flex-wrap gap-2">
+                  {fontScaleOptions.map((opt) => (
+                    <button
+                      key={opt.key}
+                      type="button"
+                      onClick={() => setFontScale(opt.key)}
+                      aria-pressed={fontScale === opt.key}
+                      className={`rounded-lg px-3 py-1.5 text-sm transition ${
+                        fontScale === opt.key ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           </section>
