@@ -16,6 +16,13 @@ body {
   to { width: 100%; }
 }
 
+/* Falling emoji for message effects. */
+@keyframes messageEffectFall {
+  0% { transform: translateY(0) rotate(0deg); opacity: 0; }
+  10% { opacity: 1; }
+  100% { transform: translateY(110vh) rotate(220deg); opacity: 0.9; }
+}
+
 /* =========================================================================
    Theme, accent color, contrast and font-scale.
    The app's dark-mode Tailwind classes are static utility classes (not CSS

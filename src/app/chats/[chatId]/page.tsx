@@ -21,6 +21,7 @@ import { useOnlineUsers } from '@/components/presence-provider';
 import { useLanguage } from '@/lib/i18n/context';
 import { PollComposer } from '@/components/poll-composer';
 import { ImageEditor } from '@/components/image-editor';
+import { MessageEffects, detectEffect } from '@/components/message-effects';
 import type { ChatSummary, MessageRow } from '@/lib/db/types';
 
 type Payload = {
@@ -299,6 +300,10 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
   // Image editor (crop/rotate/filter/draw before sending)
   const [editorIndex, setEditorIndex] = useState<number | null>(null);
 
+  // Animated message effects (iMessage-style emoji burst on trigger emojis)
+  const [effectTrigger, setEffectTrigger] = useState<string | null>(null);
+  const lastEffectMsgId = useRef<string | null>(null);
+
   // Inputs
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const videoInputRef = useRef<HTMLInputElement | null>(null);
@@ -503,6 +508,22 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
       el.scrollTop = el.scrollHeight;
     }
   }, [items.length]);
+
+  // Fire an animated effect when the newest message contains a trigger emoji.
+  // Seeds silently on first load so history doesn't replay effects.
+  useEffect(() => {
+    if (items.length === 0) return;
+    const newest = items[items.length - 1];
+    if (lastEffectMsgId.current === null) {
+      lastEffectMsgId.current = newest.id;
+      return;
+    }
+    if (newest.id === lastEffectMsgId.current) return;
+    lastEffectMsgId.current = newest.id;
+    if (newest.body.is_deleted) return;
+    const trigger = detectEffect(newest.body.text);
+    if (trigger) setEffectTrigger(trigger);
+  }, [items]);
 
   const handleScroll = () => {
     const el = scrollRef.current;
@@ -971,6 +992,8 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
 
   return (
     <PageShell title={t('chat.title')}>
+      <MessageEffects trigger={effectTrigger} onDone={() => setEffectTrigger(null)} />
+
       <ForwardModal
         open={forwardOpen}
         chats={chats}
