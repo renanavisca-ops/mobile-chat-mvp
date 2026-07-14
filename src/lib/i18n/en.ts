@@ -257,6 +257,13 @@ const en = {
     poll: 'Poll',
     cancel: 'Cancel',
   },
+  avatarCreator: {
+    title: 'Create your avatar',
+    pickEmoji: 'Pick an emoji',
+    pickBackground: 'Background',
+    save: 'Save as avatar',
+    saving: 'Saving…',
+  },
   stories: {
     yourStory: 'Your story',
     you: 'You',
@@ -402,6 +409,7 @@ const en = {
     activeDeviceId: 'Active device ID',
     noDevice: '(none) — run /onboarding',
     changePhoto: 'Change photo',
+    createAvatar: 'Create avatar',
     uploading: 'Uploading…',
     displayName: 'Display name',
     displayNamePlaceholder: 'Your name',

@@ -259,6 +259,13 @@ const es: Dictionary = {
     poll: 'Encuesta',
     cancel: 'Cancelar',
   },
+  avatarCreator: {
+    title: 'Crea tu avatar',
+    pickEmoji: 'Elige un emoji',
+    pickBackground: 'Fondo',
+    save: 'Guardar como avatar',
+    saving: 'Guardando…',
+  },
   stories: {
     yourStory: 'Tu historia',
     you: 'Tú',
@@ -404,6 +411,7 @@ const es: Dictionary = {
     activeDeviceId: 'ID de dispositivo activo',
     noDevice: '(ninguno) — ejecuta /onboarding',
     changePhoto: 'Cambiar foto',
+    createAvatar: 'Crear avatar',
     uploading: 'Subiendo…',
     displayName: 'Nombre a mostrar',
     displayNamePlaceholder: 'Tu nombre',

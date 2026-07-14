@@ -10,6 +10,7 @@ import { useNotifications } from '@/lib/hooks/useNotifications';
 import { subscribeToPush, pushSupported } from '@/lib/push';
 import { useLanguage, TransBold, type LangPreference } from '@/lib/i18n/context';
 import { useTheme, type Accent } from '@/lib/theme';
+import { AvatarCreator } from '@/components/avatar-creator';
 
 export default function SettingsPage() {
   const supabase = browserSupabase();
@@ -53,6 +54,7 @@ export default function SettingsPage() {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [savingProfile, setSavingProfile] = useState(false);
   const [avatarBusy, setAvatarBusy] = useState(false);
+  const [avatarCreatorOpen, setAvatarCreatorOpen] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement | null>(null);
   const { permission } = useNotifications();
   const [pushBusy, setPushBusy] = useState(false);
@@ -356,7 +358,7 @@ export default function SettingsPage() {
                     {(displayName || profile?.username || '?').trim().charAt(0).toUpperCase()}
                   </span>
                 )}
-                <div>
+                <div className="flex flex-wrap gap-2">
                   <button
                     type="button"
                     onClick={() => avatarInputRef.current?.click()}
@@ -364,6 +366,14 @@ export default function SettingsPage() {
                     className="rounded-lg bg-slate-800 px-3 py-1.5 text-sm text-slate-200 hover:bg-slate-700 disabled:opacity-50"
                   >
                     {avatarBusy ? t('settings.uploading') : t('settings.changePhoto')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAvatarCreatorOpen(true)}
+                    disabled={avatarBusy}
+                    className="rounded-lg bg-slate-800 px-3 py-1.5 text-sm text-slate-200 hover:bg-slate-700 disabled:opacity-50"
+                  >
+                    {t('settings.createAvatar')}
                   </button>
                   <input ref={avatarInputRef} type="file" hidden accept="image/*" onChange={onAvatarChange} />
                 </div>
@@ -720,6 +730,18 @@ export default function SettingsPage() {
             {status && <p className="text-xs text-center mt-3 text-slate-500 italic">{status}</p>}
           </div>
         </div>
+      )}
+
+      {user && (
+        <AvatarCreator
+          open={avatarCreatorOpen}
+          userId={user.id}
+          onClose={() => setAvatarCreatorOpen(false)}
+          onSaved={(url) => {
+            setAvatarUrl(url);
+            setStatus(`✅ ${t('settings.photoUpdated')}`);
+          }}
+        />
       )}
 
       {deleteOpen && (
