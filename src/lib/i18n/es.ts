@@ -96,6 +96,8 @@ const es: Dictionary = {
     photo: '📷 Imagen',
     video: '📹 Video',
     audio: '🎵 Audio',
+    gif: '🎬 GIF',
+    poll: '📊 Encuesta',
     deletedMessage: '🚫 Mensaje eliminado',
   },
   chat: {
@@ -257,7 +259,15 @@ const es: Dictionary = {
     desktopNote: '* En escritorio puede abrir el selector de archivos normal; en móvil usa la cámara.',
     file: 'Archivo (pendiente)',
     poll: 'Encuesta',
+    gif: 'GIF',
     cancel: 'Cancelar',
+  },
+  gif: {
+    searchPlaceholder: 'Buscar GIFs…',
+    noResults: 'No se encontraron GIFs.',
+    error: 'No se pudieron cargar los GIFs.',
+    notConfigured: 'Los GIFs aún no están configurados.',
+    poweredBy: 'Con tecnología de GIPHY',
   },
   avatarCreator: {
     title: 'Crea tu avatar',

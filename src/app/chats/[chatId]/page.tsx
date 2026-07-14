@@ -22,6 +22,8 @@ import { useLanguage } from '@/lib/i18n/context';
 import { PollComposer } from '@/components/poll-composer';
 import { ImageEditor } from '@/components/image-editor';
 import { MessageEffects, detectEffect } from '@/components/message-effects';
+import { GifPicker } from '@/components/gif-picker';
+import type { Gif } from '@/lib/giphy';
 import type { ChatSummary, MessageRow } from '@/lib/db/types';
 
 type Payload = {
@@ -31,6 +33,7 @@ type Payload = {
   imagePaths?: string[];
   videoPath?: string;
   audioPath?: string;
+  gifUrl?: string;
   reply_to?: string;
   is_deleted?: boolean;
   poll?: { question: string; options: string[] };
@@ -297,6 +300,9 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
   // Poll composer
   const [pollComposerOpen, setPollComposerOpen] = useState(false);
 
+  // GIF picker
+  const [gifPickerOpen, setGifPickerOpen] = useState(false);
+
   // Image editor (crop/rotate/filter/draw before sending)
   const [editorIndex, setEditorIndex] = useState<number | null>(null);
 
@@ -448,6 +454,28 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
   async function onVotePoll(messageId: string, optionIndex: number) {
     try {
       await votePoll(messageId, chatId, optionIndex);
+    } catch (e: any) {
+      setErr(e?.message ?? String(e));
+    }
+  }
+
+  async function onPickGif(gif: Gif) {
+    setGifPickerOpen(false);
+    const payload: Payload = { gifUrl: gif.sendUrl };
+    if (replyingTo) payload.reply_to = replyingTo.id;
+    const temp: MessageRow = {
+      id: `local-${crypto.randomUUID()}`,
+      chat_id: chatId,
+      sender_device_id: 'local',
+      ciphertext: JSON.stringify({ v: 1, ...payload }),
+      nonce: `local-${crypto.randomUUID()}`,
+      message_type: 'whisper',
+      created_at: new Date().toISOString(),
+    };
+    appendLocal(temp);
+    setReplyingTo(null);
+    try {
+      await sendMessage(chatId, payload as any);
     } catch (e: any) {
       setErr(e?.message ?? String(e));
     }
@@ -1146,7 +1174,13 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
           setEmojiOpen(false);
           setPollComposerOpen(true);
         }}
+        onGif={() => {
+          setEmojiOpen(false);
+          setGifPickerOpen(true);
+        }}
       />
+
+      <GifPicker open={gifPickerOpen} onClose={() => setGifPickerOpen(false)} onPick={onPickGif} />
 
       <PollComposer
         open={pollComposerOpen}
@@ -1463,6 +1497,11 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
                             </div>
                           )}
                           {m.body.text ? <div className="text-sm mt-1">{m.body.text}</div> : null}
+
+                      {m.body.gifUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={m.body.gifUrl} alt="GIF" className="mt-2 max-h-72 w-auto rounded-lg border border-slate-900" />
+                      ) : null}
 
                       {m.message_type === 'poll' && m.body.poll ? (
                         <div className="mt-1 space-y-1.5">

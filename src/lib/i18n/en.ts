@@ -94,6 +94,8 @@ const en = {
     photo: '📷 Photo',
     video: '📹 Video',
     audio: '🎵 Audio',
+    gif: '🎬 GIF',
+    poll: '📊 Poll',
     deletedMessage: '🚫 Deleted message',
   },
   chat: {
@@ -255,7 +257,15 @@ const en = {
     desktopNote: '* On desktop this may open the regular file picker; on mobile it opens the camera.',
     file: 'File (pending)',
     poll: 'Poll',
+    gif: 'GIF',
     cancel: 'Cancel',
+  },
+  gif: {
+    searchPlaceholder: 'Search GIFs…',
+    noResults: 'No GIFs found.',
+    error: 'Could not load GIFs.',
+    notConfigured: 'GIFs are not set up yet.',
+    poweredBy: 'Powered by GIPHY',
   },
   avatarCreator: {
     title: 'Create your avatar',

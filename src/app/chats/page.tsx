@@ -144,6 +144,10 @@ export default function ChatsPage() {
         return t('chatsList.video');
       case 'audio':
         return t('chatsList.audio');
+      case 'gif':
+        return t('chatsList.gif');
+      case 'poll':
+        return t('chatsList.poll');
       case 'deleted':
         return t('chatsList.deletedMessage');
       default:

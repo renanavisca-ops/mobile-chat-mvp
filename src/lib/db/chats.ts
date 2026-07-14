@@ -71,12 +71,12 @@ export async function listChats(): Promise<ChatSummary[]> {
   // (this module isn't a component and can't call the i18n hook).
   const latestByChat = new Map<
     string,
-    { created_at: string; content: string | null; kind: 'text' | 'photo' | 'video' | 'audio' | 'deleted' | null }
+    { created_at: string; content: string | null; kind: 'text' | 'photo' | 'video' | 'audio' | 'gif' | 'poll' | 'deleted' | null }
   >();
   for (const m of msgsRes.data ?? []) {
     if (latestByChat.has(m.chat_id)) continue;
     let content = m.content || '';
-    let kind: 'text' | 'photo' | 'video' | 'audio' | 'deleted' | null = content ? 'text' : null;
+    let kind: 'text' | 'photo' | 'video' | 'audio' | 'gif' | 'poll' | 'deleted' | null = content ? 'text' : null;
     if (!content && m.ciphertext) {
       try {
         const parsed = JSON.parse(m.ciphertext);
@@ -89,6 +89,10 @@ export async function listChats(): Promise<ChatSummary[]> {
           kind = 'video';
         } else if (parsed.audioPath) {
           kind = 'audio';
+        } else if (parsed.gifUrl) {
+          kind = 'gif';
+        } else if (parsed.poll) {
+          kind = 'poll';
         } else if (parsed.is_deleted) {
           kind = 'deleted';
         }
@@ -188,6 +192,7 @@ export type MessagePayload = {
   imagePaths?: string[];
   videoPath?: string;
   audioPath?: string;
+  gifUrl?: string;
   reply_to?: string;
   is_deleted?: boolean;
 };

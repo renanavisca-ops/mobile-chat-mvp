@@ -4,7 +4,7 @@ import { useEffect, useState, useRef, useMemo } from 'react';
 import { createSignedChatMediaUrl } from '@/lib/storage/upload';
 import { useLanguage } from '@/lib/i18n/context';
 
-type Payload = { v?: number; text?: string; imagePath?: string; imagePaths?: string[]; videoPath?: string; audioPath?: string; reply_to?: string; is_deleted?: boolean; };
+type Payload = { v?: number; text?: string; imagePath?: string; imagePaths?: string[]; videoPath?: string; audioPath?: string; gifUrl?: string; reply_to?: string; is_deleted?: boolean; };
 
 function parseCipher(ciphertext: string | undefined | null): Payload {
   if (!ciphertext) return {};
@@ -227,7 +227,12 @@ export default function PublicChatPage({ params }: { params: { token: string } }
                   isCustomer ? 'bg-blue-600 text-white rounded-br-none' : 'bg-white text-gray-800 border border-gray-100 rounded-bl-none'
                 }`}>
                   {m.body.text && <div className="text-sm">{m.body.text}</div>}
-                  
+
+                  {m.body.gifUrl && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={m.body.gifUrl} alt="GIF" className="mt-2 max-w-full rounded" />
+                  )}
+
                   {m.body.imagePaths && m.body.imagePaths.map((p: string) => signedUrls[p] && (
                     <img key={p} src={signedUrls[p]} alt="attachment" className="max-w-full rounded mt-2" />
                   ))}
