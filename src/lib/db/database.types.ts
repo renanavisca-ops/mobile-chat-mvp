@@ -12,6 +12,12 @@ export type Database = {
   }
   public: {
     Tables: {
+      push_subscriptions: {
+        Row: { auth: string; created_at: string; endpoint: string; id: string; p256dh: string; user_id: string }
+        Insert: { auth: string; created_at?: string; endpoint: string; id?: string; p256dh: string; user_id: string }
+        Update: { auth?: string; created_at?: string; endpoint?: string; id?: string; p256dh?: string; user_id?: string }
+        Relationships: []
+      }
       blocks: {
         Row: { blocked_id: string; blocker_id: string; created_at: string }
         Insert: { blocked_id: string; blocker_id: string; created_at?: string }

@@ -7,6 +7,7 @@ import { browserSupabase } from '@/lib/supabase/client';
 import { WALLPAPERS, getWallpaperId, setWallpaperId as saveWallpaperId } from '@/lib/wallpaper';
 import { uploadAvatar } from '@/lib/db/avatar';
 import { useNotifications } from '@/lib/hooks/useNotifications';
+import { subscribeToPush, pushSupported } from '@/lib/push';
 
 export default function SettingsPage() {
   const supabase = browserSupabase();
@@ -35,7 +36,22 @@ export default function SettingsPage() {
   const [savingProfile, setSavingProfile] = useState(false);
   const [avatarBusy, setAvatarBusy] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement | null>(null);
-  const { permission, requestPermission } = useNotifications();
+  const { permission } = useNotifications();
+  const [pushBusy, setPushBusy] = useState(false);
+  const [pushErr, setPushErr] = useState('');
+
+  async function enablePush() {
+    if (!user) return;
+    setPushBusy(true);
+    setPushErr('');
+    try {
+      await subscribeToPush(user.id);
+    } catch (e: any) {
+      setPushErr(e?.message ?? String(e));
+    } finally {
+      setPushBusy(false);
+    }
+  }
 
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState('');
@@ -424,27 +440,32 @@ export default function SettingsPage() {
 
           <section className="space-y-3">
             <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500 ml-1">Notificaciones</h2>
-            <div className="rounded-xl border border-slate-900 bg-slate-950/50 p-4 shadow-sm flex items-center justify-between gap-3">
-              <div>
-                <div className="text-sm font-medium text-slate-200">Notificaciones del navegador</div>
-                <div className="text-xs text-slate-400 mt-1">
-                  {permission === 'granted'
-                    ? 'Activadas.'
-                    : permission === 'denied'
-                    ? 'Bloqueadas — habilítalas en los ajustes del navegador.'
-                    : 'Recibe un aviso cuando llega un mensaje nuevo.'}
+            <div className="rounded-xl border border-slate-900 bg-slate-950/50 p-4 shadow-sm">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-sm font-medium text-slate-200">Notificaciones push</div>
+                  <div className="text-xs text-slate-400 mt-1">
+                    {!pushSupported()
+                      ? 'No compatible con este navegador.'
+                      : permission === 'denied'
+                      ? 'Bloqueadas — habilítalas en los ajustes del navegador.'
+                      : permission === 'granted'
+                      ? 'Activadas. Recibirás avisos incluso con la app cerrada.'
+                      : 'Recibe un aviso cuando llega un mensaje nuevo, aunque la app esté cerrada.'}
+                  </div>
                 </div>
+                {permission !== 'granted' && pushSupported() && (
+                  <button
+                    type="button"
+                    onClick={enablePush}
+                    disabled={pushBusy || permission === 'denied'}
+                    className="rounded-lg bg-slate-800 px-3 py-1.5 text-sm text-slate-200 hover:bg-slate-700 disabled:opacity-50"
+                  >
+                    {pushBusy ? 'Activando…' : 'Activar'}
+                  </button>
+                )}
               </div>
-              {permission !== 'granted' && (
-                <button
-                  type="button"
-                  onClick={() => requestPermission()}
-                  disabled={permission === 'denied'}
-                  className="rounded-lg bg-slate-800 px-3 py-1.5 text-sm text-slate-200 hover:bg-slate-700 disabled:opacity-50"
-                >
-                  Activar
-                </button>
-              )}
+              {pushErr && <p className="mt-2 text-xs text-red-400">{pushErr}</p>}
             </div>
           </section>
 
