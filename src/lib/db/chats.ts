@@ -235,6 +235,44 @@ export async function deleteMessage(messageId: string, chatId: string) {
   if (error) throw error;
 }
 
+/** Rename a group chat. Only the group's creator may do this. */
+export async function renameGroupChat(chatId: string, title: string) {
+  const supabase = browserSupabase();
+  const { error } = await supabase.rpc('rename_group_chat', { p_chat_id: chatId, p_title: title });
+  if (error) throw error;
+}
+
+/** Add members to a group. Only the group's creator may do this (enforced by RLS). */
+export async function addGroupMembers(chatId: string, memberIds: string[]) {
+  if (memberIds.length === 0) return;
+  const supabase = browserSupabase();
+  const { error } = await supabase
+    .from('chat_members')
+    .insert(memberIds.map((user_id) => ({ chat_id: chatId, user_id })));
+  if (error) throw error;
+}
+
+/** Remove another member from a group. Only the group's creator may do this. */
+export async function removeGroupMember(chatId: string, memberId: string) {
+  const supabase = browserSupabase();
+  const { error } = await supabase.rpc('remove_group_member', { p_chat_id: chatId, p_member_id: memberId });
+  if (error) throw error;
+}
+
+/** Leave a chat (removes yourself from chat_members). */
+export async function leaveChat(chatId: string) {
+  const supabase = browserSupabase();
+  const { data: me } = await supabase.auth.getUser();
+  if (!me.user) throw new Error('Not authenticated');
+
+  const { error } = await supabase
+    .from('chat_members')
+    .delete()
+    .eq('chat_id', chatId)
+    .eq('user_id', me.user.id);
+  if (error) throw error;
+}
+
 /**
  * Edit the text of a message you sent. Only updates the plain-text `content`
  * column and the ciphertext JSON's `text` field, preserving any attached

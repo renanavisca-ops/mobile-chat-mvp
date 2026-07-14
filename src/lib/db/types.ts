@@ -9,6 +9,7 @@ export type ChatSummary = {
   assigned_to?: string | null;
   status?: 'open' | 'in_progress' | 'closed';
   pinned_message_id?: string | null;
+  created_by?: string | null;
   /** For direct chats: the other participant's user id (for online status). */
   other_user_id?: string | null;
   /** For direct chats: the other participant's avatar URL. */

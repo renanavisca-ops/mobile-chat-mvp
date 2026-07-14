@@ -399,6 +399,14 @@ export type Database = {
         Args: { p_chat_id: string; p_user_id: string }
         Returns: boolean
       }
+      rename_group_chat: {
+        Args: { p_chat_id: string; p_title: string }
+        Returns: undefined
+      }
+      remove_group_member: {
+        Args: { p_chat_id: string; p_member_id: string }
+        Returns: undefined
+      }
       is_store_staff_for_chat: { Args: { p_chat_id: string }; Returns: boolean }
       touch_last_seen: { Args: Record<string, never>; Returns: undefined }
       username_available: { Args: { candidate: string }; Returns: boolean }

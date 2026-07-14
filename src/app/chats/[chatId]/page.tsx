@@ -7,6 +7,7 @@ import { MessageActionsSheet } from '@/components/message-actions-sheet';
 import { AttachSheet } from '@/components/attach-sheet';
 import { CameraCapture } from '@/components/camera-capture';
 import { ReportModal } from '@/components/report-modal';
+import { GroupInfoModal } from '@/components/group-info-modal';
 import { getWallpaperId, wallpaperCss } from '@/lib/wallpaper';
 import { blockUser, unblockUser, isBlockedByMe } from '@/lib/db/safety';
 import { EmojiPicker } from '@/components/emoji-picker';
@@ -149,6 +150,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
   const [safetyMenuOpen, setSafetyMenuOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [reportMessageId, setReportMessageId] = useState<string | null>(null);
+  const [groupInfoOpen, setGroupInfoOpen] = useState(false);
   const [blocked, setBlocked] = useState(false);
   const [blockBusy, setBlockBusy] = useState(false);
 
@@ -256,6 +258,8 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
     };
   }, []);
 
+  const [membersReloadKey, setMembersReloadKey] = useState(0);
+
   // Load members (no embeds)
   useEffect(() => {
     let alive = true;
@@ -309,7 +313,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
     return () => {
       alive = false;
     };
-  }, [chatId, supabase]);
+  }, [chatId, supabase, membersReloadKey]);
 
   const items = useMemo(() => messages.map((m) => ({ ...m, body: getMessagePayload(m) })), [messages]);
 
@@ -326,6 +330,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
   const someoneOnline = otherMemberIds.some((id) => onlineUsers.has(id));
   const isGroup = chat?.kind === 'group';
   const otherUserId = !isGroup ? otherMemberIds[0] ?? null : null;
+  const isGroupCreator = isGroup && chat?.created_by === myId;
 
   useEffect(() => {
     if (!otherUserId) return;
@@ -962,6 +967,23 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
         messageId={reportMessageId}
       />
 
+      {isGroup && (
+        <GroupInfoModal
+          open={groupInfoOpen}
+          onClose={() => setGroupInfoOpen(false)}
+          chatId={chatId}
+          title={chat?.title ?? null}
+          isCreator={isGroupCreator}
+          members={memberProfiles}
+          onRenamed={(newTitle) => setChat((prev) => (prev ? { ...prev, title: newTitle } : prev))}
+          onMembersChanged={() => setMembersReloadKey((k) => k + 1)}
+          onLeft={() => {
+            setGroupInfoOpen(false);
+            window.location.href = '/chats';
+          }}
+        />
+      )}
+
       {/* Hidden inputs */}
       <input ref={imageInputRef} type="file" hidden multiple accept="image/jpeg,image/png,image/webp" onChange={onImagesChange} />
       <input ref={videoInputRef} type="file" hidden accept="video/*" onChange={onVideoChange} />
@@ -992,6 +1014,17 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
               >
                 🔍
               </button>
+              {isGroup && (
+                <button
+                  type="button"
+                  onClick={() => setGroupInfoOpen(true)}
+                  className="rounded px-1.5 py-0.5 text-slate-400 hover:bg-slate-900 hover:text-slate-200"
+                  aria-label="Group info"
+                  title="Info del grupo"
+                >
+                  ⓘ
+                </button>
+              )}
               {otherUserId && (
                 <div className="relative">
                   <button
