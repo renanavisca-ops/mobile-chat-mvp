@@ -2,6 +2,7 @@ import './globals.css';
 import type { Metadata } from 'next';
 import { PresenceProvider } from '@/components/presence-provider';
 import { ConsentGate } from '@/components/consent-gate';
+import { LanguageProvider } from '@/lib/i18n/context';
 
 export const metadata: Metadata = {
   title: 'Toky Chat',
@@ -12,8 +13,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="es">
       <body className="min-h-screen">
-        <ConsentGate />
-        <PresenceProvider>{children}</PresenceProvider>
+        <LanguageProvider>
+          <ConsentGate />
+          <PresenceProvider>{children}</PresenceProvider>
+        </LanguageProvider>
       </body>
     </html>
   );

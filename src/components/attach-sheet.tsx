@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import { useT } from '@/lib/i18n/context';
 
 export function AttachSheet(props: {
   open: boolean;
@@ -12,6 +13,7 @@ export function AttachSheet(props: {
   onPickFile: () => void;
 }) {
   const { open, onClose, onPickPhotos, onPickVideo, onCameraPhoto, onCameraVideo, onPickFile } = props;
+  const t = useT();
 
   useEffect(() => {
     if (!open) return;
@@ -46,24 +48,24 @@ export function AttachSheet(props: {
       <div className="w-full max-w-md rounded-2xl border border-slate-900 bg-slate-950 shadow-xl">
         <div className="flex items-center justify-between border-b border-slate-900 p-4">
           <div>
-            <div className="text-sm font-semibold text-slate-100">Attach</div>
-            <div className="text-xs text-slate-400">Elige qué quieres enviar</div>
+            <div className="text-sm font-semibold text-slate-100">{t('attach.title')}</div>
+            <div className="text-xs text-slate-400">{t('attach.subtitle')}</div>
           </div>
           <button
             className="rounded bg-slate-800 px-3 py-1.5 text-xs hover:bg-slate-700"
             onClick={onClose}
             type="button"
           >
-            Close
+            {t('common.close')}
           </button>
         </div>
 
         <div className="space-y-2 p-3">
-          <Btn icon="🖼️" label="Photo library" onClick={onPickPhotos} />
-          <Btn icon="🎥" label="Video library" onClick={onPickVideo} />
+          <Btn icon="🖼️" label={t('attach.photoLibrary')} onClick={onPickPhotos} />
+          <Btn icon="🎥" label={t('attach.videoLibrary')} onClick={onPickVideo} />
 
           <div className="rounded-xl border border-slate-900 bg-slate-950/40 p-2">
-            <div className="mb-2 text-xs text-slate-400">Camera</div>
+            <div className="mb-2 text-xs text-slate-400">{t('attach.camera')}</div>
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
@@ -73,7 +75,7 @@ export function AttachSheet(props: {
                   onClose();
                 }}
               >
-                📸 Photo
+                📸 {t('attach.photo')}
               </button>
               <button
                 type="button"
@@ -83,15 +85,15 @@ export function AttachSheet(props: {
                   onClose();
                 }}
               >
-                🎬 Video
+                🎬 {t('attach.video')}
               </button>
             </div>
             <div className="mt-2 text-[11px] text-slate-500">
-              * En desktop puede abrir el file picker normal; en móvil usa la cámara.
+              {t('attach.desktopNote')}
             </div>
           </div>
 
-          <Btn icon="📎" label="File (pending)" onClick={onPickFile} />
+          <Btn icon="📎" label={t('attach.file')} onClick={onPickFile} />
         </div>
 
         <button
@@ -99,7 +101,7 @@ export function AttachSheet(props: {
           className="w-full rounded-b-2xl border-t border-slate-900 bg-slate-950 py-3 text-sm text-slate-300 hover:bg-slate-900"
           onClick={onClose}
         >
-          Cancel
+          {t('attach.cancel')}
         </button>
       </div>
     </div>

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useT } from '@/lib/i18n/context';
 
 type EmojiItem = { e: string; n: string; k: string }; // emoji, name, keywords
 
@@ -89,6 +90,7 @@ export function EmojiPicker(props: {
   anchor?: 'left' | 'right';
 }) {
   const { open, onClose, onPick, anchor = 'left' } = props;
+  const t = useT();
 
   const [q, setQ] = useState('');
   const [tab, setTab] = useState<Tab>('recents');
@@ -154,13 +156,13 @@ export function EmojiPicker(props: {
       ].join(' ')}
     >
       <div className="flex items-center justify-between border-b border-slate-900 p-3">
-        <div className="text-sm font-semibold text-slate-100">Emojis</div>
+        <div className="text-sm font-semibold text-slate-100">{t('emoji.title')}</div>
         <button
           className="rounded bg-slate-800 px-2 py-1 text-xs text-slate-100 hover:bg-slate-700"
           onClick={onClose}
           type="button"
         >
-          Close
+          {t('emoji.close')}
         </button>
       </div>
 
@@ -177,7 +179,7 @@ export function EmojiPicker(props: {
             setQ('');
           }}
         >
-          🕘 Recents
+          🕘 {t('emoji.recents')}
         </button>
         <button
           type="button"
@@ -187,7 +189,7 @@ export function EmojiPicker(props: {
           ].join(' ')}
           onClick={() => setTab('all')}
         >
-          😀 All
+          😀 {t('emoji.all')}
         </button>
       </div>
 
@@ -195,7 +197,7 @@ export function EmojiPicker(props: {
         {showSearch ? (
           <input
             className="mb-3 w-full rounded border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-100"
-            placeholder="Search… (e.g. love, ok, party)"
+            placeholder={t('emoji.searchPlaceholder')}
             value={q}
             onChange={(e) => setQ(e.target.value)}
             autoFocus
@@ -205,7 +207,7 @@ export function EmojiPicker(props: {
         <div className="max-h-56 overflow-auto rounded-xl border border-slate-900">
           {tab === 'recents' ? (
             recentsAsItems.length === 0 ? (
-              <div className="p-3 text-sm text-slate-400">No recents yet.</div>
+              <div className="p-3 text-sm text-slate-400">{t('emoji.noRecents')}</div>
             ) : (
               <div className="grid grid-cols-8 gap-1 p-2">
                 {recentsAsItems.map((x) => (
@@ -224,7 +226,7 @@ export function EmojiPicker(props: {
           ) : (
             <>
               {filteredAll.length === 0 ? (
-                <div className="p-3 text-sm text-slate-400">No matches.</div>
+                <div className="p-3 text-sm text-slate-400">{t('emoji.noMatches')}</div>
               ) : (
                 <div className="grid grid-cols-8 gap-1 p-2">
                   {filteredAll.map((x) => (
@@ -244,7 +246,7 @@ export function EmojiPicker(props: {
           )}
         </div>
 
-        <div className="mt-2 text-[11px] text-slate-500">Tip: ESC para cerrar.</div>
+        <div className="mt-2 text-[11px] text-slate-500">{t('emoji.tip')}</div>
       </div>
     </div>
   );

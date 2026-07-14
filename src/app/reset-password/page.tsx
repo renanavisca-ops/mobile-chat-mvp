@@ -4,9 +4,11 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { PageShell } from '@/components/page-shell';
 import { browserSupabase } from '@/lib/supabase/client';
+import { useT } from '@/lib/i18n/context';
 
 export default function ResetPasswordPage() {
   const router = useRouter();
+  const t = useT();
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [busy, setBusy] = useState(false);
@@ -20,12 +22,12 @@ export default function ResetPasswordPage() {
     setStatus({ type: null, message: '' });
 
     if (newPassword.length < 6) {
-      setStatus({ type: 'error', message: 'La contraseña debe tener al menos 6 caracteres' });
+      setStatus({ type: 'error', message: t('resetPassword.errorTooShort') });
       return;
     }
 
     if (newPassword !== confirmPassword) {
-      setStatus({ type: 'error', message: 'Las contraseñas no coinciden' });
+      setStatus({ type: 'error', message: t('resetPassword.errorMismatch') });
       return;
     }
 
@@ -38,30 +40,30 @@ export default function ResetPasswordPage() {
 
       if (error) throw error;
 
-      setStatus({ type: 'success', message: 'Contraseña actualizada' });
+      setStatus({ type: 'success', message: t('resetPassword.updated') });
 
       // Redirect to login after a short delay
       setTimeout(() => {
         router.push('/login');
       }, 2000);
     } catch (err: any) {
-      setStatus({ type: 'error', message: err.message || 'Error al actualizar la contraseña' });
+      setStatus({ type: 'error', message: err.message || t('resetPassword.errorUpdate') });
     } finally {
       setBusy(false);
     }
   }
 
   return (
-    <PageShell title="Recuperar contraseña">
+    <PageShell title={t('resetPassword.title')}>
       <div className="mx-auto max-w-md space-y-6">
         <div className="rounded-xl border border-slate-900 bg-slate-950/50 p-6 shadow-lg">
           <p className="text-sm text-slate-400 mb-6">
-            Ingresa tu nueva contraseña para acceder a tu cuenta.
+            {t('resetPassword.intro')}
           </p>
 
           <form onSubmit={handleResetPassword} className="space-y-4">
             <div className="space-y-2">
-              <label className="block text-sm text-slate-300 ml-1">Nueva contraseña</label>
+              <label className="block text-sm text-slate-300 ml-1">{t('resetPassword.newPassword')}</label>
               <input
                 type="password"
                 className="w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
@@ -73,7 +75,7 @@ export default function ResetPasswordPage() {
             </div>
 
             <div className="space-y-2">
-              <label className="block text-sm text-slate-300 ml-1">Confirmar contraseña</label>
+              <label className="block text-sm text-slate-300 ml-1">{t('resetPassword.confirmPassword')}</label>
               <input
                 type="password"
                 className="w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
@@ -99,7 +101,7 @@ export default function ResetPasswordPage() {
               disabled={busy}
               className="w-full rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 active:scale-[0.98] transition-all disabled:opacity-50"
             >
-              {busy ? 'Actualizando...' : 'Cambiar contraseña'}
+              {busy ? t('resetPassword.updating') : t('resetPassword.changePassword')}
             </button>
           </form>
         </div>

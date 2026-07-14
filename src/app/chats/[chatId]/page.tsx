@@ -18,6 +18,7 @@ import { uploadChatImage, uploadChatMedia, uploadChatAudio, createSignedChatMedi
 import { useChatRealtime } from '@/lib/realtime/use-chat-realtime';
 import { browserSupabase } from '@/lib/supabase/client';
 import { useOnlineUsers } from '@/components/presence-provider';
+import { useLanguage } from '@/lib/i18n/context';
 import type { ChatSummary, MessageRow } from '@/lib/db/types';
 
 type Payload = { v?: number; text?: string; imagePath?: string; imagePaths?: string[]; videoPath?: string; audioPath?: string; reply_to?: string; is_deleted?: boolean; };
@@ -37,10 +38,6 @@ function getMessagePayload(message: MessageRow): Payload {
     parsed.text = message.content;
   }
   return parsed;
-}
-
-function fmtTime(ts: string) {
-  return new Date(ts).toLocaleString();
 }
 
 function shortId(id: string) {
@@ -65,8 +62,13 @@ function toForwardPayload(body: Payload): ForwardPayload {
 
 export default function ChatPage({ params }: { params: { chatId: string } }) {
   const { loading: authLoading, user } = useRequireAuth();
+  const { t, lang } = useLanguage();
   const myId = user?.id ?? null;
   const chatId = params.chatId;
+
+  function fmtTime(ts: string) {
+    return new Date(ts).toLocaleString(lang);
+  }
 
   const supabase = browserSupabase();
   const { messages, loading: msgLoading, appendLocal, loadMore, hasMore, loadingMore, typingUsers, setMeTyping } = useChatRealtime(chatId);
@@ -82,8 +84,6 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
 
   const onlineUsers = useOnlineUsers();
 
-  // ... (rest of states)
-
   // Load chat details
   useEffect(() => {
     let alive = true;
@@ -94,7 +94,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
         .select('*, store_id, assigned_to, status')
         .eq('id', chatId)
         .single();
-      
+
       if (!alive) return;
       if (error) {
         setErr(error.message);
@@ -113,7 +113,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
       const { data: { session } } = await browserSupabase().auth.getSession();
       const res = await fetch(`/api/chat/${chatId}/status`, {
         method: 'PATCH',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session?.access_token}`
         },
@@ -121,19 +121,18 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
       });
       if (!res.ok) {
         const errorData = await res.json();
-        throw new Error(errorData.error || 'Error al actualizar estado');
+        throw new Error(errorData.error || t('chat.errorUpdatingStatus'));
       }
-      
+
       setChat(prev => prev ? { ...prev, status: newStatus } : null);
-      toast(`Estado actualizado a ${newStatus}`);
+      const statusLabel = newStatus === 'in_progress' ? t('common.statusInProgress') : t('common.statusClosed');
+      toast(t('chat.statusUpdated', { status: statusLabel }));
     } catch (e: any) {
       setErr(e.message);
     } finally {
       setBusy(false);
     }
   }
-
-
 
   // compose
   const [text, setText] = useState('');
@@ -198,13 +197,13 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
       return;
     }
     setSearching(true);
-    const t = setTimeout(() => {
+    const timer = setTimeout(() => {
       searchMessages(chatId, q)
         .then(setSearchResults)
         .catch(() => setSearchResults([]))
         .finally(() => setSearching(false));
     }, 300);
-    return () => clearTimeout(t);
+    return () => clearTimeout(timer);
   }, [searchQuery, searchOpen, chatId]);
 
   function scrollToMessage(messageId: string) {
@@ -216,7 +215,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
       el.classList.add('ring-2', 'ring-amber-400');
       setTimeout(() => el.classList.remove('ring-2', 'ring-amber-400'), 1500);
     } else {
-      toast('Ese mensaje no está cargado. Desplázate hacia arriba para verlo.');
+      toast(t('chat.messageNotLoaded'));
     }
   }
 
@@ -236,7 +235,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
   // Signed URL cache (path -> url)
   const [signedUrls, setSignedUrls] = useState<Record<string, string>>({});
 
-  // Video play error -> only shows “Abrir video”
+  // Video play error -> only shows the "Open video" link
   const [videoPlayError, setVideoPlayError] = useState<Record<string, boolean>>({});
 
   // Forward state
@@ -394,7 +393,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
     return usernameById.get(m.sender_id) || shortId(m.sender_id);
   }
 
-  // autoscroll (solo si estamos al final)
+  // autoscroll (only if we're already near the bottom)
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
@@ -443,7 +442,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
       recorder.start();
       setIsRecording(true);
     } catch (e: any) {
-      setErr('No se pudo acceder al micrófono: ' + e.message);
+      setErr(t('chat.micError', { error: e.message }));
     }
   }
 
@@ -638,7 +637,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
     cameraVideoRef.current?.click();
   }
   function pickFile() {
-    toast('File: pendiente (siguiente paso).');
+    toast(t('chat.fileFeaturePending'));
     fileInputRef.current?.click();
   }
 
@@ -656,18 +655,18 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
 
     for (const f of picked) {
       if (!allowed.has(f.type)) {
-        setErr('Solo JPG, PNG o WEBP.');
+        setErr(t('chat.onlyJpgPngWebp'));
         e.target.value = '';
         return;
       }
       if (f.size > maxSize) {
-        setErr('Máximo 5MB por imagen.');
+        setErr(t('chat.maxImageSize'));
         e.target.value = '';
         return;
       }
       const safeName = sanitizeFilename(f.name);
       if (!safeName || safeName.length < 3) {
-        setErr('Nombre de archivo inválido.');
+        setErr(t('chat.invalidFilename'));
         e.target.value = '';
         return;
       }
@@ -692,14 +691,14 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
 
     const maxSize = 200 * 1024 * 1024;
     if (file.size > maxSize) {
-      setErr('Máximo 200MB por video.');
+      setErr(t('chat.maxVideoSize'));
       e.target.value = '';
       return;
     }
 
     const safeName = sanitizeFilename(file.name);
     if (!safeName || safeName.length < 3) {
-      setErr('Nombre de archivo inválido.');
+      setErr(t('chat.invalidFilename'));
       e.target.value = '';
       return;
     }
@@ -737,13 +736,13 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
   // -------- Send
   async function onSend() {
     setErr('');
-    const t = text.trim();
+    const t2 = text.trim();
 
     if (editingId) {
-      if (!t) return;
+      if (!t2) return;
       setBusy(true);
       try {
-        await editMessage(editingId, t);
+        await editMessage(editingId, t2);
         setEditingId(null);
         setText('');
       } catch (e: any) {
@@ -754,7 +753,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
       return;
     }
 
-    if (!t && pendingImages.length === 0 && !pendingVideo) return;
+    if (!t2 && pendingImages.length === 0 && !pendingVideo) return;
 
     setBusy(true);
 
@@ -769,7 +768,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
           setSignedUrls((prev) => ({ ...prev, [path]: url }));
         } catch {}
 
-        const payload: Payload = t ? { text: t, videoPath: path } : { videoPath: path };
+        const payload: Payload = t2 ? { text: t2, videoPath: path } : { videoPath: path };
         if (replyingTo) payload.reply_to = replyingTo.id;
 
         const temp: MessageRow = {
@@ -806,7 +805,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
           });
         } catch {}
 
-        const payload: Payload = t ? { text: t, imagePaths: paths } : { imagePaths: paths };
+        const payload: Payload = t2 ? { text: t2, imagePaths: paths } : { imagePaths: paths };
         if (replyingTo) payload.reply_to = replyingTo.id;
 
         const temp: MessageRow = {
@@ -828,7 +827,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
       }
 
       // TEXT
-      const payload: Payload = { text: t };
+      const payload: Payload = { text: t2 };
       if (replyingTo) payload.reply_to = replyingTo.id;
 
       const temp: MessageRow = {
@@ -855,7 +854,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
   const loading = authLoading || msgLoading;
 
   return (
-    <PageShell title="Chat">
+    <PageShell title={t('chat.title')}>
       <ForwardModal
         open={forwardOpen}
         chats={chats}
@@ -872,7 +871,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
           ...(actionsMsg && items.find((m) => m.id === actionsMsg.id)?.sender_id === myId && !actionsMsg.body.imagePath && !actionsMsg.body.imagePaths?.length && !actionsMsg.body.videoPath && !actionsMsg.body.audioPath
             ? [{
                 key: 'edit',
-                label: 'Edit',
+                label: t('chat.actionEdit'),
                 icon: '✏️',
                 onClick: () => {
                   if (!actionsMsg) return;
@@ -883,14 +882,14 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
                 },
               }]
             : []),
-          { key: 'reply', label: 'Reply', icon: '↩️', onClick: () => {
+          { key: 'reply', label: t('chat.actionReply'), icon: '↩️', onClick: () => {
             const found = items.find(m => m.id === actionsMsg?.id);
             if (found) setReplyingTo(found as any);
             setActionsOpen(false);
           }},
           {
             key: 'forward',
-            label: 'Forward',
+            label: t('chat.actionForward'),
             icon: '↪️',
             onClick: () => {
               if (!actionsMsg) return;
@@ -900,16 +899,16 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
           },
           {
             key: 'copy',
-            label: 'Copy',
+            label: t('chat.actionCopy'),
             icon: '📄',
             onClick: async () => {
               if (!actionsMsg) return;
               await doCopy(actionsMsg.body);
-              toast('Copiado.');
+              toast(t('chat.copied'));
             },
           },
-          { key: 'save', label: 'Save', icon: '💾', onClick: () => toast('Save: pendiente (siguiente paso).') },
-          { key: 'delete', label: 'Delete', icon: '🗑️', tone: 'danger', onClick: async () => {
+          { key: 'save', label: t('chat.actionSave'), icon: '💾', onClick: () => toast(t('chat.savePending')) },
+          { key: 'delete', label: t('chat.actionDelete'), icon: '🗑️', tone: 'danger', onClick: async () => {
             if (!actionsMsg) return;
             setActionsOpen(false);
             setBusy(true);
@@ -925,7 +924,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
         moreActions={[
           {
             key: 'pin',
-            label: chat?.pinned_message_id === actionsMsg?.id ? 'Unpin' : 'Pin',
+            label: chat?.pinned_message_id === actionsMsg?.id ? t('chat.actionUnpin') : t('chat.actionPin'),
             icon: '📌',
             onClick: async () => {
               if (!actionsMsg) return;
@@ -944,7 +943,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
           },
           {
             key: 'report',
-            label: 'Report',
+            label: t('chat.actionReport'),
             icon: '🚩',
             onClick: () => {
               if (!actionsMsg) return;
@@ -1024,25 +1023,25 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
       <input ref={fileInputRef} type="file" hidden />
 
       {loading ? (
-        <p className="text-sm text-slate-300">Loading…</p>
+        <p className="text-sm text-slate-300">{t('chat.loading')}</p>
       ) : (
         <div className="flex flex-col gap-3">
           <div className="flex items-center justify-between gap-2 text-xs text-slate-400">
             <div className="flex items-center gap-2">
-              <span>Members: {membersLoading ? 'Loading…' : members.length ? members.join(', ') : '—'}</span>
+              <span>{t('chat.members')}: {membersLoading ? t('chat.loading') : members.length ? members.join(', ') : '—'}</span>
               {!membersLoading && otherMemberIds.length > 0 && (
                 someoneOnline ? (
-                  <span className="text-emerald-400">● En línea</span>
+                  <span className="text-emerald-400">{t('chat.online')}</span>
                 ) : (
-                  <span className="text-slate-500">● Desconectado</span>
+                  <span className="text-slate-500">{t('chat.offline')}</span>
                 )
               )}
               <button
                 type="button"
                 onClick={() => setSearchOpen((v) => !v)}
                 className="rounded px-1.5 py-0.5 text-slate-400 hover:bg-slate-900 hover:text-slate-200"
-                aria-label="Search in chat"
-                title="Buscar en el chat"
+                aria-label={t('chat.searchInChat')}
+                title={t('chat.searchInChat')}
               >
                 🔍
               </button>
@@ -1051,8 +1050,8 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
                   type="button"
                   onClick={() => setGroupInfoOpen(true)}
                   className="rounded px-1.5 py-0.5 text-slate-400 hover:bg-slate-900 hover:text-slate-200"
-                  aria-label="Group info"
-                  title="Info del grupo"
+                  aria-label={t('chat.groupInfo')}
+                  title={t('chat.groupInfo')}
                 >
                   ⓘ
                 </button>
@@ -1063,7 +1062,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
                     type="button"
                     onClick={() => setSafetyMenuOpen((v) => !v)}
                     className="rounded px-1.5 py-0.5 text-slate-400 hover:bg-slate-900 hover:text-slate-200"
-                    aria-label="Chat options"
+                    aria-label={t('chat.chatOptions')}
                   >
                     ⋯
                   </button>
@@ -1078,7 +1077,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
                         disabled={muteBusy}
                         className="block w-full px-3 py-2 text-left text-slate-200 hover:bg-slate-900 disabled:opacity-50"
                       >
-                        {muted ? 'Unmute' : 'Mute notifications'}
+                        {muted ? t('common.unmute') : t('common.mute')}
                       </button>
                       <button
                         type="button"
@@ -1086,7 +1085,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
                         disabled={blockBusy}
                         className="block w-full px-3 py-2 text-left text-slate-200 hover:bg-slate-900 disabled:opacity-50"
                       >
-                        {blocked ? 'Unblock user' : 'Block user'}
+                        {blocked ? t('common.unblock') : t('common.block')}
                       </button>
                       <button
                         type="button"
@@ -1096,7 +1095,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
                         }}
                         className="block w-full px-3 py-2 text-left text-red-400 hover:bg-slate-900"
                       >
-                        Report
+                        {t('common.report')}
                       </button>
                     </div>
                   )}
@@ -1113,24 +1112,24 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
                   chat.status === 'in_progress' ? 'bg-blue-900/40 text-blue-400' :
                   'bg-slate-800 text-slate-400'
                 }`}>
-                  {chat.status}
+                  {chat.status === 'open' ? t('common.statusOpen') : chat.status === 'in_progress' ? t('common.statusInProgress') : t('common.statusClosed')}
                 </span>
 
                 {chat.status === 'open' && (
-                  <button 
+                  <button
                     onClick={() => updateStatus('in_progress')}
                     className="rounded bg-blue-600 px-2 py-1 text-white hover:bg-blue-500"
                   >
-                    Tomar
+                    {t('chat.take')}
                   </button>
                 )}
-                
+
                 {chat.status !== 'closed' && (
-                  <button 
+                  <button
                     onClick={() => updateStatus('closed')}
                     className="rounded bg-slate-700 px-2 py-1 text-white hover:bg-slate-600"
                   >
-                    Cerrar
+                    {t('chat.closeChat')}
                   </button>
                 )}
               </div>
@@ -1146,13 +1145,13 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
                 autoFocus
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Buscar mensajes…"
+                placeholder={t('chat.searchPlaceholder')}
                 className="w-full rounded border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-100"
               />
               {searching ? (
-                <p className="mt-2 text-xs text-slate-500">Buscando…</p>
+                <p className="mt-2 text-xs text-slate-500">{t('chat.searching')}</p>
               ) : searchQuery.trim() && searchResults.length === 0 ? (
-                <p className="mt-2 text-xs text-slate-500">Sin resultados.</p>
+                <p className="mt-2 text-xs text-slate-500">{t('chat.noResults')}</p>
               ) : searchResults.length > 0 ? (
                 <ul className="mt-2 max-h-52 space-y-1 overflow-auto">
                   {searchResults.map((r) => (
@@ -1180,15 +1179,15 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
             >
               <span>📌</span>
               <span className="truncate">
-                {items.find((m) => m.id === chat.pinned_message_id)?.body.text || 'Mensaje fijado'}
+                {items.find((m) => m.id === chat.pinned_message_id)?.body.text || t('chat.pinnedFallback')}
               </span>
             </button>
           )}
 
           <div ref={scrollRef} onScroll={handleScroll} style={wallpaperStyle} className="h-[55vh] overflow-auto rounded-xl border border-slate-900 bg-slate-950/40 p-3">
-            {loadingMore && <div className="text-center text-xs text-slate-500 my-2">Cargando anteriores...</div>}
+            {loadingMore && <div className="text-center text-xs text-slate-500 my-2">{t('chat.loadingOlder')}</div>}
             {items.length === 0 ? (
-              <p className="text-sm text-slate-400">No messages yet.</p>
+              <p className="text-sm text-slate-400">{t('chat.noMessagesYet')}</p>
             ) : (
               <ul className="space-y-2">
                 {items.map((m) => {
@@ -1226,8 +1225,8 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
                       )}
                       <div className="text-[10px] text-slate-500 flex items-center justify-between mb-1">
                         <span>
-                          {new Date(m.created_at).toLocaleString()}
-                          {m.edited_at && <span className="ml-1 italic text-slate-600">(editado)</span>}
+                          {new Date(m.created_at).toLocaleString(lang)}
+                          {m.edited_at && <span className="ml-1 italic text-slate-600">{t('chat.edited')}</span>}
                         </span>
                         {isMine(m) ? (
                           <span className={m.read ? 'text-blue-400 ml-2' : 'text-slate-600 ml-2'}>
@@ -1238,13 +1237,13 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
 
                       {m.body.is_deleted ? (
                         <div className="text-sm text-slate-500 italic mt-1 flex items-center gap-1">
-                          <span>🚫</span> Este mensaje fue eliminado
+                          <span>🚫</span> {t('chat.deletedMessage')}
                         </div>
                       ) : (
                         <>
                           {m.body.reply_to && (
                             <div className="mb-1 text-xs border-l-2 border-blue-500 pl-2 text-slate-400 bg-slate-900/50 rounded py-1 pr-2 mt-1">
-                              Respuesta a un mensaje
+                              {t('chat.replyToMessage')}
                             </div>
                           )}
                           {m.body.text ? <div className="text-sm mt-1">{m.body.text}</div> : null}
@@ -1276,9 +1275,9 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
                               />
                               {videoPlayError[videoPath] ? (
                                 <div className="mt-2 text-xs text-slate-400">
-                                  No se pudo reproducir inline.{' '}
+                                  {t('chat.cantPlayInline')}{' '}
                                   <a className="text-blue-400 underline" href={signedUrls[videoPath]} target="_blank" rel="noreferrer">
-                                    Abrir video
+                                    {t('chat.openVideo')}
                                   </a>
                                 </div>
                               ) : null}
@@ -1310,7 +1309,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
           {/* Preview images */}
           {previewImages.length ? (
             <div className="rounded border border-slate-900 bg-slate-950/40 p-2">
-              <div className="mb-2 text-xs text-slate-400">Preview imágenes:</div>
+              <div className="mb-2 text-xs text-slate-400">{t('chat.previewImages')}</div>
               <div className="grid grid-cols-3 gap-2">
                 {previewImages.map((u) => (
                   // eslint-disable-next-line @next/next/no-img-element
@@ -1319,7 +1318,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
               </div>
               <div className="mt-2 flex justify-end">
                 <button className="rounded bg-slate-800 px-3 py-1.5 text-xs hover:bg-slate-700" onClick={clearPendingImages} disabled={busy}>
-                  Remove all
+                  {t('common.removeAll')}
                 </button>
               </div>
             </div>
@@ -1328,11 +1327,11 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
           {/* Preview video */}
           {previewVideo ? (
             <div className="rounded border border-slate-900 bg-slate-950/40 p-2">
-              <div className="mb-2 text-xs text-slate-400">Preview video:</div>
+              <div className="mb-2 text-xs text-slate-400">{t('chat.previewVideo')}</div>
               <video src={previewVideo} controls className="max-h-72 w-full rounded border border-slate-900" />
               <div className="mt-2 flex justify-end">
                 <button className="rounded bg-slate-800 px-3 py-1.5 text-xs hover:bg-slate-700" onClick={clearPendingVideo} disabled={busy}>
-                  Remove
+                  {t('common.remove')}
                 </button>
               </div>
             </div>
@@ -1340,14 +1339,14 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
 
           {typingUsers.length > 0 && (
             <div className="text-xs text-blue-400 animate-pulse ml-2">
-              {typingUsers.map((id) => usernameById.get(id) || 'Alguien').join(', ')} escribiendo…
+              {typingUsers.map((id) => usernameById.get(id) || t('chat.someone')).join(', ')} {t('chat.typingSuffix')}
             </div>
           )}
 
           {editingId && (
             <div className="flex items-center justify-between rounded border border-amber-900 bg-amber-950/30 p-2 text-xs text-amber-200">
               <div className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap pr-2 border-l-2 border-amber-500 pl-2">
-                ✏️ Editando mensaje
+                {t('chat.editingMessage')}
               </div>
               <button
                 className="text-slate-400 hover:text-white"
@@ -1364,7 +1363,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
           {replyingTo && (
             <div className="flex items-center justify-between rounded border border-blue-900 bg-blue-950/40 p-2 text-xs text-blue-200">
               <div className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap pr-2 border-l-2 border-blue-500 pl-2">
-                Respondiendo a: {parseCipher(replyingTo.ciphertext).text || 'Mensaje multimedia'}
+                {t('chat.replyingTo')} {parseCipher(replyingTo.ciphertext).text || t('chat.mediaMessage')}
               </div>
               <button className="text-slate-400 hover:text-white" onClick={() => setReplyingTo(null)}>
                 ✕
@@ -1374,7 +1373,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
 
           {blocked && (
             <p className="rounded-lg border border-red-900/50 bg-red-950/30 px-3 py-2 text-xs text-red-300">
-              You&apos;ve blocked this user. Unblock them (⋯ menu above) to send messages.
+              {t('chat.blockedNotice')}
             </p>
           )}
 
@@ -1387,7 +1386,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
                 setAttachOpen(true);
               }}
               type="button"
-              title="Attach"
+              title={t('chat.attach')}
               disabled={busy}
             >
               +
@@ -1402,7 +1401,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
                   setEmojiOpen((v) => !v);
                 }}
                 type="button"
-                title="Emoji"
+                title={t('chat.emoji')}
                 disabled={busy}
               >
                 😀
@@ -1423,7 +1422,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
               className="flex-1 rounded border border-slate-800 bg-slate-950 px-3 py-2 text-slate-100"
               value={text}
               onChange={(e) => setText(e.target.value)}
-              placeholder="Type a message…"
+              placeholder={t('chat.composerPlaceholder')}
               onFocus={() => setEmojiOpen(false)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') onSend();
@@ -1432,13 +1431,13 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
             />
 
             <button className="rounded bg-blue-600 px-3 py-2 text-sm hover:bg-blue-500 disabled:opacity-60" onClick={onSend} disabled={busy || isRecording || blocked}>
-              {editingId ? 'Save' : 'Send'}
+              {editingId ? t('chat.saveEdit') : t('chat.send')}
             </button>
-            <button 
+            <button
               className={`rounded px-3 py-2 text-sm disabled:opacity-60 ${isRecording ? 'bg-red-600 animate-pulse text-white' : 'bg-slate-800 hover:bg-slate-700'}`}
-              onClick={isRecording ? stopRecording : startRecording} 
+              onClick={isRecording ? stopRecording : startRecording}
               disabled={busy}
-              title={isRecording ? 'Parar y enviar' : 'Grabar audio'}
+              title={isRecording ? t('chat.stopAndSend') : t('chat.recordAudio')}
             >
               🎤
             </button>

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { useT } from '@/lib/i18n/context';
 
 /**
  * Live webcam capture modal (works on desktop and mobile via getUserMedia).
@@ -15,6 +16,7 @@ export function CameraCapture({
   onClose: () => void;
   onCapture: (file: File) => void;
 }) {
+  const t = useT();
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const [err, setErr] = useState('');
@@ -33,7 +35,7 @@ export function CameraCapture({
           audio: false,
         });
         if (cancelled) {
-          stream.getTracks().forEach((t) => t.stop());
+          stream.getTracks().forEach((track) => track.stop());
           return;
         }
         streamRef.current = stream;
@@ -45,20 +47,20 @@ export function CameraCapture({
       } catch (e: any) {
         setErr(
           e?.name === 'NotAllowedError'
-            ? 'Permiso de cámara denegado. Habilítalo en el navegador.'
+            ? t('camera.permissionDenied')
             : e?.name === 'NotFoundError'
-            ? 'No se encontró ninguna cámara.'
-            : `No se pudo abrir la cámara: ${e?.message ?? String(e)}`
+            ? t('camera.noCamera')
+            : t('camera.genericError', { error: e?.message ?? String(e) })
         );
       }
     })();
 
     return () => {
       cancelled = true;
-      streamRef.current?.getTracks().forEach((t) => t.stop());
+      streamRef.current?.getTracks().forEach((track) => track.stop());
       streamRef.current = null;
     };
-  }, [open]);
+  }, [open, t]);
 
   function capture() {
     const video = videoRef.current;
@@ -92,13 +94,13 @@ export function CameraCapture({
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-4">
       <div className="w-full max-w-md rounded-2xl border border-slate-900 bg-slate-950 p-3 shadow-xl">
         <div className="mb-2 flex items-center justify-between">
-          <div className="text-sm font-semibold text-slate-100">Tomar foto</div>
+          <div className="text-sm font-semibold text-slate-100">{t('camera.title')}</div>
           <button
             type="button"
             className="rounded bg-slate-800 px-3 py-1.5 text-xs hover:bg-slate-700"
             onClick={onClose}
           >
-            Cerrar
+            {t('camera.close')}
           </button>
         </div>
 
@@ -115,7 +117,7 @@ export function CameraCapture({
                 disabled={!ready}
                 className="rounded-full bg-blue-600 px-6 py-2 text-sm text-white hover:bg-blue-500 disabled:opacity-60"
               >
-                📸 Capturar
+                {t('camera.capture')}
               </button>
             </div>
           </>

@@ -2,9 +2,11 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useT } from '@/lib/i18n/context';
 
 export default function StartChatPage() {
   const router = useRouter();
+  const t = useT();
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -29,7 +31,7 @@ export default function StartChatPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.error || 'Failed to start chat');
+        throw new Error(data.error || t('startChat.errorFailed'));
       }
 
       router.push(`/public-chat/${data.token}`);
@@ -49,8 +51,8 @@ export default function StartChatPage() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
             </svg>
           </div>
-          <h1 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#111827', margin: '0 0 0.5rem' }}>Iniciar Chat</h1>
-          <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>Comunícate con uno de nuestros agentes en tiempo real.</p>
+          <h1 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#111827', margin: '0 0 0.5rem' }}>{t('startChat.title')}</h1>
+          <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>{t('startChat.subtitle')}</p>
         </div>
 
         {/* Form */}
@@ -63,13 +65,13 @@ export default function StartChatPage() {
 
           <div style={{ marginBottom: '1rem' }}>
             <label htmlFor="name" style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, color: '#374151', marginBottom: '0.375rem' }}>
-              Nombre Completo
+              {t('startChat.fullName')}
             </label>
             <input
               id="name"
               type="text"
               required
-              placeholder="Ej. Juan Pérez"
+              placeholder={t('startChat.fullNamePlaceholder')}
               value={formData.name}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, name: e.target.value })}
               style={{ width: '100%', padding: '0.625rem 0.875rem', border: '1px solid #d1d5db', borderRadius: '0.5rem', fontSize: '0.875rem', boxSizing: 'border-box', outline: 'none' }}
@@ -78,13 +80,13 @@ export default function StartChatPage() {
 
           <div style={{ marginBottom: '1rem' }}>
             <label htmlFor="phone" style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, color: '#374151', marginBottom: '0.375rem' }}>
-              Teléfono
+              {t('startChat.phone')}
             </label>
             <input
               id="phone"
               type="tel"
               required
-              placeholder="Ej. +506 8888 8888"
+              placeholder={t('startChat.phonePlaceholder')}
               value={formData.phone}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, phone: e.target.value })}
               style={{ width: '100%', padding: '0.625rem 0.875rem', border: '1px solid #d1d5db', borderRadius: '0.5rem', fontSize: '0.875rem', boxSizing: 'border-box', outline: 'none' }}
@@ -93,7 +95,7 @@ export default function StartChatPage() {
 
           <div style={{ marginBottom: '1.5rem' }}>
             <label htmlFor="country" style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, color: '#374151', marginBottom: '0.375rem' }}>
-              País
+              {t('startChat.country')}
             </label>
             <select
               id="country"
@@ -122,7 +124,7 @@ export default function StartChatPage() {
               transition: 'background 0.2s'
             }}
           >
-            {loading ? 'Conectando...' : 'Comenzar a chatear'}
+            {loading ? t('startChat.connecting') : t('startChat.startChatting')}
           </button>
         </form>
       </div>

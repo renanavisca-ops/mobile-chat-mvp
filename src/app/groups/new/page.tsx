@@ -5,10 +5,12 @@ import { PageShell } from '@/components/page-shell';
 import { useRequireAuth } from '@/lib/auth/use-require-auth';
 import { listMyContacts, searchUsers } from '@/lib/db/contacts';
 import { createGroupChat } from '@/lib/db/chats';
+import { useT } from '@/lib/i18n/context';
 import type { ProfileLite } from '@/lib/db/types';
 
 export default function NewGroupPage() {
   const { loading: authLoading } = useRequireAuth();
+  const t = useT();
 
   const [title, setTitle] = useState('');
   const [contacts, setContacts] = useState<ProfileLite[]>([]);
@@ -35,12 +37,12 @@ export default function NewGroupPage() {
       setResults([]);
       return;
     }
-    const t = setTimeout(() => {
+    const timer = setTimeout(() => {
       searchUsers(q)
         .then(setResults)
         .catch((e) => setErr(e?.message ?? String(e)));
     }, 300);
-    return () => clearTimeout(t);
+    return () => clearTimeout(timer);
   }, [q, canSearch]);
 
   function toggle(user: ProfileLite) {
@@ -56,11 +58,11 @@ export default function NewGroupPage() {
     setErr('');
     const trimmed = title.trim();
     if (!trimmed) {
-      setErr('Group name required');
+      setErr(t('groupNew.errorNameRequired'));
       return;
     }
     if (selected.size === 0) {
-      setErr('Select at least 1 member');
+      setErr(t('groupNew.errorSelectMember'));
       return;
     }
 
@@ -79,18 +81,18 @@ export default function NewGroupPage() {
   const rows = canSearch ? results : contacts;
 
   return (
-    <PageShell title="New Group">
+    <PageShell title={t('groupNew.title')}>
       {err && <p className="mb-3 text-sm text-red-400">{err}</p>}
 
       <div className="flex flex-col gap-4">
         {/* Title */}
         <div>
-          <label className="block text-sm text-slate-300 mb-1">Group name</label>
+          <label className="block text-sm text-slate-300 mb-1">{t('groupNew.groupName')}</label>
           <input
             className="w-full rounded border border-slate-800 bg-slate-950 px-3 py-2 text-slate-100"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder="e.g. Marketing Team"
+            placeholder={t('groupNew.groupNamePlaceholder')}
           />
         </div>
 
@@ -106,7 +108,7 @@ export default function NewGroupPage() {
                 <button
                   className="text-blue-300 hover:text-white"
                   onClick={() => toggle({ id, username })}
-                  aria-label="Remove"
+                  aria-label={t('groupNew.removeAria')}
                 >
                   ×
                 </button>
@@ -117,19 +119,19 @@ export default function NewGroupPage() {
 
         {/* Search members */}
         <div>
-          <div className="text-sm text-slate-300 mb-2">Add members</div>
+          <div className="text-sm text-slate-300 mb-2">{t('groupNew.addMembers')}</div>
           <input
             className="w-full rounded border border-slate-800 bg-slate-950 px-3 py-2 text-slate-100"
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Search by username (min 2 chars)…"
+            placeholder={t('groupNew.searchPlaceholder')}
             autoCapitalize="none"
           />
 
           <ul className="mt-2 space-y-2">
             {rows.length === 0 ? (
               <li className="text-sm text-slate-500">
-                {canSearch ? 'No users found.' : 'Type a username above to find people to add.'}
+                {canSearch ? t('groupNew.noUsersFound') : t('groupNew.typeToSearch')}
               </li>
             ) : (
               rows.map((c) => (
@@ -155,7 +157,7 @@ export default function NewGroupPage() {
           onClick={onCreate}
           disabled={busy}
         >
-          {busy ? 'Creating…' : 'Create group'}
+          {busy ? t('groupNew.creating') : t('groupNew.create')}
         </button>
       </div>
     </PageShell>

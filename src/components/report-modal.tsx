@@ -2,15 +2,7 @@
 
 import { useState } from 'react';
 import { submitReport } from '@/lib/db/safety';
-
-const REASONS = [
-  'Harassment or bullying',
-  'Spam',
-  'Impersonation',
-  'Sexual or exploitative content',
-  'Violence or dangerous behavior',
-  'Other',
-];
+import { useT } from '@/lib/i18n/context';
 
 export function ReportModal({
   open,
@@ -25,6 +17,16 @@ export function ReportModal({
   chatId?: string | null;
   messageId?: string | null;
 }) {
+  const t = useT();
+  const REASONS = [
+    t('reportModal.reasonHarassment'),
+    t('reportModal.reasonSpam'),
+    t('reportModal.reasonImpersonation'),
+    t('reportModal.reasonSexual'),
+    t('reportModal.reasonViolence'),
+    t('reportModal.reasonOther'),
+  ];
+
   const [reason, setReason] = useState('');
   const [details, setDetails] = useState('');
   const [busy, setBusy] = useState(false);
@@ -42,7 +44,7 @@ export function ReportModal({
 
   async function submit() {
     if (!reason) {
-      setErr('Choose a reason.');
+      setErr(t('reportModal.chooseReasonError'));
       return;
     }
     setBusy(true);
@@ -68,12 +70,12 @@ export function ReportModal({
       }}
     >
       <div className="w-full max-w-sm rounded-2xl border border-slate-900 bg-slate-950 p-4 shadow-xl">
-        <div className="text-base font-semibold text-slate-100">Report</div>
+        <div className="text-base font-semibold text-slate-100">{t('reportModal.title')}</div>
 
         {done ? (
           <>
             <p className="mt-3 text-sm text-slate-300">
-              Thanks — your report was submitted and our team will review it.
+              {t('reportModal.thanks')}
             </p>
             <button
               type="button"
@@ -83,7 +85,7 @@ export function ReportModal({
               }}
               className="mt-4 w-full rounded-lg bg-slate-800 px-4 py-2 text-sm text-slate-200 hover:bg-slate-700"
             >
-              Close
+              {t('reportModal.close')}
             </button>
           </>
         ) : (
@@ -108,7 +110,7 @@ export function ReportModal({
             <textarea
               value={details}
               onChange={(e) => setDetails(e.target.value)}
-              placeholder="Additional details (optional)"
+              placeholder={t('reportModal.detailsPlaceholder')}
               rows={3}
               className="mt-3 w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
             />
@@ -124,7 +126,7 @@ export function ReportModal({
                 }}
                 className="flex-1 rounded-lg border border-slate-800 bg-slate-900 px-4 py-2 text-sm text-slate-300 hover:bg-slate-800"
               >
-                Cancel
+                {t('reportModal.cancel')}
               </button>
               <button
                 type="button"
@@ -132,7 +134,7 @@ export function ReportModal({
                 disabled={busy}
                 className="flex-1 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-500 disabled:opacity-50"
               >
-                {busy ? 'Sending…' : 'Submit report'}
+                {busy ? t('reportModal.sending') : t('reportModal.submit')}
               </button>
             </div>
           </>

@@ -8,9 +8,11 @@ import { WALLPAPERS, CUSTOM_WALLPAPER_ID, getWallpaperId, setWallpaperId as save
 import { uploadAvatar } from '@/lib/db/avatar';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import { subscribeToPush, pushSupported } from '@/lib/push';
+import { useLanguage, TransBold, type LangPreference } from '@/lib/i18n/context';
 
 export default function SettingsPage() {
   const supabase = browserSupabase();
+  const { t, preference, setPreference } = useLanguage();
 
   const [user, setUser] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
@@ -124,7 +126,7 @@ export default function SettingsPage() {
         .update({ display_name: displayName.trim() || null })
         .eq('id', user.id);
       if (error) throw error;
-      setStatus('✅ Perfil actualizado');
+      setStatus(`✅ ${t('settings.profileUpdated')}`);
     } catch (e: any) {
       setStatus(`❌ ${e?.message ?? String(e)}`);
     } finally {
@@ -143,7 +145,7 @@ export default function SettingsPage() {
       const { error } = await supabase.from('profiles').update({ avatar_url: url }).eq('id', user.id);
       if (error) throw error;
       setAvatarUrl(url);
-      setStatus('✅ Foto actualizada');
+      setStatus(`✅ ${t('settings.photoUpdated')}`);
     } catch (e: any) {
       setStatus(`❌ ${e?.message ?? String(e)}`);
     } finally {
@@ -168,7 +170,7 @@ export default function SettingsPage() {
 
         if (!currentUser) {
           if (mounted) {
-            setProfile({ username: 'Usuario', role: 'agent' });
+            setProfile({ username: 'User', role: 'agent' });
             setLoading(false);
           }
           return;
@@ -187,7 +189,7 @@ export default function SettingsPage() {
 
         if (mounted) {
           const prof = data?.[0] ?? {
-            username: 'Usuario',
+            username: 'User',
             role: 'agent'
           };
           setProfile(prof);
@@ -201,7 +203,7 @@ export default function SettingsPage() {
 
         if (mounted) {
           setProfile({
-            username: 'Usuario',
+            username: 'User',
             role: 'agent'
           });
         }
@@ -223,7 +225,7 @@ export default function SettingsPage() {
   async function signOut() {
     setStatus('');
     await supabase.auth.signOut();
-    setStatus('✅ Signed out');
+    setStatus(`✅ ${t('settings.signedOut')}`);
   }
 
   async function toggleShowOnline() {
@@ -252,12 +254,12 @@ export default function SettingsPage() {
     setPasswordStatus({ type: null, message: '' });
 
     if (newPassword.length < 6) {
-      setPasswordStatus({ type: 'error', message: 'La contraseña debe tener al menos 6 caracteres' });
+      setPasswordStatus({ type: 'error', message: t('settings.passwordTooShort') });
       return;
     }
 
     if (newPassword !== confirmPassword) {
-      setPasswordStatus({ type: 'error', message: 'Las contraseñas no coinciden' });
+      setPasswordStatus({ type: 'error', message: t('settings.passwordMismatch') });
       return;
     }
 
@@ -269,43 +271,49 @@ export default function SettingsPage() {
 
       if (error) throw error;
 
-      setPasswordStatus({ type: 'success', message: 'Contraseña actualizada' });
+      setPasswordStatus({ type: 'success', message: t('settings.passwordUpdated') });
       setNewPassword('');
       setConfirmPassword('');
       setCurrentPassword('');
     } catch (err: any) {
-      setPasswordStatus({ type: 'error', message: err.message || 'Error al actualizar la contraseña' });
+      setPasswordStatus({ type: 'error', message: err.message || t('settings.passwordUpdateError') });
     } finally {
       setIsUpdating(false);
     }
   }
 
+  const langOptions: { key: LangPreference; label: string }[] = [
+    { key: 'auto', label: t('settings.languageAuto') },
+    { key: 'en', label: t('settings.languageEnglish') },
+    { key: 'es', label: t('settings.languageSpanish') },
+  ];
+
   return (
-    <PageShell title="Settings">
+    <PageShell title={t('nav.settings')}>
       {loading ? (
         <div className="flex items-center justify-center p-8">
-          <p className="text-sm text-slate-300 animate-pulse">Cargando...</p>
+          <p className="text-sm text-slate-300 animate-pulse">{t('settings.loading')}</p>
         </div>
       ) : (
         <div className="space-y-6">
           <section className="space-y-3">
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500 ml-1">Cuenta</h2>
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500 ml-1">{t('settings.sectionAccount')}</h2>
             <div className="rounded-xl border border-slate-900 bg-slate-950/50 p-4 shadow-sm">
-              <div className="text-sm font-medium text-slate-200">Email</div>
-              <div className="text-xs text-slate-400 mt-1">{user?.email ?? user?.id ?? 'No disponible'}</div>
+              <div className="text-sm font-medium text-slate-200">{t('settings.email')}</div>
+              <div className="text-xs text-slate-400 mt-1">{user?.email ?? user?.id ?? t('settings.emailNotAvailable')}</div>
             </div>
           </section>
 
           <section className="space-y-3">
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500 ml-1">Dispositivo</h2>
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500 ml-1">{t('settings.sectionDevice')}</h2>
             <div className="rounded-xl border border-slate-900 bg-slate-950/50 p-4 shadow-sm">
-              <div className="text-sm font-medium text-slate-200">ID de dispositivo activo</div>
-              <div className="text-xs text-slate-400 mt-1">{activeDeviceId ?? '(ninguno) — ejecuta /onboarding'}</div>
+              <div className="text-sm font-medium text-slate-200">{t('settings.activeDeviceId')}</div>
+              <div className="text-xs text-slate-400 mt-1">{activeDeviceId ?? t('settings.noDevice')}</div>
             </div>
           </section>
 
           <section className="space-y-3">
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500 ml-1">Perfil</h2>
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500 ml-1">{t('settings.sectionProfile')}</h2>
             <div className="space-y-4 rounded-xl border border-slate-900 bg-slate-950/50 p-4 shadow-sm">
               <div className="flex items-center gap-4">
                 {avatarUrl ? (
@@ -323,22 +331,22 @@ export default function SettingsPage() {
                     disabled={avatarBusy}
                     className="rounded-lg bg-slate-800 px-3 py-1.5 text-sm text-slate-200 hover:bg-slate-700 disabled:opacity-50"
                   >
-                    {avatarBusy ? 'Subiendo…' : 'Cambiar foto'}
+                    {avatarBusy ? t('settings.uploading') : t('settings.changePhoto')}
                   </button>
                   <input ref={avatarInputRef} type="file" hidden accept="image/*" onChange={onAvatarChange} />
                 </div>
               </div>
 
               <div className="space-y-1.5">
-                <label className="ml-1 block text-xs text-slate-400">Nombre a mostrar</label>
+                <label className="ml-1 block text-xs text-slate-400">{t('settings.displayName')}</label>
                 <input
                   value={displayName}
                   onChange={(e) => setDisplayName(e.target.value)}
                   maxLength={40}
-                  placeholder={profile?.username ?? 'Tu nombre'}
+                  placeholder={profile?.username ?? t('settings.displayNamePlaceholder')}
                   className="w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
                 />
-                <div className="ml-1 text-xs text-slate-500">Username: {profile?.username ?? '(sin username)'}</div>
+                <div className="ml-1 text-xs text-slate-500">{t('settings.username')}: {profile?.username ?? t('settings.noUsername')}</div>
               </div>
 
               <button
@@ -347,15 +355,36 @@ export default function SettingsPage() {
                 disabled={savingProfile}
                 className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50"
               >
-                {savingProfile ? 'Guardando…' : 'Guardar perfil'}
+                {savingProfile ? t('settings.savingProfile') : t('settings.saveProfile')}
               </button>
             </div>
           </section>
 
           <section className="space-y-3">
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500 ml-1">Fondo de chat</h2>
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500 ml-1">{t('settings.sectionLanguage')}</h2>
             <div className="rounded-xl border border-slate-900 bg-slate-950/50 p-4 shadow-sm">
-              <div className="text-sm font-medium text-slate-200">Elige un fondo para tus chats</div>
+              <div className="flex flex-wrap gap-2">
+                {langOptions.map((opt) => (
+                  <button
+                    key={opt.key}
+                    type="button"
+                    onClick={() => setPreference(opt.key)}
+                    aria-pressed={preference === opt.key}
+                    className={`rounded-lg px-3 py-1.5 text-sm transition ${
+                      preference === opt.key ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </section>
+
+          <section className="space-y-3">
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500 ml-1">{t('settings.sectionWallpaper')}</h2>
+            <div className="rounded-xl border border-slate-900 bg-slate-950/50 p-4 shadow-sm">
+              <div className="text-sm font-medium text-slate-200">{t('settings.chooseWallpaper')}</div>
               <div className="mt-3 grid grid-cols-4 gap-3 sm:grid-cols-8">
                 {WALLPAPERS.map((w) => (
                   <button
@@ -379,7 +408,7 @@ export default function SettingsPage() {
                   type="button"
                   onClick={() => wallpaperInputRef.current?.click()}
                   disabled={wallpaperUploadBusy}
-                  title="Subir desde tu galería"
+                  title={t('settings.uploadFromLibrary')}
                   aria-pressed={wallpaperId === CUSTOM_WALLPAPER_ID}
                   className={`relative h-14 overflow-hidden rounded-lg border-2 transition disabled:opacity-50 ${
                     wallpaperId === CUSTOM_WALLPAPER_ID ? 'border-indigo-500' : 'border-slate-800 hover:border-slate-600'
@@ -396,17 +425,17 @@ export default function SettingsPage() {
                 </button>
                 <input ref={wallpaperInputRef} type="file" hidden accept="image/*" onChange={onWallpaperFileChange} />
               </div>
-              <div className="mt-2 text-xs text-slate-500">Se guarda en este dispositivo. El último ícono sube una foto tuya.</div>
+              <div className="mt-2 text-xs text-slate-500">{t('settings.wallpaperSavedNote')}</div>
             </div>
           </section>
 
           <section className="space-y-3">
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500 ml-1">Privacidad</h2>
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500 ml-1">{t('settings.sectionPrivacy')}</h2>
             <div className="rounded-xl border border-slate-900 bg-slate-950/50 p-4 shadow-sm flex items-center justify-between gap-3">
               <div>
-                <div className="text-sm font-medium text-slate-200">Mostrar mi estado en línea</div>
+                <div className="text-sm font-medium text-slate-200">{t('settings.showOnlineStatus')}</div>
                 <div className="text-xs text-slate-400 mt-1">
-                  Si lo desactivas, los demás no verán cuándo estás conectado.
+                  {t('settings.showOnlineStatusDesc')}
                 </div>
               </div>
               <button
@@ -428,11 +457,11 @@ export default function SettingsPage() {
           </section>
 
           <section className="space-y-3">
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500 ml-1">Seguridad</h2>
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500 ml-1">{t('settings.sectionSecurity')}</h2>
             <div className="rounded-xl border border-slate-900 bg-slate-950/50 p-4 shadow-sm">
               <form onSubmit={handleUpdatePassword} className="space-y-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs text-slate-400 block ml-1">Contraseña actual (opcional)</label>
+                  <label className="text-xs text-slate-400 block ml-1">{t('settings.currentPassword')}</label>
                   <input
                     type="password"
                     value={currentPassword}
@@ -443,19 +472,19 @@ export default function SettingsPage() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs text-slate-400 block ml-1">Nueva contraseña</label>
+                  <label className="text-xs text-slate-400 block ml-1">{t('settings.newPassword')}</label>
                   <input
                     type="password"
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
                     className="w-full rounded-lg bg-slate-900 border border-slate-800 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all"
-                    placeholder="Mínimo 6 caracteres"
+                    placeholder={t('settings.minChars')}
                     required
                   />
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs text-slate-400 block ml-1">Confirmar nueva contraseña</label>
+                  <label className="text-xs text-slate-400 block ml-1">{t('settings.confirmPassword')}</label>
                   <input
                     type="password"
                     value={confirmPassword}
@@ -478,26 +507,26 @@ export default function SettingsPage() {
                   disabled={isUpdating}
                   className="w-full rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {isUpdating ? 'Actualizando...' : 'Cambiar contraseña'}
+                  {isUpdating ? t('settings.updatingPassword') : t('settings.changePassword')}
                 </button>
               </form>
             </div>
           </section>
 
           <section className="space-y-3">
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500 ml-1">Notificaciones</h2>
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500 ml-1">{t('settings.sectionNotifications')}</h2>
             <div className="rounded-xl border border-slate-900 bg-slate-950/50 p-4 shadow-sm">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <div className="text-sm font-medium text-slate-200">Notificaciones push</div>
+                  <div className="text-sm font-medium text-slate-200">{t('settings.pushNotifications')}</div>
                   <div className="text-xs text-slate-400 mt-1">
                     {!pushSupported()
-                      ? 'No compatible con este navegador.'
+                      ? t('settings.pushUnsupported')
                       : permission === 'denied'
-                      ? 'Bloqueadas — habilítalas en los ajustes del navegador.'
+                      ? t('settings.pushBlocked')
                       : permission === 'granted'
-                      ? 'Activadas. Recibirás avisos incluso con la app cerrada.'
-                      : 'Recibe un aviso cuando llega un mensaje nuevo, aunque la app esté cerrada.'}
+                      ? t('settings.pushGranted')
+                      : t('settings.pushPrompt')}
                   </div>
                 </div>
                 {permission !== 'granted' && pushSupported() && (
@@ -507,7 +536,7 @@ export default function SettingsPage() {
                     disabled={pushBusy || permission === 'denied'}
                     className="rounded-lg bg-slate-800 px-3 py-1.5 text-sm text-slate-200 hover:bg-slate-700 disabled:opacity-50"
                   >
-                    {pushBusy ? 'Activando…' : 'Activar'}
+                    {pushBusy ? t('settings.enabling') : t('settings.enable')}
                   </button>
                 )}
               </div>
@@ -516,29 +545,27 @@ export default function SettingsPage() {
           </section>
 
           <section className="space-y-3">
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500 ml-1">Legal</h2>
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500 ml-1">{t('settings.sectionLegal')}</h2>
             <div className="rounded-xl border border-slate-900 bg-slate-950/50 p-4 shadow-sm text-sm">
-              <Link href="/privacy" className="text-blue-400 hover:text-blue-300">Política de privacidad</Link>
+              <Link href="/privacy" className="text-blue-400 hover:text-blue-300">{t('settings.privacyPolicy')}</Link>
               <span className="mx-2 text-slate-600">·</span>
-              <Link href="/terms" className="text-blue-400 hover:text-blue-300">Términos de servicio</Link>
+              <Link href="/terms" className="text-blue-400 hover:text-blue-300">{t('settings.termsOfService')}</Link>
             </div>
           </section>
 
           <section className="space-y-3">
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-rose-500 ml-1">Zona de peligro</h2>
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-rose-500 ml-1">{t('settings.sectionDangerZone')}</h2>
             <div className="rounded-xl border border-rose-900/40 bg-rose-950/10 p-4 shadow-sm">
-              <div className="text-sm font-medium text-slate-200">Eliminar cuenta</div>
+              <div className="text-sm font-medium text-slate-200">{t('settings.deleteAccountTitle')}</div>
               <div className="mt-1 text-xs text-slate-400">
-                Elimina tu perfil, dispositivos y contactos de forma permanente. Los
-                mensajes que enviaste se mantienen visibles para las otras personas del
-                chat. Esta acción no se puede deshacer.
+                {t('settings.deleteAccountDesc')}
               </div>
               <button
                 type="button"
                 onClick={() => setDeleteOpen(true)}
                 className="mt-3 rounded-lg bg-rose-700 px-4 py-2 text-sm font-medium text-white hover:bg-rose-600"
               >
-                Eliminar mi cuenta
+                {t('settings.deleteAccountButton')}
               </button>
             </div>
           </section>
@@ -548,7 +575,7 @@ export default function SettingsPage() {
               className="w-full rounded-lg border border-slate-800 bg-slate-900/50 px-4 py-2 text-sm text-slate-300 hover:bg-slate-800 hover:text-white transition-colors"
               onClick={signOut}
             >
-              Cerrar sesión
+              {t('settings.signOut')}
             </button>
             {status && <p className="text-xs text-center mt-3 text-slate-500 italic">{status}</p>}
           </div>
@@ -567,14 +594,14 @@ export default function SettingsPage() {
           }}
         >
           <div className="w-full max-w-sm rounded-2xl border border-rose-900/50 bg-slate-950 p-4 shadow-xl">
-            <div className="text-base font-semibold text-rose-400">Eliminar cuenta</div>
+            <div className="text-base font-semibold text-rose-400">{t('settings.deleteAccountTitle')}</div>
             <p className="mt-2 text-sm text-slate-300">
-              Esta acción es permanente. Escribe <b>DELETE</b> para confirmar.
+              <TransBold text={t('settings.deleteModalPrompt')} />
             </p>
             <input
               value={deleteConfirm}
               onChange={(e) => setDeleteConfirm(e.target.value)}
-              placeholder="DELETE"
+              placeholder={t('settings.deleteModalPlaceholder')}
               className="mt-3 w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-rose-500/50"
             />
             {deleteErr && <p className="mt-2 text-xs text-red-400">{deleteErr}</p>}
@@ -589,7 +616,7 @@ export default function SettingsPage() {
                 disabled={deleteBusy}
                 className="flex-1 rounded-lg border border-slate-800 bg-slate-900 px-4 py-2 text-sm text-slate-300 hover:bg-slate-800 disabled:opacity-50"
               >
-                Cancelar
+                {t('settings.deleteModalCancel')}
               </button>
               <button
                 type="button"
@@ -597,7 +624,7 @@ export default function SettingsPage() {
                 disabled={deleteBusy || deleteConfirm !== 'DELETE'}
                 className="flex-1 rounded-lg bg-rose-700 px-4 py-2 text-sm font-medium text-white hover:bg-rose-600 disabled:opacity-50"
               >
-                {deleteBusy ? 'Eliminando…' : 'Eliminar definitivamente'}
+                {deleteBusy ? t('settings.deleting') : t('settings.deleteModalConfirm')}
               </button>
             </div>
           </div>

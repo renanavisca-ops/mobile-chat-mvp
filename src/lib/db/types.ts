@@ -5,6 +5,7 @@ export type ChatSummary = {
   created_at: string;
   last_message_at: string | null;
   last_ciphertext: string | null;
+  last_message_kind?: 'text' | 'photo' | 'video' | 'audio' | 'deleted' | null;
   store_id?: string | null;
   assigned_to?: string | null;
   status?: 'open' | 'in_progress' | 'closed';

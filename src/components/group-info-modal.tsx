@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { searchUsers } from '@/lib/db/contacts';
 import { updateGroupInfo, addGroupMembers, removeGroupMember, leaveChat, setChatMuted, getChatMuted } from '@/lib/db/chats';
 import { uploadGroupAvatar } from '@/lib/db/groupAvatar';
+import { useT } from '@/lib/i18n/context';
 import type { ProfileLite } from '@/lib/db/types';
 
 export function GroupInfoModal({
@@ -31,6 +32,7 @@ export function GroupInfoModal({
   onMembersChanged: () => void;
   onLeft: () => void;
 }) {
+  const t = useT();
   const [name, setName] = useState(title ?? '');
   const [desc, setDesc] = useState(description ?? '');
   const [savingInfo, setSavingInfo] = useState(false);
@@ -68,12 +70,12 @@ export function GroupInfoModal({
       setResults([]);
       return;
     }
-    const t = setTimeout(() => {
+    const timer = setTimeout(() => {
       searchUsers(query)
         .then((rows) => setResults(rows.filter((r) => !members.some((m) => m.id === r.id))))
         .catch(() => setResults([]));
     }, 300);
-    return () => clearTimeout(t);
+    return () => clearTimeout(timer);
   }, [q, members]);
 
   if (!open) return null;
@@ -173,9 +175,9 @@ export function GroupInfoModal({
     >
       <div className="max-h-[90vh] w-full max-w-sm overflow-auto rounded-2xl border border-slate-900 bg-slate-950 p-4 shadow-xl">
         <div className="flex items-center justify-between">
-          <div className="text-base font-semibold text-slate-100">Group info</div>
+          <div className="text-base font-semibold text-slate-100">{t('groupInfo.title')}</div>
           <button type="button" onClick={onClose} className="rounded bg-slate-800 px-3 py-1.5 text-xs hover:bg-slate-700">
-            Close
+            {t('common.close')}
           </button>
         </div>
 
@@ -198,7 +200,7 @@ export function GroupInfoModal({
                 disabled={avatarBusy}
                 className="rounded-lg bg-slate-800 px-3 py-1.5 text-sm text-slate-200 hover:bg-slate-700 disabled:opacity-50"
               >
-                {avatarBusy ? 'Subiendo…' : 'Cambiar foto'}
+                {avatarBusy ? t('groupInfo.uploading') : t('groupInfo.changePhoto')}
               </button>
               <input ref={avatarInputRef} type="file" hidden accept="image/*" onChange={onAvatarChange} />
             </div>
@@ -206,7 +208,7 @@ export function GroupInfoModal({
         </div>
 
         <div className="mt-4 space-y-1.5">
-          <label className="ml-1 block text-xs text-slate-400">Group name</label>
+          <label className="ml-1 block text-xs text-slate-400">{t('groupInfo.groupName')}</label>
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -217,14 +219,14 @@ export function GroupInfoModal({
         </div>
 
         <div className="mt-3 space-y-1.5">
-          <label className="ml-1 block text-xs text-slate-400">Description</label>
+          <label className="ml-1 block text-xs text-slate-400">{t('groupInfo.description')}</label>
           <textarea
             value={desc}
             onChange={(e) => setDesc(e.target.value)}
             disabled={!isCreator}
             maxLength={500}
             rows={2}
-            placeholder={isCreator ? 'What is this group about?' : ''}
+            placeholder={isCreator ? t('groupInfo.descriptionPlaceholder') : ''}
             className="w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-slate-100 disabled:opacity-60"
           />
         </div>
@@ -236,16 +238,16 @@ export function GroupInfoModal({
             disabled={savingInfo || !name.trim() || !infoChanged}
             className="mt-2 w-full rounded-lg bg-indigo-600 px-3 py-2 text-sm text-white hover:bg-indigo-500 disabled:opacity-50"
           >
-            {savingInfo ? 'Guardando…' : 'Guardar'}
+            {savingInfo ? t('groupInfo.saving') : t('groupInfo.save')}
           </button>
         ) : (
-          <p className="mt-1 ml-1 text-xs text-slate-500">Solo el creador del grupo puede editarlo.</p>
+          <p className="mt-1 ml-1 text-xs text-slate-500">{t('groupInfo.onlyCreatorCanEdit')}</p>
         )}
 
         <div className="mt-4 flex items-center justify-between rounded-lg border border-slate-900 bg-slate-950/60 p-3">
           <div>
-            <div className="text-sm font-medium text-slate-200">Silenciar notificaciones</div>
-            <div className="text-xs text-slate-500">No recibirás avisos push de este chat.</div>
+            <div className="text-sm font-medium text-slate-200">{t('groupInfo.muteTitle')}</div>
+            <div className="text-xs text-slate-500">{t('groupInfo.muteDesc')}</div>
           </div>
           <button
             type="button"
@@ -262,7 +264,7 @@ export function GroupInfoModal({
         </div>
 
         <div className="mt-4">
-          <div className="ml-1 text-xs text-slate-400">Members ({members.length})</div>
+          <div className="ml-1 text-xs text-slate-400">{t('groupInfo.members')} ({members.length})</div>
           <ul className="mt-2 max-h-40 space-y-1 overflow-auto">
             {members.map((m) => (
               <li key={m.id} className="flex items-center justify-between rounded-lg px-2 py-1.5 text-sm text-slate-200 hover:bg-slate-900">
@@ -274,7 +276,7 @@ export function GroupInfoModal({
                     disabled={busyMemberId === m.id}
                     className="text-xs text-red-400 hover:text-red-300 disabled:opacity-50"
                   >
-                    Remove
+                    {t('groupInfo.remove')}
                   </button>
                 )}
               </li>
@@ -284,11 +286,11 @@ export function GroupInfoModal({
 
         {isCreator && (
           <div className="mt-4 space-y-1.5">
-            <label className="ml-1 block text-xs text-slate-400">Add members</label>
+            <label className="ml-1 block text-xs text-slate-400">{t('groupInfo.addMembers')}</label>
             <input
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              placeholder="Search by username…"
+              placeholder={t('groupInfo.searchPlaceholder')}
               autoCapitalize="none"
               className="w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-slate-100"
             />
@@ -303,7 +305,7 @@ export function GroupInfoModal({
                       disabled={adding}
                       className="rounded bg-slate-800 px-2 py-1 text-xs text-slate-200 hover:bg-slate-700 disabled:opacity-50"
                     >
-                      Add
+                      {t('groupInfo.add')}
                     </button>
                   </li>
                 ))}
@@ -315,13 +317,13 @@ export function GroupInfoModal({
         <div className="mt-5 border-t border-slate-900 pt-4">
           {confirmLeave ? (
             <div className="flex items-center gap-2">
-              <span className="flex-1 text-xs text-slate-400">Leave this group?</span>
+              <span className="flex-1 text-xs text-slate-400">{t('groupInfo.leaveConfirm')}</span>
               <button
                 type="button"
                 onClick={() => setConfirmLeave(false)}
                 className="rounded-lg border border-slate-800 bg-slate-900 px-3 py-1.5 text-xs text-slate-300 hover:bg-slate-800"
               >
-                Cancel
+                {t('groupInfo.cancel')}
               </button>
               <button
                 type="button"
@@ -329,7 +331,7 @@ export function GroupInfoModal({
                 disabled={leaving}
                 className="rounded-lg bg-rose-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-rose-600 disabled:opacity-50"
               >
-                {leaving ? 'Leaving…' : 'Confirm'}
+                {leaving ? t('groupInfo.leaving') : t('groupInfo.confirm')}
               </button>
             </div>
           ) : (
@@ -338,7 +340,7 @@ export function GroupInfoModal({
               onClick={() => setConfirmLeave(true)}
               className="w-full rounded-lg border border-rose-900/50 bg-rose-950/20 px-4 py-2 text-sm text-rose-300 hover:bg-rose-950/30"
             >
-              Leave group
+              {t('groupInfo.leaveGroup')}
             </button>
           )}
         </div>

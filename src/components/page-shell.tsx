@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useT } from '@/lib/i18n/context';
 
 function NavLink({ href, label }: { href: string; label: string }) {
   const pathname = usePathname();
@@ -28,6 +29,8 @@ export function PageShell({
   right?: React.ReactNode;
   children: React.ReactNode;
 }) {
+  const t = useT();
+
   return (
     <main className="min-h-screen bg-slate-950 text-slate-50">
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 p-4 sm:p-6">
@@ -38,10 +41,10 @@ export function PageShell({
           </div>
 
           <nav className="flex flex-wrap items-center gap-2">
-            <NavLink href="/chats" label="Chats" />
-            <NavLink href="/contacts" label="Contacts" />
-            <NavLink href="/groups/new" label="New group" />
-            <NavLink href="/settings" label="Settings" />
+            <NavLink href="/chats" label={t('nav.chats')} />
+            <NavLink href="/contacts" label={t('nav.contacts')} />
+            <NavLink href="/groups/new" label={t('nav.newGroup')} />
+            <NavLink href="/settings" label={t('nav.settings')} />
           </nav>
 
           <div className="hidden sm:block">{right}</div>
@@ -52,7 +55,7 @@ export function PageShell({
         </section>
 
         <footer className="pb-6 text-center text-xs text-slate-500">
-         Toky Chat • built on Next.js + Supabase
+          {t('footer.tagline')}
         </footer>
       </div>
     </main>

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef, useMemo } from 'react';
 import { createSignedChatMediaUrl } from '@/lib/storage/upload';
+import { useLanguage } from '@/lib/i18n/context';
 
 type Payload = { v?: number; text?: string; imagePath?: string; imagePaths?: string[]; videoPath?: string; audioPath?: string; reply_to?: string; is_deleted?: boolean; };
 
@@ -24,6 +25,7 @@ function getMessagePayload(message: any): Payload {
 
 export default function PublicChatPage({ params }: { params: { token: string } }) {
   const token = params.token;
+  const { t, lang } = useLanguage();
 
   const [sessionData, setSessionData] = useState<any>(null);
   const [messages, setMessages] = useState<any[]>([]);
@@ -40,7 +42,7 @@ export default function PublicChatPage({ params }: { params: { token: string } }
       try {
         const res = await fetch(`/api/public-chat/${token}`);
         if (!res.ok) {
-          throw new Error('Chat session not found or expired');
+          throw new Error(t('publicChat.errorNotFound'));
         }
         const data = await res.json();
         if (alive) {
@@ -139,8 +141,8 @@ export default function PublicChatPage({ params }: { params: { token: string } }
   }, [items, signedUrls]);
 
   const onSend = async () => {
-    const t = text.trim();
-    if (!t) return;
+    const trimmed = text.trim();
+    if (!trimmed) return;
     setBusy(true);
     try {
       // Optimistic
@@ -148,8 +150,8 @@ export default function PublicChatPage({ params }: { params: { token: string } }
       setMessages(prev => [...prev, {
         id: tempId,
         chat_id: sessionData.chat_id,
-        content: t,
-        ciphertext: JSON.stringify({ v: 1, text: t }),
+        content: trimmed,
+        ciphertext: JSON.stringify({ v: 1, text: trimmed }),
         created_at: new Date().toISOString(),
         sender_type: 'customer',
         sender_id: sessionData.customer_id,
@@ -160,9 +162,9 @@ export default function PublicChatPage({ params }: { params: { token: string } }
       const res = await fetch(`/api/public-chat/${token}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: t })
+        body: JSON.stringify({ text: trimmed })
       });
-      if (!res.ok) throw new Error('Error al enviar mensaje');
+      if (!res.ok) throw new Error(t('publicChat.errorSendFailed'));
     } catch (e: any) {
       console.error(e);
     } finally {
@@ -171,15 +173,15 @@ export default function PublicChatPage({ params }: { params: { token: string } }
   };
 
   if (loading) {
-    return <div className="min-h-screen flex items-center justify-center bg-gray-50">Cargando chat...</div>;
+    return <div className="min-h-screen flex items-center justify-center bg-gray-50">{t('publicChat.loading')}</div>;
   }
 
   if (error || !sessionData) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="bg-white p-8 rounded-xl shadow-sm border border-red-100 text-center">
-          <h2 className="text-xl font-bold text-red-600 mb-2">Error</h2>
-          <p className="text-gray-600">{error || 'Chat no encontrado'}</p>
+          <h2 className="text-xl font-bold text-red-600 mb-2">{t('publicChat.error')}</h2>
+          <p className="text-gray-600">{error || t('publicChat.chatNotFound')}</p>
         </div>
       </div>
     );
@@ -190,9 +192,9 @@ export default function PublicChatPage({ params }: { params: { token: string } }
       {/* Header */}
       <div className="bg-blue-600 text-white p-4 shadow-md flex items-center justify-between z-10">
         <div>
-          <h1 className="font-bold text-lg">{sessionData.chats?.title || 'Soporte Toky Chat'}</h1>
+          <h1 className="font-bold text-lg">{sessionData.chats?.title || t('publicChat.supportFallback')}</h1>
           <p className="text-blue-100 text-xs">
-            {sessionData.chats?.status === 'closed' ? 'Chat finalizado' : 'Conectado'}
+            {sessionData.chats?.status === 'closed' ? t('publicChat.chatClosed') : t('publicChat.connected')}
           </p>
         </div>
         <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
@@ -203,7 +205,7 @@ export default function PublicChatPage({ params }: { params: { token: string } }
       {/* Messages */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50">
         {items.length === 0 ? (
-          <div className="text-center text-gray-400 mt-10">No hay mensajes aún.</div>
+          <div className="text-center text-gray-400 mt-10">{t('publicChat.noMessagesYet')}</div>
         ) : (
           items.map(m => {
             const isCustomer = m.sender_type === 'customer';
@@ -213,7 +215,7 @@ export default function PublicChatPage({ params }: { params: { token: string } }
               return (
                 <div key={m.id} className="text-center">
                   <span className="inline-block bg-slate-200 text-slate-600 text-xs px-3 py-1 rounded-full">
-                    {m.body.text || 'Notificación del sistema'}
+                    {m.body.text || t('publicChat.systemNotification')}
                   </span>
                 </div>
               );
@@ -240,7 +242,7 @@ export default function PublicChatPage({ params }: { params: { token: string } }
                   )}
 
                   <div className={`text-[10px] mt-1 text-right ${isCustomer ? 'text-blue-200' : 'text-gray-400'}`}>
-                    {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    {new Date(m.created_at).toLocaleTimeString(lang, { hour: '2-digit', minute: '2-digit' })}
                   </div>
                 </div>
               </div>
@@ -254,7 +256,7 @@ export default function PublicChatPage({ params }: { params: { token: string } }
         <div className="bg-white p-3 border-t border-gray-100 flex items-center gap-2 pb-safe">
           <input
             className="flex-1 bg-gray-100 border-transparent focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-200 rounded-full px-4 py-2.5 text-sm transition-all"
-            placeholder="Escribe un mensaje..."
+            placeholder={t('publicChat.composerPlaceholder')}
             value={text}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && onSend()}
@@ -272,7 +274,7 @@ export default function PublicChatPage({ params }: { params: { token: string } }
         </div>
       ) : (
         <div className="bg-gray-100 p-4 text-center text-sm text-gray-500 pb-safe">
-          Este chat ha sido cerrado.
+          {t('publicChat.thisChatClosed')}
         </div>
       )}
     </div>

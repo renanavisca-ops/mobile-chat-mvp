@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { useT } from '@/lib/i18n/context';
 import type { ChatSummary } from '@/lib/db/types';
 
 export function ForwardModal(props: {
@@ -11,6 +12,7 @@ export function ForwardModal(props: {
   onConfirm: (chatIds: string[]) => Promise<void>;
 }) {
   const { open, chats, loading, onClose, onConfirm } = props;
+  const t = useT();
 
   const [q, setQ] = useState('');
   const [selected, setSelected] = useState<Record<string, boolean>>({});
@@ -46,15 +48,15 @@ export function ForwardModal(props: {
       <div className="w-full max-w-lg rounded-2xl border border-slate-900 bg-slate-950 shadow-xl">
         <div className="flex items-center justify-between border-b border-slate-900 p-4">
           <div>
-            <div className="text-base font-semibold text-slate-100">Forward</div>
-            <div className="text-xs text-slate-400">Selecciona uno o varios chats destino</div>
+            <div className="text-base font-semibold text-slate-100">{t('forward.title')}</div>
+            <div className="text-xs text-slate-400">{t('forward.subtitle')}</div>
           </div>
           <button
             className="rounded bg-slate-800 px-3 py-1.5 text-xs hover:bg-slate-700"
             onClick={onClose}
             disabled={busy}
           >
-            Close
+            {t('forward.close')}
           </button>
         </div>
 
@@ -63,24 +65,24 @@ export function ForwardModal(props: {
 
           <input
             className="mb-3 w-full rounded border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-100"
-            placeholder="Search chats…"
+            placeholder={t('forward.searchPlaceholder')}
             value={q}
             onChange={(e) => setQ(e.target.value)}
           />
 
           <div className="max-h-72 overflow-auto rounded-xl border border-slate-900">
             {loading ? (
-              <div className="p-3 text-sm text-slate-400">Loading chats…</div>
+              <div className="p-3 text-sm text-slate-400">{t('forward.loadingChats')}</div>
             ) : filtered.length === 0 ? (
-              <div className="p-3 text-sm text-slate-400">No matches.</div>
+              <div className="p-3 text-sm text-slate-400">{t('forward.noMatches')}</div>
             ) : (
               <ul className="divide-y divide-slate-900">
                 {filtered.map((c) => {
                   const checked = !!selected[c.id];
                   const title =
                     c.kind === 'group'
-                      ? c.title ?? 'Group'
-                      : c.title ?? 'Direct';
+                      ? c.title ?? t('forward.group')
+                      : c.title ?? t('forward.direct');
 
                   return (
                     <li key={c.id} className="flex items-center gap-3 p-3">
@@ -106,7 +108,7 @@ export function ForwardModal(props: {
 
           <div className="mt-4 flex items-center justify-between">
             <div className="text-xs text-slate-400">
-              Selected: <span className="font-mono">{selectedIds.length}</span>
+              {t('forward.selected')} <span className="font-mono">{selectedIds.length}</span>
             </div>
 
             <button
@@ -125,7 +127,7 @@ export function ForwardModal(props: {
                 }
               }}
             >
-              Forward
+              {t('forward.forward')}
             </button>
           </div>
         </div>

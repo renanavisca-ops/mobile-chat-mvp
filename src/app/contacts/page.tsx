@@ -8,10 +8,12 @@ import { createDirectChatWith } from '@/lib/db/chats';
 import { addContact, listMyContacts, searchUsers } from '@/lib/db/contacts';
 import { blockUser } from '@/lib/db/safety';
 import { ReportModal } from '@/components/report-modal';
+import { useT, TransBold } from '@/lib/i18n/context';
 import type { ProfileLite } from '@/lib/db/types';
 
 export default function ContactsPage() {
   const { loading } = useRequireAuth();
+  const t = useT();
   const supabase = browserSupabase();
 
   const [contacts, setContacts] = useState<ProfileLite[]>([]);
@@ -38,8 +40,8 @@ export default function ContactsPage() {
 
   useEffect(() => {
     if (!openAdd) return;
-    const t = setTimeout(() => inputRef.current?.focus(), 0);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => inputRef.current?.focus(), 0);
+    return () => clearTimeout(timer);
   }, [openAdd]);
 
   useEffect(() => {
@@ -104,23 +106,23 @@ export default function ContactsPage() {
 
   return (
     <PageShell
-      title="Contacts"
+      title={t('contacts.title')}
       right={
         <button
           className="rounded-full bg-blue-600 px-4 py-2 text-sm hover:bg-blue-500"
           onClick={openModal}
         >
-          + Add contact
+          {t('contacts.addContact')}
         </button>
       }
     >
       {err ? <p className="mb-3 text-sm text-red-300">{err}</p> : null}
 
       <div className="rounded-xl border border-slate-900 bg-slate-950/40 p-3">
-        <div className="text-sm text-slate-300">My contacts</div>
+        <div className="text-sm text-slate-300">{t('contacts.myContacts')}</div>
 
         {contacts.length === 0 ? (
-          <p className="mt-2 text-sm text-slate-400">No contacts yet. Click “Add contact”.</p>
+          <p className="mt-2 text-sm text-slate-400">{t('contacts.noContactsYet')}</p>
         ) : (
           <ul className="mt-2 divide-y divide-slate-900 rounded-lg border border-slate-900">
             {contacts.map((c) => (
@@ -130,7 +132,7 @@ export default function ContactsPage() {
                   className="rounded bg-blue-600 px-3 py-1.5 text-sm hover:bg-blue-500"
                   onClick={() => onChat(c.id)}
                 >
-                  Chat
+                  {t('contacts.chat')}
                 </button>
               </li>
             ))}
@@ -149,16 +151,16 @@ export default function ContactsPage() {
           <div className="w-full max-w-lg rounded-2xl border border-slate-900 bg-slate-950 p-4 shadow-xl">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <div className="text-base font-semibold">Add contact</div>
+                <div className="text-base font-semibold">{t('contacts.addContactTitle')}</div>
                 <div className="text-xs text-slate-400">
-                  Search by <b>username</b> (set in <b>/onboarding</b>). Min 2 chars.
+                  <TransBold text={t('contacts.searchHint')} />
                 </div>
               </div>
               <button
                 className="rounded bg-slate-800 px-3 py-1.5 text-sm hover:bg-slate-700"
                 onClick={closeModal}
               >
-                Close
+                {t('common.close')}
               </button>
             </div>
 
@@ -167,7 +169,7 @@ export default function ContactsPage() {
               className="mt-3 w-full rounded border border-slate-800 bg-slate-950 px-3 py-2 text-slate-100"
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              placeholder="e.g. ana, jose, tienda01…"
+              placeholder={t('contacts.searchPlaceholder')}
             />
 
             {canSearch ? (
@@ -181,37 +183,37 @@ export default function ContactsPage() {
                           className="rounded bg-slate-800 px-3 py-1.5 text-sm hover:bg-slate-700"
                           onClick={() => onAdd(r.id)}
                         >
-                          Add
+                          {t('contacts.add')}
                         </button>
                         <button
                           className="rounded bg-blue-600 px-3 py-1.5 text-sm hover:bg-blue-500"
                           onClick={() => onChat(r.id)}
                         >
-                          Chat
+                          {t('contacts.chat')}
                         </button>
                         <button
                           className="rounded bg-slate-800 px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-700"
                           onClick={() => onBlock(r.id)}
-                          title="Block user"
+                          title={t('contacts.blockUser')}
                         >
-                          Block
+                          {t('contacts.block')}
                         </button>
                         <button
                           className="rounded bg-slate-800 px-3 py-1.5 text-sm text-red-400 hover:bg-slate-700"
                           onClick={() => setReportTarget(r.id)}
-                          title="Report user"
+                          title={t('contacts.reportUser')}
                         >
-                          Report
+                          {t('contacts.report')}
                         </button>
                       </div>
                     </li>
                   ))}
                 </ul>
               ) : (
-                <p className="mt-3 text-sm text-slate-400">No results.</p>
+                <p className="mt-3 text-sm text-slate-400">{t('contacts.noResults')}</p>
               )
             ) : (
-              <p className="mt-3 text-sm text-slate-500">Type at least 2 characters…</p>
+              <p className="mt-3 text-sm text-slate-500">{t('contacts.typeAtLeast2')}</p>
             )}
           </div>
         </div>

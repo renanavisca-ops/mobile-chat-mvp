@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { useT } from '@/lib/i18n/context';
 
 type Action = {
   key: string;
@@ -20,6 +21,7 @@ export function MessageActionsSheet(props: {
   moreActions?: Action[];
 }) {
   const { open, onClose, actions, moreActions, title } = props;
+  const t = useT();
 
   const [mode, setMode] = useState<Mode>('main');
 
@@ -37,9 +39,9 @@ export function MessageActionsSheet(props: {
   const showMoreButton = !!moreActions?.length;
 
   const header = useMemo(() => {
-    if (mode === 'main') return { title: 'Message', subtitle: title };
-    return { title: 'More', subtitle: title };
-  }, [mode, title]);
+    if (mode === 'main') return { title: t('messageActions.title'), subtitle: title };
+    return { title: t('messageActions.more'), subtitle: title };
+  }, [mode, title, t]);
 
   if (!open) return null;
 
@@ -58,9 +60,9 @@ export function MessageActionsSheet(props: {
                 className="rounded bg-slate-800 px-3 py-1.5 text-xs hover:bg-slate-700"
                 onClick={() => setMode('main')}
                 type="button"
-                title="Back"
+                title={t('messageActions.back')}
               >
-                ← Back
+                ← {t('messageActions.back')}
               </button>
             ) : null}
 
@@ -69,7 +71,7 @@ export function MessageActionsSheet(props: {
               onClick={onClose}
               type="button"
             >
-              Close
+              {t('messageActions.close')}
             </button>
           </div>
         </div>
@@ -106,7 +108,7 @@ export function MessageActionsSheet(props: {
                   >
                     <span className="flex items-center gap-2">
                       <span className="text-base">…</span>
-                      <span>More</span>
+                      <span>{t('messageActions.moreButton')}</span>
                     </span>
                     <span className="text-slate-400">→</span>
                   </button>
@@ -143,7 +145,7 @@ export function MessageActionsSheet(props: {
           className="w-full rounded-b-2xl border-t border-slate-900 bg-slate-950 py-3 text-sm text-slate-300 hover:bg-slate-900"
           onClick={onClose}
         >
-          Cancel
+          {t('messageActions.cancel')}
         </button>
       </div>
     </div>

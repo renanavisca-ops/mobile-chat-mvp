@@ -66,22 +66,35 @@ export async function listChats(): Promise<ChatSummary[]> {
     }
   }
 
-  // Latest message preview per chat
-  const latestByChat = new Map<string, { created_at: string; content: string | null }>();
+  // Latest message preview per chat. `kind` lets the UI render a translated
+  // label for non-text previews instead of a hardcoded-language string here
+  // (this module isn't a component and can't call the i18n hook).
+  const latestByChat = new Map<
+    string,
+    { created_at: string; content: string | null; kind: 'text' | 'photo' | 'video' | 'audio' | 'deleted' | null }
+  >();
   for (const m of msgsRes.data ?? []) {
     if (latestByChat.has(m.chat_id)) continue;
-    let preview = m.content || '';
-    if (!preview && m.ciphertext) {
+    let content = m.content || '';
+    let kind: 'text' | 'photo' | 'video' | 'audio' | 'deleted' | null = content ? 'text' : null;
+    if (!content && m.ciphertext) {
       try {
         const parsed = JSON.parse(m.ciphertext);
-        if (parsed.text) preview = parsed.text;
-        else if (parsed.imagePath || parsed.imagePaths?.length > 0) preview = '📷 Imagen';
-        else if (parsed.videoPath) preview = '📹 Video';
-        else if (parsed.audioPath) preview = '🎵 Audio';
-        else if (parsed.is_deleted) preview = '🚫 Mensaje eliminado';
+        if (parsed.text) {
+          content = parsed.text;
+          kind = 'text';
+        } else if (parsed.imagePath || parsed.imagePaths?.length > 0) {
+          kind = 'photo';
+        } else if (parsed.videoPath) {
+          kind = 'video';
+        } else if (parsed.audioPath) {
+          kind = 'audio';
+        } else if (parsed.is_deleted) {
+          kind = 'deleted';
+        }
       } catch {}
     }
-    latestByChat.set(m.chat_id, { created_at: m.created_at, content: preview || null });
+    latestByChat.set(m.chat_id, { created_at: m.created_at, content: content || null, kind });
   }
 
   return chatList.map((c) => {
@@ -106,6 +119,7 @@ export async function listChats(): Promise<ChatSummary[]> {
       description: c.description,
       last_message_at: latestByChat.get(c.id)?.created_at ?? null,
       last_ciphertext: latestByChat.get(c.id)?.content ?? null,
+      last_message_kind: latestByChat.get(c.id)?.kind ?? null,
       other_user_id: c.kind === 'direct' ? otherIds[0] ?? null : null,
       other_user_avatar: c.kind === 'direct' ? avatarById.get(otherIds[0]) ?? null : null,
       member_ids: otherIds,
