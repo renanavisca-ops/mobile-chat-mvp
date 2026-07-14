@@ -10,6 +10,12 @@ body {
   @apply bg-slate-950 text-slate-100;
 }
 
+/* Story progress bar fill (used by the full-screen story viewer). */
+@keyframes storyProgress {
+  from { width: 0%; }
+  to { width: 100%; }
+}
+
 /* =========================================================================
    Theme, accent color, contrast and font-scale.
    The app's dark-mode Tailwind classes are static utility classes (not CSS

@@ -14,41 +14,6 @@ export type Database = {
   }
   public: {
     Tables: {
-      attachments: {
-        Row: {
-          cipher_blob_path: string
-          created_at: string
-          file_size_bytes: number
-          id: string
-          media_type: string
-          message_id: string
-        }
-        Insert: {
-          cipher_blob_path: string
-          created_at?: string
-          file_size_bytes: number
-          id?: string
-          media_type: string
-          message_id: string
-        }
-        Update: {
-          cipher_blob_path?: string
-          created_at?: string
-          file_size_bytes?: number
-          id?: string
-          media_type?: string
-          message_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "attachments_message_id_fkey"
-            columns: ["message_id"]
-            isOneToOne: false
-            referencedRelation: "messages"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       blocks: {
         Row: {
           blocked_id: string
@@ -466,41 +431,6 @@ export type Database = {
           },
         ]
       }
-      prekeys: {
-        Row: {
-          consumed_at: string | null
-          created_at: string
-          device_id: string
-          id: number
-          prekey_id: number
-          public_key: string
-        }
-        Insert: {
-          consumed_at?: string | null
-          created_at?: string
-          device_id: string
-          id?: number
-          prekey_id: number
-          public_key: string
-        }
-        Update: {
-          consumed_at?: string | null
-          created_at?: string
-          device_id?: string
-          id?: number
-          prekey_id?: number
-          public_key?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "prekeys_device_id_fkey"
-            columns: ["device_id"]
-            isOneToOne: false
-            referencedRelation: "devices"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -619,6 +549,62 @@ export type Database = {
             columns: ["message_id"]
             isOneToOne: false
             referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stories: {
+        Row: {
+          background: string | null
+          created_at: string
+          expires_at: string
+          id: string
+          media_path: string | null
+          text_content: string | null
+          user_id: string
+        }
+        Insert: {
+          background?: string | null
+          created_at?: string
+          expires_at?: string
+          id?: string
+          media_path?: string | null
+          text_content?: string | null
+          user_id: string
+        }
+        Update: {
+          background?: string | null
+          created_at?: string
+          expires_at?: string
+          id?: string
+          media_path?: string | null
+          text_content?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      story_views: {
+        Row: {
+          story_id: string
+          viewed_at: string
+          viewer_id: string
+        }
+        Insert: {
+          story_id: string
+          viewed_at?: string
+          viewer_id: string
+        }
+        Update: {
+          story_id?: string
+          viewed_at?: string
+          viewer_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "story_views_story_id_fkey"
+            columns: ["story_id"]
+            isOneToOne: false
+            referencedRelation: "stories"
             referencedColumns: ["id"]
           },
         ]

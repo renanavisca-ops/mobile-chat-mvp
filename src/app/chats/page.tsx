@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useState, useRef } from 'react';
 
 import { PageShell } from '@/components/page-shell';
+import { StoriesBar } from '@/components/stories-bar';
 import { useRequireAuth } from '@/lib/auth/use-require-auth';
 import { browserSupabase } from '@/lib/supabase/client';
 import { listChats } from '@/lib/db/chats';
@@ -152,6 +153,8 @@ export default function ChatsPage() {
 
   return (
     <PageShell title={t('chatsList.title')} right={<Link className="text-sm text-slate-200 hover:text-white" href="/contacts">{t('chatsList.newChat')}</Link>}>
+      <StoriesBar />
+
       {err ? <p className="text-sm text-red-300">{err}</p> : null}
 
       {loading ? (

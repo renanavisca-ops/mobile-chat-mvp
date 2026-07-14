@@ -70,3 +70,24 @@ export type HiddenMessage = {
   chat_id: string;
   created_at: string;
 };
+
+export type Story = {
+  id: string;
+  user_id: string;
+  media_path: string | null;
+  text_content: string | null;
+  background: string | null;
+  created_at: string;
+  expires_at: string;
+};
+
+/** A user's stories grouped for the rings strip. */
+export type StoryGroup = {
+  user_id: string;
+  username: string | null;
+  display_name: string | null;
+  avatar_url: string | null;
+  stories: Story[];
+  allViewed: boolean;
+  isMe: boolean;
+};
