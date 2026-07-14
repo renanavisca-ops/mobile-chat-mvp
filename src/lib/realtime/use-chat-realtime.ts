@@ -3,8 +3,8 @@
 import { useEffect, useState, useCallback } from 'react';
 import type { RealtimePostgresChangesPayload, REALTIME_SUBSCRIBE_STATES } from '@supabase/supabase-js';
 import { browserSupabase } from '@/lib/supabase/client';
-import { listMessages, markMessagesAsRead, listReactions, listPollVotes } from '@/lib/db/chats';
-import type { MessageRow, MessageReaction, PollVote } from '@/lib/db/types';
+import { listMessages, markMessagesAsRead, listReactions, listPollVotes, listHiddenMessages } from '@/lib/db/chats';
+import type { MessageRow, MessageReaction, PollVote, HiddenMessage } from '@/lib/db/types';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 
 const PAGE_SIZE = 50;
@@ -21,14 +21,18 @@ export function useChatRealtime(chatId: string) {
 
   const [reactions, setReactions] = useState<MessageReaction[]>([]);
   const [pollVotes, setPollVotes] = useState<PollVote[]>([]);
+  const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set());
 
   const { notify } = useNotifications();
 
-  // initial reactions + poll votes for the whole chat
+  // initial reactions + poll votes + hidden messages for the whole chat
   useEffect(() => {
     let alive = true;
     listReactions(chatId).then((rows) => alive && setReactions(rows)).catch(() => {});
     listPollVotes(chatId).then((rows) => alive && setPollVotes(rows)).catch(() => {});
+    listHiddenMessages(chatId)
+      .then((rows) => alive && setHiddenIds(new Set(rows.map((r) => r.message_id))))
+      .catch(() => {});
     return () => {
       alive = false;
     };
@@ -170,6 +174,24 @@ export function useChatRealtime(chatId: string) {
           });
         }
       )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'hidden_messages', filter: `chat_id=eq.${chatId}` },
+        (payload: RealtimePostgresChangesPayload<HiddenMessage>) => {
+          if (payload.eventType === 'DELETE') {
+            const oldRow = payload.old as Partial<HiddenMessage>;
+            if (!oldRow.message_id) return;
+            setHiddenIds((prev) => {
+              const next = new Set(prev);
+              next.delete(oldRow.message_id!);
+              return next;
+            });
+            return;
+          }
+          const row = payload.new as HiddenMessage;
+          setHiddenIds((prev) => new Set(prev).add(row.message_id));
+        }
+      )
       .on('presence', { event: 'sync' }, () => {
         const state = channel.presenceState() as Record<string, Array<{ typing: boolean; userId: string }>>;
         const typing: string[] = [];
@@ -228,5 +250,6 @@ export function useChatRealtime(chatId: string) {
     setMeTyping,
     reactions,
     pollVotes,
+    hiddenIds,
   };
 }

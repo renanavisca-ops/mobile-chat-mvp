@@ -12,7 +12,7 @@ import { getWallpaperId, wallpaperCss, getCustomWallpaperUrl, CUSTOM_WALLPAPER_I
 import { blockUser, unblockUser, isBlockedByMe } from '@/lib/db/safety';
 import { EmojiPicker } from '@/components/emoji-picker';
 import { useRequireAuth } from '@/lib/auth/use-require-auth';
-import { listChats, sendMessage, deleteMessage, editMessage, pinMessage, unpinMessage, searchMessages, setChatMuted, getChatMuted, toggleReaction, createPoll, votePoll, setDisappearingMessages } from '@/lib/db/chats';
+import { listChats, sendMessage, deleteMessage, hideMessageForMe, editMessage, pinMessage, unpinMessage, searchMessages, setChatMuted, getChatMuted, toggleReaction, createPoll, votePoll, setDisappearingMessages } from '@/lib/db/chats';
 import { forwardMessageToChats, type ForwardPayload } from '@/lib/db/forward';
 import { uploadChatImage, uploadChatMedia, uploadChatAudio, createSignedChatMediaUrl } from '@/lib/storage/upload';
 import { useChatRealtime } from '@/lib/realtime/use-chat-realtime';
@@ -91,7 +91,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
   }
 
   const supabase = browserSupabase();
-  const { messages, loading: msgLoading, appendLocal, loadMore, hasMore, loadingMore, typingUsers, setMeTyping, reactions, pollVotes } = useChatRealtime(chatId);
+  const { messages, loading: msgLoading, appendLocal, loadMore, hasMore, loadingMore, typingUsers, setMeTyping, reactions, pollVotes, hiddenIds } = useChatRealtime(chatId);
 
   // chat details
   const [chat, setChat] = useState<ChatSummary | null>(null);
@@ -389,7 +389,10 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
     };
   }, [chatId, supabase, membersReloadKey]);
 
-  const items = useMemo(() => messages.map((m) => ({ ...m, body: getMessagePayload(m) })), [messages]);
+  const items = useMemo(
+    () => messages.filter((m) => !hiddenIds.has(m.id)).map((m) => ({ ...m, body: getMessagePayload(m) })),
+    [messages, hiddenIds]
+  );
 
   const reactionsByMessage = useMemo(() => {
     const map = new Map<string, { emoji: string; count: number; mine: boolean }[]>();
@@ -1021,18 +1024,44 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
             },
           },
           { key: 'save', label: t('chat.actionSave'), icon: '💾', onClick: () => toast(t('chat.savePending')) },
-          { key: 'delete', label: t('chat.actionDelete'), icon: '🗑️', tone: 'danger', onClick: async () => {
-            if (!actionsMsg) return;
-            setActionsOpen(false);
-            setBusy(true);
-            try {
-              await deleteMessage(actionsMsg.id, chatId);
-            } catch(e:any) {
-              setErr(e.message);
-            } finally {
-              setBusy(false);
-            }
-          } },
+          {
+            key: 'delete-me',
+            label: t('chat.actionDeleteForMe'),
+            icon: '🙈',
+            tone: 'danger',
+            onClick: async () => {
+              if (!actionsMsg) return;
+              setActionsOpen(false);
+              setBusy(true);
+              try {
+                await hideMessageForMe(actionsMsg.id, chatId);
+              } catch (e: any) {
+                setErr(e.message);
+              } finally {
+                setBusy(false);
+              }
+            },
+          },
+          ...(actionsMsg && items.find((m) => m.id === actionsMsg.id)?.sender_id === myId
+            ? [{
+                key: 'delete-all',
+                label: t('chat.actionDeleteForEveryone'),
+                icon: '🗑️',
+                tone: 'danger' as const,
+                onClick: async () => {
+                  if (!actionsMsg) return;
+                  setActionsOpen(false);
+                  setBusy(true);
+                  try {
+                    await deleteMessage(actionsMsg.id, chatId);
+                  } catch (e: any) {
+                    setErr(e.message);
+                  } finally {
+                    setBusy(false);
+                  }
+                },
+              }]
+            : []),
         ]}
         moreActions={[
           {
@@ -1528,6 +1557,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
                                     type="button"
                                     onClick={() => onToggleReaction(m.id, e)}
                                     className="rounded-full px-1 text-base hover:bg-slate-900"
+                                    aria-label={e}
                                   >
                                     {e}
                                   </button>
@@ -1560,6 +1590,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
                       onClick={() => setEditorIndex(i)}
                       className="absolute bottom-1 right-1 rounded-full bg-black/60 px-2 py-1 text-xs text-white hover:bg-black/80"
                       title={t('chat.editPhoto')}
+                      aria-label={t('chat.editPhoto')}
                     >
                       ✏️
                     </button>
@@ -1604,6 +1635,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
                   setEditingId(null);
                   setText('');
                 }}
+                aria-label={t('common.cancel')}
               >
                 ✕
               </button>
@@ -1615,7 +1647,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
               <div className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap pr-2 border-l-2 border-blue-500 pl-2">
                 {t('chat.replyingTo')} {parseCipher(replyingTo.ciphertext).text || t('chat.mediaMessage')}
               </div>
-              <button className="text-slate-400 hover:text-white" onClick={() => setReplyingTo(null)}>
+              <button className="text-slate-400 hover:text-white" onClick={() => setReplyingTo(null)} aria-label={t('common.cancel')}>
                 ✕
               </button>
             </div>
@@ -1637,6 +1669,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
               }}
               type="button"
               title={t('chat.attach')}
+              aria-label={t('chat.attach')}
               disabled={busy}
             >
               +
@@ -1652,6 +1685,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
                 }}
                 type="button"
                 title={t('chat.emoji')}
+                aria-label={t('chat.emoji')}
                 disabled={busy}
               >
                 😀
@@ -1688,6 +1722,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
               onClick={isRecording ? stopRecording : startRecording}
               disabled={busy}
               title={isRecording ? t('chat.stopAndSend') : t('chat.recordAudio')}
+              aria-label={isRecording ? t('chat.stopAndSend') : t('chat.recordAudio')}
             >
               🎤
             </button>

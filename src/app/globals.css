@@ -63,6 +63,22 @@ html[data-theme='light'][data-contrast='high'] .border-slate-800 { border-color:
 html[data-font-scale='lg'] { font-size: 112.5%; }
 html[data-font-scale='xl'] { font-size: 125%; }
 
+/* ---------- Simple mode ----------
+   Larger base text plus bigger, easier-to-hit tap targets for buttons,
+   links and inputs. Layered on top of any font-scale choice. */
+html[data-simple='on'] { font-size: 118%; }
+html[data-simple='on'][data-font-scale='lg'] { font-size: 128%; }
+html[data-simple='on'][data-font-scale='xl'] { font-size: 138%; }
+html[data-simple='on'] button:not([role='switch']):not([role='checkbox']),
+html[data-simple='on'] a[role='button'] {
+  min-height: 44px;
+}
+html[data-simple='on'] input:not([type='checkbox']):not([type='radio']):not([type='range']),
+html[data-simple='on'] select,
+html[data-simple='on'] textarea {
+  min-height: 44px;
+}
+
 /* ---------- Accent color ----------
    Blue/indigo is the default accent throughout the app; presets below remap
    just those utility classes, leaving semantic colors (red/rose = danger,

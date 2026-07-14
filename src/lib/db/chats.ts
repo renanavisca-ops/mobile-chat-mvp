@@ -245,6 +245,11 @@ export async function setDisappearingMessages(chatId: string, seconds: number) {
   if (error) throw error;
 }
 
+/**
+ * Delete a message for everyone. Blanks out the payload and flags it deleted
+ * so every participant sees the "message was deleted" placeholder. Only the
+ * sender may do this (enforced by RLS on the messages table).
+ */
 export async function deleteMessage(messageId: string, chatId: string) {
   const supabase = browserSupabase();
 
@@ -280,6 +285,36 @@ export async function deleteMessage(messageId: string, chatId: string) {
     .eq('id', messageId);
 
   if (error) throw error;
+}
+
+/**
+ * "Delete for me": hide a message from the current user's view only. The
+ * message stays intact for everyone else. Works on any message (yours or
+ * someone else's) and syncs across the user's own devices via realtime.
+ */
+export async function hideMessageForMe(messageId: string, chatId: string) {
+  const supabase = browserSupabase();
+  const { data: me } = await supabase.auth.getUser();
+  if (!me.user) throw new Error('Not authenticated');
+
+  const { error } = await supabase.from('hidden_messages').upsert(
+    { message_id: messageId, chat_id: chatId, user_id: me.user.id },
+    { onConflict: 'user_id,message_id' }
+  );
+  if (error) throw error;
+}
+
+export async function listHiddenMessages(chatId: string): Promise<import('@/lib/db/types').HiddenMessage[]> {
+  const supabase = browserSupabase();
+  const { data: me } = await supabase.auth.getUser();
+  if (!me.user) return [];
+
+  const { data, error } = await supabase
+    .from('hidden_messages')
+    .select('user_id, message_id, chat_id, created_at')
+    .eq('chat_id', chatId);
+  if (error) throw error;
+  return (data ?? []) as import('@/lib/db/types').HiddenMessage[];
 }
 
 /** Rename/describe a group chat. Only the group's creator may do this. */

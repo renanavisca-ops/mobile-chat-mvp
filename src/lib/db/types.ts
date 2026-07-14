@@ -63,3 +63,10 @@ export type PollVote = {
   option_index: number;
   created_at: string;
 };
+
+export type HiddenMessage = {
+  user_id: string;
+  message_id: string;
+  chat_id: string;
+  created_at: string;
+};

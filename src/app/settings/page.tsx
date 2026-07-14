@@ -23,6 +23,8 @@ export default function SettingsPage() {
     setHighContrast,
     fontScale,
     setFontScale,
+    simpleMode,
+    setSimpleMode,
   } = useTheme();
 
   const [user, setUser] = useState<any>(null);
@@ -463,6 +465,7 @@ export default function SettingsPage() {
                   onClick={() => setHighContrast(!highContrast)}
                   role="switch"
                   aria-checked={highContrast}
+                  aria-label={t('settings.highContrastLabel')}
                   className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
                     highContrast ? 'bg-emerald-600' : 'bg-slate-700'
                   }`}
@@ -470,6 +473,28 @@ export default function SettingsPage() {
                   <span
                     className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
                       highContrast ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-sm font-medium text-slate-200">{t('settings.simpleModeLabel')}</div>
+                  <div className="mt-1 text-xs text-slate-400">{t('settings.simpleModeDesc')}</div>
+                </div>
+                <button
+                  onClick={() => setSimpleMode(!simpleMode)}
+                  role="switch"
+                  aria-checked={simpleMode}
+                  aria-label={t('settings.simpleModeLabel')}
+                  className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
+                    simpleMode ? 'bg-emerald-600' : 'bg-slate-700'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      simpleMode ? 'translate-x-6' : 'translate-x-1'
                     }`}
                   />
                 </button>

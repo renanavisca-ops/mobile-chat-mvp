@@ -283,6 +283,42 @@ export type Database = {
         }
         Relationships: []
       }
+      hidden_messages: {
+        Row: {
+          chat_id: string
+          created_at: string
+          message_id: string
+          user_id: string
+        }
+        Insert: {
+          chat_id: string
+          created_at?: string
+          message_id: string
+          user_id: string
+        }
+        Update: {
+          chat_id?: string
+          created_at?: string
+          message_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hidden_messages_chat_id_fkey"
+            columns: ["chat_id"]
+            isOneToOne: false
+            referencedRelation: "chats"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hidden_messages_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       message_reactions: {
         Row: {
           chat_id: string

@@ -13,9 +13,10 @@ type Prefs = {
   accent: Accent;
   highContrast: boolean;
   fontScale: FontScale;
+  simpleMode: boolean;
 };
 
-const DEFAULTS: Prefs = { theme: 'auto', accent: 'blue', highContrast: false, fontScale: 'normal' };
+const DEFAULTS: Prefs = { theme: 'auto', accent: 'blue', highContrast: false, fontScale: 'normal', simpleMode: false };
 
 function readPrefs(): Prefs {
   try {
@@ -42,6 +43,8 @@ function apply(prefs: Prefs) {
   else delete html.dataset.contrast;
   if (prefs.fontScale === 'normal') delete html.dataset.fontScale;
   else html.dataset.fontScale = prefs.fontScale;
+  if (prefs.simpleMode) html.dataset.simple = 'on';
+  else delete html.dataset.simple;
 }
 
 type Ctx = Prefs & {
@@ -49,6 +52,7 @@ type Ctx = Prefs & {
   setAccent: (a: Accent) => void;
   setHighContrast: (v: boolean) => void;
   setFontScale: (f: FontScale) => void;
+  setSimpleMode: (v: boolean) => void;
 };
 
 const ThemeContext = createContext<Ctx>({
@@ -57,6 +61,7 @@ const ThemeContext = createContext<Ctx>({
   setAccent: () => {},
   setHighContrast: () => {},
   setFontScale: () => {},
+  setSimpleMode: () => {},
 });
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
@@ -97,6 +102,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       setAccent: (a) => update({ accent: a }),
       setHighContrast: (v) => update({ highContrast: v }),
       setFontScale: (f) => update({ fontScale: f }),
+      setSimpleMode: (v) => update({ simpleMode: v }),
     }),
     [prefs, update]
   );
