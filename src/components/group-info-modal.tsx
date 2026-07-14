@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { searchUsers } from '@/lib/db/contacts';
-import { renameGroupChat, addGroupMembers, removeGroupMember, leaveChat } from '@/lib/db/chats';
+import { updateGroupInfo, addGroupMembers, removeGroupMember, leaveChat, setChatMuted, getChatMuted } from '@/lib/db/chats';
+import { uploadGroupAvatar } from '@/lib/db/groupAvatar';
 import type { ProfileLite } from '@/lib/db/types';
 
 export function GroupInfoModal({
@@ -10,9 +11,11 @@ export function GroupInfoModal({
   onClose,
   chatId,
   title,
+  description,
+  avatarUrl,
   isCreator,
   members,
-  onRenamed,
+  onUpdated,
   onMembersChanged,
   onLeft,
 }: {
@@ -20,15 +23,24 @@ export function GroupInfoModal({
   onClose: () => void;
   chatId: string;
   title: string | null;
+  description: string | null;
+  avatarUrl: string | null;
   isCreator: boolean;
   members: { id: string; username: string | null }[];
-  onRenamed: (title: string) => void;
+  onUpdated: (patch: { title?: string; description?: string; avatar_url?: string }) => void;
   onMembersChanged: () => void;
   onLeft: () => void;
 }) {
   const [name, setName] = useState(title ?? '');
-  const [savingName, setSavingName] = useState(false);
+  const [desc, setDesc] = useState(description ?? '');
+  const [savingInfo, setSavingInfo] = useState(false);
   const [err, setErr] = useState('');
+
+  const [avatarBusy, setAvatarBusy] = useState(false);
+  const avatarInputRef = useRef<HTMLInputElement | null>(null);
+
+  const [muted, setMuted] = useState(false);
+  const [muteBusy, setMuteBusy] = useState(false);
 
   const [q, setQ] = useState('');
   const [results, setResults] = useState<ProfileLite[]>([]);
@@ -41,12 +53,14 @@ export function GroupInfoModal({
   useEffect(() => {
     if (open) {
       setName(title ?? '');
+      setDesc(description ?? '');
       setErr('');
       setQ('');
       setResults([]);
       setConfirmLeave(false);
+      getChatMuted(chatId).then(setMuted).catch(() => {});
     }
-  }, [open, title]);
+  }, [open, title, description, chatId]);
 
   useEffect(() => {
     const query = q.trim();
@@ -64,18 +78,49 @@ export function GroupInfoModal({
 
   if (!open) return null;
 
-  async function saveName() {
-    const trimmed = name.trim();
-    if (!trimmed || trimmed === title) return;
-    setSavingName(true);
+  const infoChanged = name.trim() !== (title ?? '') || desc.trim() !== (description ?? '');
+
+  async function saveInfo() {
+    const trimmedTitle = name.trim();
+    if (!trimmedTitle) return;
+    setSavingInfo(true);
     setErr('');
     try {
-      await renameGroupChat(chatId, trimmed);
-      onRenamed(trimmed);
+      await updateGroupInfo(chatId, trimmedTitle, desc.trim());
+      onUpdated({ title: trimmedTitle, description: desc.trim() });
     } catch (e: any) {
       setErr(e?.message ?? String(e));
     } finally {
-      setSavingName(false);
+      setSavingInfo(false);
+    }
+  }
+
+  async function onAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setAvatarBusy(true);
+    setErr('');
+    try {
+      const url = await uploadGroupAvatar(chatId, file);
+      onUpdated({ avatar_url: url });
+    } catch (e: any) {
+      setErr(e?.message ?? String(e));
+    } finally {
+      setAvatarBusy(false);
+    }
+  }
+
+  async function toggleMute() {
+    const next = !muted;
+    setMuteBusy(true);
+    try {
+      await setChatMuted(chatId, next);
+      setMuted(next);
+    } catch (e: any) {
+      setErr(e?.message ?? String(e));
+    } finally {
+      setMuteBusy(false);
     }
   }
 
@@ -126,7 +171,7 @@ export function GroupInfoModal({
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="w-full max-w-sm rounded-2xl border border-slate-900 bg-slate-950 p-4 shadow-xl">
+      <div className="max-h-[90vh] w-full max-w-sm overflow-auto rounded-2xl border border-slate-900 bg-slate-950 p-4 shadow-xl">
         <div className="flex items-center justify-between">
           <div className="text-base font-semibold text-slate-100">Group info</div>
           <button type="button" onClick={onClose} className="rounded bg-slate-800 px-3 py-1.5 text-xs hover:bg-slate-700">
@@ -136,28 +181,84 @@ export function GroupInfoModal({
 
         {err && <p className="mt-2 text-xs text-red-400">{err}</p>}
 
-        <div className="mt-4 space-y-1.5">
-          <label className="ml-1 block text-xs text-slate-400">Group name</label>
-          <div className="flex gap-2">
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              disabled={!isCreator}
-              maxLength={60}
-              className="flex-1 rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-slate-100 disabled:opacity-60"
-            />
-            {isCreator && (
+        <div className="mt-4 flex items-center gap-4">
+          {avatarUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={avatarUrl} alt="" className="h-16 w-16 rounded-full border border-slate-800 object-cover" />
+          ) : (
+            <span className="grid h-16 w-16 place-items-center rounded-full bg-slate-800 text-lg font-semibold text-slate-300">
+              {(title || '?').trim().charAt(0).toUpperCase()}
+            </span>
+          )}
+          {isCreator && (
+            <div>
               <button
                 type="button"
-                onClick={saveName}
-                disabled={savingName || !name.trim() || name.trim() === title}
-                className="rounded-lg bg-indigo-600 px-3 py-2 text-sm text-white hover:bg-indigo-500 disabled:opacity-50"
+                onClick={() => avatarInputRef.current?.click()}
+                disabled={avatarBusy}
+                className="rounded-lg bg-slate-800 px-3 py-1.5 text-sm text-slate-200 hover:bg-slate-700 disabled:opacity-50"
               >
-                Save
+                {avatarBusy ? 'Subiendo…' : 'Cambiar foto'}
               </button>
-            )}
+              <input ref={avatarInputRef} type="file" hidden accept="image/*" onChange={onAvatarChange} />
+            </div>
+          )}
+        </div>
+
+        <div className="mt-4 space-y-1.5">
+          <label className="ml-1 block text-xs text-slate-400">Group name</label>
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            disabled={!isCreator}
+            maxLength={60}
+            className="w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-slate-100 disabled:opacity-60"
+          />
+        </div>
+
+        <div className="mt-3 space-y-1.5">
+          <label className="ml-1 block text-xs text-slate-400">Description</label>
+          <textarea
+            value={desc}
+            onChange={(e) => setDesc(e.target.value)}
+            disabled={!isCreator}
+            maxLength={500}
+            rows={2}
+            placeholder={isCreator ? 'What is this group about?' : ''}
+            className="w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-slate-100 disabled:opacity-60"
+          />
+        </div>
+
+        {isCreator ? (
+          <button
+            type="button"
+            onClick={saveInfo}
+            disabled={savingInfo || !name.trim() || !infoChanged}
+            className="mt-2 w-full rounded-lg bg-indigo-600 px-3 py-2 text-sm text-white hover:bg-indigo-500 disabled:opacity-50"
+          >
+            {savingInfo ? 'Guardando…' : 'Guardar'}
+          </button>
+        ) : (
+          <p className="mt-1 ml-1 text-xs text-slate-500">Solo el creador del grupo puede editarlo.</p>
+        )}
+
+        <div className="mt-4 flex items-center justify-between rounded-lg border border-slate-900 bg-slate-950/60 p-3">
+          <div>
+            <div className="text-sm font-medium text-slate-200">Silenciar notificaciones</div>
+            <div className="text-xs text-slate-500">No recibirás avisos push de este chat.</div>
           </div>
-          {!isCreator && <p className="ml-1 text-xs text-slate-500">Only the group creator can rename it.</p>}
+          <button
+            type="button"
+            onClick={toggleMute}
+            disabled={muteBusy}
+            role="switch"
+            aria-checked={muted}
+            className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors disabled:opacity-50 ${
+              muted ? 'bg-emerald-600' : 'bg-slate-700'
+            }`}
+          >
+            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${muted ? 'translate-x-6' : 'translate-x-1'}`} />
+          </button>
         </div>
 
         <div className="mt-4">

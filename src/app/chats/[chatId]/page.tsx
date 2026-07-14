@@ -8,11 +8,11 @@ import { AttachSheet } from '@/components/attach-sheet';
 import { CameraCapture } from '@/components/camera-capture';
 import { ReportModal } from '@/components/report-modal';
 import { GroupInfoModal } from '@/components/group-info-modal';
-import { getWallpaperId, wallpaperCss } from '@/lib/wallpaper';
+import { getWallpaperId, wallpaperCss, getCustomWallpaperUrl, CUSTOM_WALLPAPER_ID } from '@/lib/wallpaper';
 import { blockUser, unblockUser, isBlockedByMe } from '@/lib/db/safety';
 import { EmojiPicker } from '@/components/emoji-picker';
 import { useRequireAuth } from '@/lib/auth/use-require-auth';
-import { listChats, sendMessage, deleteMessage, editMessage, pinMessage, unpinMessage, searchMessages } from '@/lib/db/chats';
+import { listChats, sendMessage, deleteMessage, editMessage, pinMessage, unpinMessage, searchMessages, setChatMuted, getChatMuted } from '@/lib/db/chats';
 import { forwardMessageToChats, type ForwardPayload } from '@/lib/db/forward';
 import { uploadChatImage, uploadChatMedia, uploadChatAudio, createSignedChatMediaUrl } from '@/lib/storage/upload';
 import { useChatRealtime } from '@/lib/realtime/use-chat-realtime';
@@ -140,10 +140,20 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
   const [pendingImages, setPendingImages] = useState<File[]>([]);
   const [pendingVideo, setPendingVideo] = useState<File | null>(null);
   const [cameraOpen, setCameraOpen] = useState(false);
-  const [chatWallpaper, setChatWallpaper] = useState('');
+  const [wallpaperStyle, setWallpaperStyle] = useState<React.CSSProperties | undefined>(undefined);
 
   useEffect(() => {
-    setChatWallpaper(wallpaperCss(getWallpaperId()));
+    const id = getWallpaperId();
+    if (id === CUSTOM_WALLPAPER_ID) {
+      getCustomWallpaperUrl()
+        .then((url) => {
+          if (url) setWallpaperStyle({ backgroundImage: `url(${url})`, backgroundSize: 'cover', backgroundPosition: 'center' });
+        })
+        .catch(() => {});
+    } else {
+      const css = wallpaperCss(id);
+      setWallpaperStyle(css ? { background: css } : undefined);
+    }
   }, []);
 
   // Safety: block / report (direct chats only — a "menu" for the other person).
@@ -153,6 +163,26 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
   const [groupInfoOpen, setGroupInfoOpen] = useState(false);
   const [blocked, setBlocked] = useState(false);
   const [blockBusy, setBlockBusy] = useState(false);
+  const [muted, setMuted] = useState(false);
+  const [muteBusy, setMuteBusy] = useState(false);
+
+  useEffect(() => {
+    getChatMuted(chatId).then(setMuted).catch(() => {});
+  }, [chatId]);
+
+  async function toggleMute() {
+    const next = !muted;
+    setMuteBusy(true);
+    try {
+      await setChatMuted(chatId, next);
+      setMuted(next);
+    } catch (e: any) {
+      setErr(e?.message ?? String(e));
+    } finally {
+      setMuteBusy(false);
+      setSafetyMenuOpen(false);
+    }
+  }
 
   // In-chat search
   const [searchOpen, setSearchOpen] = useState(false);
@@ -973,9 +1003,11 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
           onClose={() => setGroupInfoOpen(false)}
           chatId={chatId}
           title={chat?.title ?? null}
+          description={chat?.description ?? null}
+          avatarUrl={chat?.avatar_url ?? null}
           isCreator={isGroupCreator}
           members={memberProfiles}
-          onRenamed={(newTitle) => setChat((prev) => (prev ? { ...prev, title: newTitle } : prev))}
+          onUpdated={(patch) => setChat((prev) => (prev ? { ...prev, ...patch } : prev))}
           onMembersChanged={() => setMembersReloadKey((k) => k + 1)}
           onLeft={() => {
             setGroupInfoOpen(false);
@@ -1040,6 +1072,14 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
                       className="absolute left-0 top-6 z-20 w-44 overflow-hidden rounded-lg border border-slate-800 bg-slate-950 text-sm shadow-xl"
                       onMouseLeave={() => setSafetyMenuOpen(false)}
                     >
+                      <button
+                        type="button"
+                        onClick={toggleMute}
+                        disabled={muteBusy}
+                        className="block w-full px-3 py-2 text-left text-slate-200 hover:bg-slate-900 disabled:opacity-50"
+                      >
+                        {muted ? 'Unmute' : 'Mute notifications'}
+                      </button>
                       <button
                         type="button"
                         onClick={toggleBlock}
@@ -1145,7 +1185,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
             </button>
           )}
 
-          <div ref={scrollRef} onScroll={handleScroll} style={chatWallpaper ? { background: chatWallpaper } : undefined} className="h-[55vh] overflow-auto rounded-xl border border-slate-900 bg-slate-950/40 p-3">
+          <div ref={scrollRef} onScroll={handleScroll} style={wallpaperStyle} className="h-[55vh] overflow-auto rounded-xl border border-slate-900 bg-slate-950/40 p-3">
             {loadingMore && <div className="text-center text-xs text-slate-500 my-2">Cargando anteriores...</div>}
             {items.length === 0 ? (
               <p className="text-sm text-slate-400">No messages yet.</p>

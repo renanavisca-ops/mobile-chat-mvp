@@ -91,16 +91,19 @@ export type Database = {
         Row: {
           chat_id: string
           joined_at: string
+          muted: boolean
           user_id: string
         }
         Insert: {
           chat_id: string
           joined_at?: string
+          muted?: boolean
           user_id: string
         }
         Update: {
           chat_id?: string
           joined_at?: string
+          muted?: boolean
           user_id?: string
         }
         Relationships: []
@@ -108,8 +111,10 @@ export type Database = {
       chats: {
         Row: {
           assigned_to: string | null
+          avatar_url: string | null
           created_at: string
           created_by: string | null
+          description: string | null
           id: string
           kind: string
           pinned_message_id: string | null
@@ -119,8 +124,10 @@ export type Database = {
         }
         Insert: {
           assigned_to?: string | null
+          avatar_url?: string | null
           created_at?: string
           created_by?: string | null
+          description?: string | null
           id?: string
           kind: string
           pinned_message_id?: string | null
@@ -130,8 +137,10 @@ export type Database = {
         }
         Update: {
           assigned_to?: string | null
+          avatar_url?: string | null
           created_at?: string
           created_by?: string | null
+          description?: string | null
           id?: string
           kind?: string
           pinned_message_id?: string | null
@@ -405,6 +414,14 @@ export type Database = {
       }
       remove_group_member: {
         Args: { p_chat_id: string; p_member_id: string }
+        Returns: undefined
+      }
+      update_group_info: {
+        Args: { p_chat_id: string; p_description: string; p_title: string }
+        Returns: undefined
+      }
+      set_chat_muted: {
+        Args: { p_chat_id: string; p_muted: boolean }
         Returns: undefined
       }
       is_store_staff_for_chat: { Args: { p_chat_id: string }; Returns: boolean }

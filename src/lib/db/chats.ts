@@ -20,7 +20,7 @@ export async function listChats(): Promise<ChatSummary[]> {
 
   const { data: chats, error } = await supabase
     .from('chats')
-    .select('id, kind, title, created_at, store_id, assigned_to, status, pinned_message_id')
+    .select('id, kind, title, created_at, store_id, assigned_to, status, pinned_message_id, avatar_url, description')
     .order('created_at', { ascending: false });
 
   if (error) throw error;
@@ -102,6 +102,8 @@ export async function listChats(): Promise<ChatSummary[]> {
       assigned_to: c.assigned_to,
       status: c.status as ChatSummary['status'],
       pinned_message_id: c.pinned_message_id,
+      avatar_url: c.avatar_url,
+      description: c.description,
       last_message_at: latestByChat.get(c.id)?.created_at ?? null,
       last_ciphertext: latestByChat.get(c.id)?.content ?? null,
       other_user_id: c.kind === 'direct' ? otherIds[0] ?? null : null,
@@ -235,11 +237,37 @@ export async function deleteMessage(messageId: string, chatId: string) {
   if (error) throw error;
 }
 
-/** Rename a group chat. Only the group's creator may do this. */
-export async function renameGroupChat(chatId: string, title: string) {
+/** Rename/describe a group chat. Only the group's creator may do this. */
+export async function updateGroupInfo(chatId: string, title: string, description: string) {
   const supabase = browserSupabase();
-  const { error } = await supabase.rpc('rename_group_chat', { p_chat_id: chatId, p_title: title });
+  const { error } = await supabase.rpc('update_group_info', {
+    p_chat_id: chatId,
+    p_title: title,
+    p_description: description,
+  });
   if (error) throw error;
+}
+
+/** Mute/unmute a chat for yourself (suppresses push notifications for it). */
+export async function setChatMuted(chatId: string, muted: boolean) {
+  const supabase = browserSupabase();
+  const { error } = await supabase.rpc('set_chat_muted', { p_chat_id: chatId, p_muted: muted });
+  if (error) throw error;
+}
+
+export async function getChatMuted(chatId: string): Promise<boolean> {
+  const supabase = browserSupabase();
+  const { data: me } = await supabase.auth.getUser();
+  if (!me.user) return false;
+
+  const { data, error } = await supabase
+    .from('chat_members')
+    .select('muted')
+    .eq('chat_id', chatId)
+    .eq('user_id', me.user.id)
+    .maybeSingle();
+  if (error) throw error;
+  return data?.muted ?? false;
 }
 
 /** Add members to a group. Only the group's creator may do this (enforced by RLS). */

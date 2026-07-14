@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { PageShell } from '@/components/page-shell';
 import { browserSupabase } from '@/lib/supabase/client';
-import { WALLPAPERS, getWallpaperId, setWallpaperId as saveWallpaperId } from '@/lib/wallpaper';
+import { WALLPAPERS, CUSTOM_WALLPAPER_ID, getWallpaperId, setWallpaperId as saveWallpaperId, uploadCustomWallpaper, getCustomWallpaperUrl } from '@/lib/wallpaper';
 import { uploadAvatar } from '@/lib/db/avatar';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import { subscribeToPush, pushSupported } from '@/lib/push';
@@ -31,6 +31,9 @@ export default function SettingsPage() {
   const [isUpdating, setIsUpdating] = useState(false);
 
   const [wallpaperId, setWpId] = useState('default');
+  const [customWallpaperUrl, setCustomWallpaperUrl] = useState<string | null>(null);
+  const [wallpaperUploadBusy, setWallpaperUploadBusy] = useState(false);
+  const wallpaperInputRef = useRef<HTMLInputElement | null>(null);
   const [displayName, setDisplayName] = useState('');
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [savingProfile, setSavingProfile] = useState(false);
@@ -81,12 +84,34 @@ export default function SettingsPage() {
 
   useEffect(() => {
     setActiveDeviceId(localStorage.getItem('active_device_id'));
-    setWpId(getWallpaperId());
+    const id = getWallpaperId();
+    setWpId(id);
+    if (id === CUSTOM_WALLPAPER_ID) {
+      getCustomWallpaperUrl().then(setCustomWallpaperUrl).catch(() => {});
+    }
   }, []);
 
   function chooseWallpaper(id: string) {
     saveWallpaperId(id);
     setWpId(id);
+  }
+
+  async function onWallpaperFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || !user) return;
+    setWallpaperUploadBusy(true);
+    setStatus('');
+    try {
+      await uploadCustomWallpaper(user.id, file);
+      setWpId(CUSTOM_WALLPAPER_ID);
+      const url = await getCustomWallpaperUrl();
+      setCustomWallpaperUrl(url);
+    } catch (e: any) {
+      setStatus(`❌ ${e?.message ?? String(e)}`);
+    } finally {
+      setWallpaperUploadBusy(false);
+    }
   }
 
   async function saveProfile() {
@@ -349,8 +374,29 @@ export default function SettingsPage() {
                     )}
                   </button>
                 ))}
+
+                <button
+                  type="button"
+                  onClick={() => wallpaperInputRef.current?.click()}
+                  disabled={wallpaperUploadBusy}
+                  title="Subir desde tu galería"
+                  aria-pressed={wallpaperId === CUSTOM_WALLPAPER_ID}
+                  className={`relative h-14 overflow-hidden rounded-lg border-2 transition disabled:opacity-50 ${
+                    wallpaperId === CUSTOM_WALLPAPER_ID ? 'border-indigo-500' : 'border-slate-800 hover:border-slate-600'
+                  }`}
+                  style={
+                    wallpaperId === CUSTOM_WALLPAPER_ID && customWallpaperUrl
+                      ? { backgroundImage: `url(${customWallpaperUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' }
+                      : { background: '#0f1420' }
+                  }
+                >
+                  <span className="absolute inset-0 grid place-items-center bg-black/30 text-lg text-white">
+                    {wallpaperUploadBusy ? '…' : '🖼️'}
+                  </span>
+                </button>
+                <input ref={wallpaperInputRef} type="file" hidden accept="image/*" onChange={onWallpaperFileChange} />
               </div>
-              <div className="mt-2 text-xs text-slate-500">Se guarda en este dispositivo.</div>
+              <div className="mt-2 text-xs text-slate-500">Se guarda en este dispositivo. El último ícono sube una foto tuya.</div>
             </div>
           </section>
 
