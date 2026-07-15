@@ -98,6 +98,7 @@ const es: Dictionary = {
     audio: '🎵 Audio',
     gif: '🎬 GIF',
     poll: '📊 Encuesta',
+    file: '📎 Archivo',
     deletedMessage: '🚫 Mensaje eliminado',
   },
   chat: {
@@ -121,6 +122,7 @@ const es: Dictionary = {
     deletedMessage: 'Este mensaje fue eliminado',
     replyToMessage: 'Respuesta a un mensaje',
     mediaMessage: 'Mensaje multimedia',
+    file: 'Archivo',
     previewImages: 'Vista previa de imágenes:',
     previewVideo: 'Vista previa de video:',
     typingSuffix: 'escribiendo…',

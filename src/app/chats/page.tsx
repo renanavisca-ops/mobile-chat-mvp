@@ -148,6 +148,8 @@ export default function ChatsPage() {
         return t('chatsList.gif');
       case 'poll':
         return t('chatsList.poll');
+      case 'file':
+        return t('chatsList.file');
       case 'deleted':
         return t('chatsList.deletedMessage');
       default:

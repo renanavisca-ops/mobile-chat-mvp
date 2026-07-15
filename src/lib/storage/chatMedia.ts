@@ -185,3 +185,31 @@ export async function createSignedChatMediaUrl(path: string, expiresSeconds = 60
   if (error) throw error;
   return data.signedUrl;
 }
+
+const MAX_FILE_BYTES = 25 * 1024 * 1024; // 25MB
+
+export type UploadedFile = { path: string; name: string; size: number; mime: string };
+
+/**
+ * Upload an arbitrary document/file to the private chat-media bucket under
+ * chats/<chatId>/files/. Returns metadata used to render a file card.
+ */
+export async function uploadChatFile(chatId: string, file: File): Promise<UploadedFile> {
+  if (file.size > MAX_FILE_BYTES) throw new Error('Máximo 25MB por archivo.');
+
+  const safeName = assertFilenameOk(file.name || 'file');
+  const ts = Date.now();
+  const id = crypto.randomUUID();
+  const path = `chats/${chatId}/files/${ts}_${id}_${safeName}`;
+  const contentType = file.type || 'application/octet-stream';
+
+  const supabase = browserSupabase();
+  const { error } = await supabase.storage.from('chat-media').upload(path, file, {
+    upsert: false,
+    contentType,
+    cacheControl: '3600',
+  });
+  if (error) throw error;
+
+  return { path, name: safeName, size: file.size, mime: contentType };
+}

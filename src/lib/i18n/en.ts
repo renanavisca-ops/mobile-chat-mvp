@@ -96,6 +96,7 @@ const en = {
     audio: '🎵 Audio',
     gif: '🎬 GIF',
     poll: '📊 Poll',
+    file: '📎 File',
     deletedMessage: '🚫 Deleted message',
   },
   chat: {
@@ -119,6 +120,7 @@ const en = {
     deletedMessage: 'This message was deleted',
     replyToMessage: 'Reply to a message',
     mediaMessage: 'Media message',
+    file: 'File',
     previewImages: 'Image preview:',
     previewVideo: 'Video preview:',
     typingSuffix: 'is typing…',

@@ -4,7 +4,7 @@ import { useEffect, useState, useRef, useMemo } from 'react';
 import { createSignedChatMediaUrl } from '@/lib/storage/upload';
 import { useLanguage } from '@/lib/i18n/context';
 
-type Payload = { v?: number; text?: string; imagePath?: string; imagePaths?: string[]; videoPath?: string; audioPath?: string; gifUrl?: string; reply_to?: string; is_deleted?: boolean; };
+type Payload = { v?: number; text?: string; imagePath?: string; imagePaths?: string[]; videoPath?: string; audioPath?: string; gifUrl?: string; filePath?: string; fileName?: string; reply_to?: string; is_deleted?: boolean; };
 
 function parseCipher(ciphertext: string | undefined | null): Payload {
   if (!ciphertext) return {};
@@ -114,6 +114,7 @@ export default function PublicChatPage({ params }: { params: { token: string } }
         if (m.body.imagePaths) m.body.imagePaths.forEach((p: string) => allPaths.add(p));
         if (m.body.videoPath) allPaths.add(m.body.videoPath);
         if (m.body.audioPath) allPaths.add(m.body.audioPath);
+        if (m.body.filePath) allPaths.add(m.body.filePath);
       }
 
       const missing = Array.from(allPaths).filter((p) => !signedUrls[p]);
@@ -244,6 +245,17 @@ export default function PublicChatPage({ params }: { params: { token: string } }
                   )}
                   {m.body.audioPath && signedUrls[m.body.audioPath] && (
                     <audio src={signedUrls[m.body.audioPath]} controls className="max-w-full mt-2" />
+                  )}
+                  {m.body.filePath && signedUrls[m.body.filePath] && (
+                    <a
+                      href={signedUrls[m.body.filePath]}
+                      target="_blank"
+                      rel="noreferrer"
+                      download={m.body.fileName}
+                      className={`mt-2 flex items-center gap-2 rounded-lg border p-2 text-sm ${isCustomer ? 'border-white/30 text-white' : 'border-gray-200 text-gray-700'}`}
+                    >
+                      📎 <span className="truncate">{m.body.fileName || 'File'}</span>
+                    </a>
                   )}
 
                   <div className={`text-[10px] mt-1 text-right ${isCustomer ? 'text-blue-200' : 'text-gray-400'}`}>

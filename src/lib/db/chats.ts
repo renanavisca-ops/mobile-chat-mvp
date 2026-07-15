@@ -71,12 +71,12 @@ export async function listChats(): Promise<ChatSummary[]> {
   // (this module isn't a component and can't call the i18n hook).
   const latestByChat = new Map<
     string,
-    { created_at: string; content: string | null; kind: 'text' | 'photo' | 'video' | 'audio' | 'gif' | 'poll' | 'deleted' | null }
+    { created_at: string; content: string | null; kind: 'text' | 'photo' | 'video' | 'audio' | 'gif' | 'poll' | 'file' | 'deleted' | null }
   >();
   for (const m of msgsRes.data ?? []) {
     if (latestByChat.has(m.chat_id)) continue;
     let content = m.content || '';
-    let kind: 'text' | 'photo' | 'video' | 'audio' | 'gif' | 'poll' | 'deleted' | null = content ? 'text' : null;
+    let kind: 'text' | 'photo' | 'video' | 'audio' | 'gif' | 'poll' | 'file' | 'deleted' | null = content ? 'text' : null;
     if (!content && m.ciphertext) {
       try {
         const parsed = JSON.parse(m.ciphertext);
@@ -91,6 +91,8 @@ export async function listChats(): Promise<ChatSummary[]> {
           kind = 'audio';
         } else if (parsed.gifUrl) {
           kind = 'gif';
+        } else if (parsed.filePath) {
+          kind = 'file';
         } else if (parsed.poll) {
           kind = 'poll';
         } else if (parsed.is_deleted) {
@@ -193,6 +195,10 @@ export type MessagePayload = {
   videoPath?: string;
   audioPath?: string;
   gifUrl?: string;
+  filePath?: string;
+  fileName?: string;
+  fileSize?: number;
+  fileMime?: string;
   reply_to?: string;
   is_deleted?: boolean;
 };

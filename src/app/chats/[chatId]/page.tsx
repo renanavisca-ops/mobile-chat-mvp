@@ -14,7 +14,7 @@ import { EmojiPicker } from '@/components/emoji-picker';
 import { useRequireAuth } from '@/lib/auth/use-require-auth';
 import { listChats, sendMessage, deleteMessage, hideMessageForMe, editMessage, pinMessage, unpinMessage, searchMessages, setChatMuted, getChatMuted, toggleReaction, createPoll, votePoll, setDisappearingMessages } from '@/lib/db/chats';
 import { forwardMessageToChats, type ForwardPayload } from '@/lib/db/forward';
-import { uploadChatImage, uploadChatMedia, uploadChatAudio, createSignedChatMediaUrl } from '@/lib/storage/upload';
+import { uploadChatImage, uploadChatMedia, uploadChatAudio, uploadChatFile, createSignedChatMediaUrl } from '@/lib/storage/upload';
 import { useChatRealtime } from '@/lib/realtime/use-chat-realtime';
 import { browserSupabase } from '@/lib/supabase/client';
 import { useOnlineUsers } from '@/components/presence-provider';
@@ -25,7 +25,7 @@ import { MessageEffects, detectEffect } from '@/components/message-effects';
 import { GifPicker } from '@/components/gif-picker';
 import type { Gif } from '@/lib/giphy';
 import { useCall } from '@/lib/call/call-provider';
-import { PhoneIcon, VideoIcon, PlusIcon, SmileIcon, MicIcon, PencilIcon, ReplyIcon, ForwardIcon, CopyIcon, DownloadIcon, EyeOffIcon, TrashIcon, PinIcon, FlagIcon } from '@/components/icons';
+import { PhoneIcon, VideoIcon, PlusIcon, SmileIcon, MicIcon, PencilIcon, ReplyIcon, ForwardIcon, CopyIcon, DownloadIcon, EyeOffIcon, TrashIcon, PinIcon, FlagIcon, PaperclipIcon } from '@/components/icons';
 import type { ChatSummary, MessageRow } from '@/lib/db/types';
 
 type Payload = {
@@ -36,10 +36,26 @@ type Payload = {
   videoPath?: string;
   audioPath?: string;
   gifUrl?: string;
+  filePath?: string;
+  fileName?: string;
+  fileSize?: number;
+  fileMime?: string;
   reply_to?: string;
   is_deleted?: boolean;
   poll?: { question: string; options: string[] };
 };
+
+function formatBytes(bytes?: number): string {
+  if (!bytes || bytes <= 0) return '';
+  const units = ['B', 'KB', 'MB', 'GB'];
+  let n = bytes;
+  let i = 0;
+  while (n >= 1024 && i < units.length - 1) {
+    n /= 1024;
+    i++;
+  }
+  return `${n.toFixed(n < 10 && i > 0 ? 1 : 0)} ${units[i]}`;
+}
 
 const QUICK_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
 const DISAPPEARING_OPTIONS: { seconds: number; labelKey: string }[] = [
@@ -323,6 +339,9 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
 
   const composerRef = useRef<HTMLDivElement | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  // Tracks whether we've already jumped to the newest message for this chat,
+  // so opening a chat lands at the bottom but later updates don't yank you down.
+  const initialScrollDoneRef = useRef(false);
 
   // Long-press support
   const longPressTimer = useRef<number | null>(null);
@@ -531,14 +550,28 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
     return usernameById.get(m.sender_id) || shortId(m.sender_id);
   }
 
-  // autoscroll (only if we're already near the bottom)
+  // Reset the "landed at bottom" flag when switching chats (the component
+  // instance is reused across chat routes, so the ref would otherwise persist).
+  useEffect(() => {
+    initialScrollDoneRef.current = false;
+  }, [chatId]);
+
+  // Scroll behavior: on first open jump straight to the newest message; after
+  // that only auto-scroll when you're already near the bottom.
+  const chatReady = !authLoading && !msgLoading;
   useEffect(() => {
     const el = scrollRef.current;
-    if (!el) return;
+    if (!el || !chatReady || items.length === 0) return;
+    if (!initialScrollDoneRef.current) {
+      el.scrollTop = el.scrollHeight;
+      initialScrollDoneRef.current = true;
+      return;
+    }
     if (el.scrollHeight - el.scrollTop - el.clientHeight < 150) {
       el.scrollTop = el.scrollHeight;
     }
-  }, [items.length]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items.length, chatReady]);
 
   // Fire an animated effect when the newest message contains a trigger emoji.
   // Seeds silently on first load so history doesn't replay effects.
@@ -639,6 +672,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
     if (Array.isArray(body.imagePaths)) for (const p of body.imagePaths) if (p) arr.push(p);
     if (body.videoPath) arr.push(body.videoPath);
     if (body.audioPath) arr.push(body.audioPath);
+    if (body.filePath) arr.push(body.filePath);
     return Array.from(new Set(arr));
   }
 
@@ -805,8 +839,48 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
     cameraVideoRef.current?.click();
   }
   function pickFile() {
-    toast(t('chat.fileFeaturePending'));
+    setErr('');
     fileInputRef.current?.click();
+  }
+
+  async function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setErr('');
+    setBusy(true);
+    try {
+      const uploaded = await uploadChatFile(chatId, file);
+      const payload: Payload = {
+        filePath: uploaded.path,
+        fileName: uploaded.name,
+        fileSize: uploaded.size,
+        fileMime: uploaded.mime,
+      };
+      if (replyingTo) payload.reply_to = replyingTo.id;
+
+      try {
+        const url = await createSignedChatMediaUrl(uploaded.path, 300);
+        setSignedUrls((prev) => ({ ...prev, [uploaded.path]: url }));
+      } catch {}
+
+      const temp: MessageRow = {
+        id: `local-${crypto.randomUUID()}`,
+        chat_id: chatId,
+        sender_device_id: 'local',
+        ciphertext: JSON.stringify({ v: 1, ...payload }),
+        nonce: `local-${crypto.randomUUID()}`,
+        message_type: 'whisper',
+        created_at: new Date().toISOString(),
+      };
+      appendLocal(temp);
+      setReplyingTo(null);
+      await sendMessage(chatId, payload as any);
+    } catch (e: any) {
+      setErr(e?.message ?? String(e));
+    } finally {
+      setBusy(false);
+    }
   }
 
   // -------- Input change: images
@@ -1240,7 +1314,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
       <input ref={videoInputRef} type="file" hidden accept="video/*" onChange={onVideoChange} />
       <input ref={cameraPhotoRef} type="file" hidden accept="image/*" capture="environment" onChange={onCameraPhotoChange} />
       <input ref={cameraVideoRef} type="file" hidden accept="video/*" capture="environment" onChange={onCameraVideoChange} />
-      <input ref={fileInputRef} type="file" hidden />
+      <input ref={fileInputRef} type="file" hidden onChange={onFileChange} />
 
       {loading ? (
         <p className="text-sm text-slate-300">{t('chat.loading')}</p>
@@ -1621,6 +1695,27 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
                             <div className="h-10 w-full animate-pulse rounded-lg border border-slate-900 bg-slate-800" />
                           )}
                         </div>
+                      ) : null}
+
+                      {m.body.filePath ? (
+                        <a
+                          href={signedUrls[m.body.filePath] || undefined}
+                          target="_blank"
+                          rel="noreferrer"
+                          download={m.body.fileName}
+                          className="mt-2 flex items-center gap-3 rounded-lg border border-slate-800 bg-slate-950/60 p-2 hover:bg-slate-900"
+                        >
+                          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-slate-800 text-slate-300">
+                            <PaperclipIcon size={18} />
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-sm text-slate-100">{m.body.fileName || t('chat.file')}</span>
+                            {m.body.fileSize ? <span className="block text-xs text-slate-500">{formatBytes(m.body.fileSize)}</span> : null}
+                          </span>
+                          <span className="shrink-0 text-slate-400">
+                            <DownloadIcon size={18} />
+                          </span>
+                        </a>
                       ) : null}
 
                       {m.sender_type !== 'system' && (
