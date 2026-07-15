@@ -4,6 +4,7 @@ import { PresenceProvider } from '@/components/presence-provider';
 import { ConsentGate } from '@/components/consent-gate';
 import { LanguageProvider } from '@/lib/i18n/context';
 import { ThemeProvider } from '@/lib/theme';
+import { CallProvider } from '@/lib/call/call-provider';
 
 export const metadata: Metadata = {
   title: 'Toky Chat',
@@ -17,7 +18,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ThemeProvider>
           <LanguageProvider>
             <ConsentGate />
-            <PresenceProvider>{children}</PresenceProvider>
+            <CallProvider>
+              <PresenceProvider>{children}</PresenceProvider>
+            </CallProvider>
           </LanguageProvider>
         </ThemeProvider>
       </body>

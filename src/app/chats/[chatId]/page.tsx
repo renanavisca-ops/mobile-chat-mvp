@@ -24,6 +24,7 @@ import { ImageEditor } from '@/components/image-editor';
 import { MessageEffects, detectEffect } from '@/components/message-effects';
 import { GifPicker } from '@/components/gif-picker';
 import type { Gif } from '@/lib/giphy';
+import { useCall } from '@/lib/call/call-provider';
 import type { ChatSummary, MessageRow } from '@/lib/db/types';
 
 type Payload = {
@@ -95,6 +96,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
   }
 
   const supabase = browserSupabase();
+  const { startCall, busy: callBusy } = useCall();
   const { messages, loading: msgLoading, appendLocal, loadMore, hasMore, loadingMore, typingUsers, setMeTyping, reactions, pollVotes, hiddenIds } = useChatRealtime(chatId);
 
   // chat details
@@ -1262,6 +1264,42 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
               >
                 🔍
               </button>
+              {otherUserId && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      startCall({
+                        peerId: otherUserId,
+                        peerName: usernameById.get(otherUserId) || chat?.title || t('chat.someone'),
+                        video: false,
+                      })
+                    }
+                    disabled={callBusy}
+                    className="rounded px-1.5 py-0.5 text-slate-400 hover:bg-slate-900 hover:text-slate-200 disabled:opacity-40"
+                    aria-label={t('call.startAudio')}
+                    title={t('call.startAudio')}
+                  >
+                    📞
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      startCall({
+                        peerId: otherUserId,
+                        peerName: usernameById.get(otherUserId) || chat?.title || t('chat.someone'),
+                        video: true,
+                      })
+                    }
+                    disabled={callBusy}
+                    className="rounded px-1.5 py-0.5 text-slate-400 hover:bg-slate-900 hover:text-slate-200 disabled:opacity-40"
+                    aria-label={t('call.startVideo')}
+                    title={t('call.startVideo')}
+                  >
+                    📹
+                  </button>
+                </>
+              )}
               {isGroup && (
                 <button
                   type="button"
