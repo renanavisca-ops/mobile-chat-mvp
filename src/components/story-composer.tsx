@@ -3,6 +3,7 @@
 import { useRef, useState } from 'react';
 import { createImageStory, createTextStory } from '@/lib/db/stories';
 import { useT } from '@/lib/i18n/context';
+import { ImageIcon, TypeIcon } from '@/components/icons';
 
 const BACKGROUNDS = [
   'linear-gradient(135deg,#6366f1,#a855f7)',
@@ -102,7 +103,7 @@ export function StoryComposer({
               disabled={busy}
               className="flex flex-col items-center gap-2 rounded-xl border border-slate-900 bg-slate-950/60 px-3 py-6 text-sm text-slate-100 hover:bg-slate-900 disabled:opacity-50"
             >
-              <span className="text-2xl">🖼️</span>
+              <ImageIcon size={26} />
               {t('stories.photo')}
             </button>
             <button
@@ -111,7 +112,7 @@ export function StoryComposer({
               disabled={busy}
               className="flex flex-col items-center gap-2 rounded-xl border border-slate-900 bg-slate-950/60 px-3 py-6 text-sm text-slate-100 hover:bg-slate-900 disabled:opacity-50"
             >
-              <span className="text-2xl">🅰️</span>
+              <TypeIcon size={26} />
               {t('stories.text')}
             </button>
             <input ref={fileRef} type="file" hidden accept="image/jpeg,image/png,image/webp" onChange={onFileChange} />

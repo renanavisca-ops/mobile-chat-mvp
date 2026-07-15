@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createSignedStoryUrl, markStoryViewed, countStoryViews, deleteStory } from '@/lib/db/stories';
 import { useT, useLanguage } from '@/lib/i18n/context';
+import { XIcon, TrashIcon, EyeIcon } from '@/components/icons';
 import type { StoryGroup } from '@/lib/db/types';
 
 const DURATION = 5000;
@@ -158,9 +159,9 @@ export function StoryViewer({
             type="button"
             onClick={onClose}
             aria-label={t('common.close')}
-            className="rounded-full bg-black/40 px-2 py-1 text-white hover:bg-black/60"
+            className="grid place-items-center rounded-full bg-black/40 p-1.5 text-white hover:bg-black/60"
           >
-            ✕
+            <XIcon size={18} />
           </button>
         </div>
 
@@ -200,15 +201,15 @@ export function StoryViewer({
         {/* Footer (own story: views + delete) */}
         {group.isMe && (
           <div className="absolute bottom-0 left-0 right-0 z-20 flex items-center justify-between px-4 py-3">
-            <span className="text-xs text-white/80">
-              👁️ {viewCount ?? 0} {viewCount === 1 ? t('stories.view') : t('stories.views')}
+            <span className="flex items-center gap-1.5 text-xs text-white/80">
+              <EyeIcon size={16} /> {viewCount ?? 0} {viewCount === 1 ? t('stories.view') : t('stories.views')}
             </span>
             <button
               type="button"
               onClick={onDelete}
-              className="rounded-lg bg-black/50 px-3 py-1.5 text-xs text-rose-300 hover:bg-black/70"
+              className="flex items-center gap-1.5 rounded-lg bg-black/50 px-3 py-1.5 text-xs text-rose-300 hover:bg-black/70"
             >
-              🗑️ {t('common.delete')}
+              <TrashIcon size={16} /> {t('common.delete')}
             </button>
           </div>
         )}

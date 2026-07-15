@@ -25,7 +25,7 @@ import { MessageEffects, detectEffect } from '@/components/message-effects';
 import { GifPicker } from '@/components/gif-picker';
 import type { Gif } from '@/lib/giphy';
 import { useCall } from '@/lib/call/call-provider';
-import { PhoneIcon, VideoIcon, PlusIcon, SmileIcon, MicIcon } from '@/components/icons';
+import { PhoneIcon, VideoIcon, PlusIcon, SmileIcon, MicIcon, PencilIcon, ReplyIcon, ForwardIcon, CopyIcon, DownloadIcon, EyeOffIcon, TrashIcon, PinIcon, FlagIcon } from '@/components/icons';
 import type { ChatSummary, MessageRow } from '@/lib/db/types';
 
 type Payload = {
@@ -1042,7 +1042,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
             ? [{
                 key: 'edit',
                 label: t('chat.actionEdit'),
-                icon: '✏️',
+                icon: <PencilIcon size={18} />,
                 onClick: () => {
                   if (!actionsMsg) return;
                   setEditingId(actionsMsg.id);
@@ -1052,7 +1052,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
                 },
               }]
             : []),
-          { key: 'reply', label: t('chat.actionReply'), icon: '↩️', onClick: () => {
+          { key: 'reply', label: t('chat.actionReply'), icon: <ReplyIcon size={18} />, onClick: () => {
             const found = items.find(m => m.id === actionsMsg?.id);
             if (found) setReplyingTo(found as any);
             setActionsOpen(false);
@@ -1060,7 +1060,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
           {
             key: 'forward',
             label: t('chat.actionForward'),
-            icon: '↪️',
+            icon: <ForwardIcon size={18} />,
             onClick: () => {
               if (!actionsMsg) return;
               setForwardBody(toForwardPayload(actionsMsg.body));
@@ -1070,18 +1070,18 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
           {
             key: 'copy',
             label: t('chat.actionCopy'),
-            icon: '📄',
+            icon: <CopyIcon size={18} />,
             onClick: async () => {
               if (!actionsMsg) return;
               await doCopy(actionsMsg.body);
               toast(t('chat.copied'));
             },
           },
-          { key: 'save', label: t('chat.actionSave'), icon: '💾', onClick: () => toast(t('chat.savePending')) },
+          { key: 'save', label: t('chat.actionSave'), icon: <DownloadIcon size={18} />, onClick: () => toast(t('chat.savePending')) },
           {
             key: 'delete-me',
             label: t('chat.actionDeleteForMe'),
-            icon: '🙈',
+            icon: <EyeOffIcon size={18} />,
             tone: 'danger',
             onClick: async () => {
               if (!actionsMsg) return;
@@ -1100,7 +1100,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
             ? [{
                 key: 'delete-all',
                 label: t('chat.actionDeleteForEveryone'),
-                icon: '🗑️',
+                icon: <TrashIcon size={18} />,
                 tone: 'danger' as const,
                 onClick: async () => {
                   if (!actionsMsg) return;
@@ -1121,7 +1121,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
           {
             key: 'pin',
             label: chat?.pinned_message_id === actionsMsg?.id ? t('chat.actionUnpin') : t('chat.actionPin'),
-            icon: '📌',
+            icon: <PinIcon size={18} />,
             onClick: async () => {
               if (!actionsMsg) return;
               try {
@@ -1140,7 +1140,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
           {
             key: 'report',
             label: t('chat.actionReport'),
-            icon: '🚩',
+            icon: <FlagIcon size={18} />,
             onClick: () => {
               if (!actionsMsg) return;
               setReportMessageId(actionsMsg.id);
@@ -1466,7 +1466,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
               onClick={() => scrollToMessage(chat.pinned_message_id!)}
               className="flex items-center gap-2 truncate rounded-lg border border-amber-900/40 bg-amber-950/20 px-3 py-2 text-left text-xs text-amber-200 hover:bg-amber-950/30"
             >
-              <span>📌</span>
+              <PinIcon size={14} />
               <span className="truncate">
                 {items.find((m) => m.id === chat.pinned_message_id)?.body.text || t('chat.pinnedFallback')}
               </span>
@@ -1689,11 +1689,11 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
                     <button
                       type="button"
                       onClick={() => setEditorIndex(i)}
-                      className="absolute bottom-1 right-1 rounded-full bg-black/60 px-2 py-1 text-xs text-white hover:bg-black/80"
+                      className="absolute bottom-1 right-1 grid place-items-center rounded-full bg-black/60 p-1.5 text-white hover:bg-black/80"
                       title={t('chat.editPhoto')}
                       aria-label={t('chat.editPhoto')}
                     >
-                      ✏️
+                      <PencilIcon size={14} />
                     </button>
                   </div>
                 ))}

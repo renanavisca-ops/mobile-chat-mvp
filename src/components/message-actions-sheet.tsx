@@ -1,12 +1,12 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useT } from '@/lib/i18n/context';
 
 type Action = {
   key: string;
   label: string;
-  icon: string; // emoji/icon simple
+  icon: ReactNode; // emoji or SVG icon
   tone?: 'normal' | 'danger';
   onClick: () => void;
 };

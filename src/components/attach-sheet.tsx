@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { useT } from '@/lib/i18n/context';
+import { ImageIcon, FilmIcon, CameraIcon, VideoIcon, GifIcon, BarChartIcon, PaperclipIcon } from '@/components/icons';
 
 export function AttachSheet(props: {
   open: boolean;
@@ -28,7 +29,7 @@ export function AttachSheet(props: {
 
   if (!open) return null;
 
-  const Btn = (p: { icon: string; label: string; onClick: () => void }) => (
+  const Btn = (p: { icon: ReactNode; label: string; onClick: () => void }) => (
     <button
       type="button"
       className="flex w-full items-center justify-between rounded-xl border border-slate-900 bg-slate-950/60 px-4 py-3 text-sm text-slate-100 hover:bg-slate-900"
@@ -38,7 +39,7 @@ export function AttachSheet(props: {
       }}
     >
       <span className="flex items-center gap-3">
-        <span className="text-base">{p.icon}</span>
+        <span className="text-slate-300">{p.icon}</span>
         <span>{p.label}</span>
       </span>
       <span className="text-slate-400">→</span>
@@ -63,8 +64,8 @@ export function AttachSheet(props: {
         </div>
 
         <div className="space-y-2 p-3">
-          <Btn icon="🖼️" label={t('attach.photoLibrary')} onClick={onPickPhotos} />
-          <Btn icon="🎥" label={t('attach.videoLibrary')} onClick={onPickVideo} />
+          <Btn icon={<ImageIcon size={18} />} label={t('attach.photoLibrary')} onClick={onPickPhotos} />
+          <Btn icon={<FilmIcon size={18} />} label={t('attach.videoLibrary')} onClick={onPickVideo} />
 
           <div className="rounded-xl border border-slate-900 bg-slate-950/40 p-2">
             <div className="mb-2 text-xs text-slate-400">{t('attach.camera')}</div>
@@ -77,7 +78,7 @@ export function AttachSheet(props: {
                   onClose();
                 }}
               >
-                📸 {t('attach.photo')}
+                <CameraIcon size={18} /> {t('attach.photo')}
               </button>
               <button
                 type="button"
@@ -87,7 +88,7 @@ export function AttachSheet(props: {
                   onClose();
                 }}
               >
-                🎬 {t('attach.video')}
+                <VideoIcon size={18} /> {t('attach.video')}
               </button>
             </div>
             <div className="mt-2 text-[11px] text-slate-500">
@@ -95,9 +96,9 @@ export function AttachSheet(props: {
             </div>
           </div>
 
-          <Btn icon="🎬" label={t('attach.gif')} onClick={onGif} />
-          <Btn icon="📊" label={t('attach.poll')} onClick={onPoll} />
-          <Btn icon="📎" label={t('attach.file')} onClick={onPickFile} />
+          <Btn icon={<GifIcon size={18} />} label={t('attach.gif')} onClick={onGif} />
+          <Btn icon={<BarChartIcon size={18} />} label={t('attach.poll')} onClick={onPoll} />
+          <Btn icon={<PaperclipIcon size={18} />} label={t('attach.file')} onClick={onPickFile} />
         </div>
 
         <button
