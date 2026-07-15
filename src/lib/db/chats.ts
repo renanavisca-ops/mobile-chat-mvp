@@ -20,7 +20,7 @@ export async function listChats(): Promise<ChatSummary[]> {
 
   const { data: chats, error } = await supabase
     .from('chats')
-    .select('id, kind, title, created_at, store_id, assigned_to, status, pinned_message_id, avatar_url, description, disappearing_seconds')
+    .select('id, kind, title, created_at, store_id, assigned_to, status, pinned_message_id, avatar_url, description, disappearing_seconds, created_by, is_public')
     .order('created_at', { ascending: false });
 
   if (error) throw error;
@@ -41,11 +41,15 @@ export async function listChats(): Promise<ChatSummary[]> {
       .limit(300),
   ]);
 
-  // Map chat -> other user ids
+  // Map chat -> other user ids, and track which chats *I* belong to.
   const otherIdsByChat = new Map<string, string[]>();
   const allOtherIds = new Set<string>();
+  const myMemberChatIds = new Set<string>();
   for (const row of membersRes.data ?? []) {
-    if (row.user_id === user.id) continue;
+    if (row.user_id === user.id) {
+      myMemberChatIds.add(row.chat_id);
+      continue;
+    }
     const arr = otherIdsByChat.get(row.chat_id) ?? [];
     arr.push(row.user_id);
     otherIdsByChat.set(row.chat_id, arr);
@@ -103,7 +107,11 @@ export async function listChats(): Promise<ChatSummary[]> {
     latestByChat.set(m.chat_id, { created_at: m.created_at, content: content || null, kind });
   }
 
-  return chatList.map((c) => {
+  // Public channels are globally visible via RLS (for discovery); the main
+  // list must only show chats I actually belong to (plus store chats I staff).
+  const myChats = chatList.filter((c) => myMemberChatIds.has(c.id) || !!c.store_id);
+
+  return myChats.map((c) => {
     let title = c.title;
     if (c.kind === 'direct') {
       const others = (otherIdsByChat.get(c.id) ?? [])
@@ -114,8 +122,10 @@ export async function listChats(): Promise<ChatSummary[]> {
     const otherIds = otherIdsByChat.get(c.id) ?? [];
     return {
       id: c.id,
-      kind: c.kind as 'direct' | 'group',
+      kind: c.kind as ChatSummary['kind'],
       title,
+      is_public: c.is_public,
+      created_by: c.created_by,
       created_at: c.created_at,
       store_id: c.store_id,
       assigned_to: c.assigned_to,
@@ -163,6 +173,77 @@ export async function createGroupChat(title: string, memberIds: string[]): Promi
   if (error) throw error;
 
   return data as string;
+}
+
+/* ------------------------------ Channels ----------------------------- */
+
+/** Create a public broadcast channel; returns its chat id. */
+export async function createChannel(title: string, description?: string): Promise<string> {
+  const supabase = browserSupabase();
+  const { data, error } = await supabase.rpc('create_channel', {
+    p_title: title,
+    p_description: description ?? undefined,
+  });
+  if (error) throw error;
+  return data as string;
+}
+
+export type ChannelSummary = {
+  id: string;
+  title: string | null;
+  description: string | null;
+  avatar_url: string | null;
+  created_by: string | null;
+  joined: boolean;
+};
+
+/** List public channels for discovery, flagging which ones you've joined. */
+export async function listPublicChannels(search?: string): Promise<ChannelSummary[]> {
+  const supabase = browserSupabase();
+  const { data: me } = await supabase.auth.getUser();
+
+  let query = supabase
+    .from('chats')
+    .select('id, title, description, avatar_url, created_by')
+    .eq('kind', 'channel')
+    .eq('is_public', true)
+    .order('created_at', { ascending: false })
+    .limit(100);
+
+  const q = (search ?? '').trim();
+  if (q) query = query.ilike('title', `%${q}%`);
+
+  const { data, error } = await query;
+  if (error) throw error;
+
+  const channels = data ?? [];
+  let joinedIds = new Set<string>();
+  if (me.user && channels.length > 0) {
+    const { data: mems } = await supabase
+      .from('chat_members')
+      .select('chat_id')
+      .eq('user_id', me.user.id)
+      .in('chat_id', channels.map((c) => c.id));
+    joinedIds = new Set((mems ?? []).map((m) => m.chat_id));
+  }
+
+  return channels.map((c) => ({
+    id: c.id,
+    title: c.title,
+    description: c.description,
+    avatar_url: c.avatar_url,
+    created_by: c.created_by,
+    joined: joinedIds.has(c.id),
+  }));
+}
+
+/** Join a public channel (self-insert membership). */
+export async function joinChannel(chatId: string): Promise<void> {
+  const supabase = browserSupabase();
+  const { data: me } = await supabase.auth.getUser();
+  if (!me.user) throw new Error('Not authenticated');
+  const { error } = await supabase.from('chat_members').insert({ chat_id: chatId, user_id: me.user.id });
+  if (error && !String(error.message).includes('duplicate')) throw error;
 }
 
 export async function listMessages(

@@ -70,6 +70,7 @@ export type Database = {
           description: string | null
           disappearing_seconds: number | null
           id: string
+          is_public: boolean
           kind: string
           pinned_message_id: string | null
           status: string | null
@@ -84,6 +85,7 @@ export type Database = {
           description?: string | null
           disappearing_seconds?: number | null
           id?: string
+          is_public?: boolean
           kind: string
           pinned_message_id?: string | null
           status?: string | null
@@ -98,6 +100,7 @@ export type Database = {
           description?: string | null
           disappearing_seconds?: number | null
           id?: string
+          is_public?: boolean
           kind?: string
           pinned_message_id?: string | null
           status?: string | null
@@ -639,6 +642,10 @@ export type Database = {
     }
     Functions: {
       create_direct_chat: { Args: { other_user: string }; Returns: string }
+      create_channel: {
+        Args: { p_title: string; p_description?: string }
+        Returns: string
+      }
       create_group_chat: {
         Args: { member_ids: string[]; title: string }
         Returns: string

@@ -43,6 +43,7 @@ export function PageShell({
           <nav className="flex flex-wrap items-center gap-2">
             <NavLink href="/chats" label={t('nav.chats')} />
             <NavLink href="/contacts" label={t('nav.contacts')} />
+            <NavLink href="/channels" label={t('nav.channels')} />
             <NavLink href="/groups/new" label={t('nav.newGroup')} />
             <NavLink href="/settings" label={t('nav.settings')} />
           </nav>

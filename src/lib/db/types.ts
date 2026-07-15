@@ -1,7 +1,8 @@
 export type ChatSummary = {
   id: string;
-  kind: 'direct' | 'group';
+  kind: 'direct' | 'group' | 'channel';
   title: string | null;
+  is_public?: boolean;
   created_at: string;
   last_message_at: string | null;
   last_ciphertext: string | null;

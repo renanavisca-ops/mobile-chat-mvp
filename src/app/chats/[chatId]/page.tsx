@@ -515,8 +515,12 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
   );
   const someoneOnline = otherMemberIds.some((id) => onlineUsers.has(id));
   const isGroup = chat?.kind === 'group';
-  const otherUserId = !isGroup ? otherMemberIds[0] ?? null : null;
+  const isChannel = chat?.kind === 'channel';
+  const isDirect = chat?.kind === 'direct';
+  const otherUserId = isDirect ? otherMemberIds[0] ?? null : null;
   const isGroupCreator = isGroup && chat?.created_by === myId;
+  // In a channel only the owner may post; everyone else is read-only.
+  const canPost = !isChannel || chat?.created_by === myId;
 
   useEffect(() => {
     if (!otherUserId) return;
@@ -1855,6 +1859,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
             </p>
           )}
 
+          {canPost ? (
           <div ref={composerRef} className="relative flex items-center gap-2">
             {/* + button */}
             <button
@@ -1923,6 +1928,11 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
               <MicIcon size={18} />
             </button>
           </div>
+          ) : (
+            <p className="rounded-lg border border-slate-900 bg-slate-950/60 px-3 py-3 text-center text-xs text-slate-400">
+              {t('channels.readOnlyNotice')}
+            </p>
+          )}
         </div>
       )}
     </PageShell>
