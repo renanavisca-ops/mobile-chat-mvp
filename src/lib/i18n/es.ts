@@ -329,6 +329,16 @@ const es: Dictionary = {
     previous: 'Anterior',
     nextStory: 'Siguiente',
   },
+  videoTrim: {
+    title: 'Recortar video',
+    trim: 'Recortar',
+    start: 'Inicio',
+    end: 'Fin',
+    selected: 'Seleccionado',
+    apply: 'Aplicar',
+    note: 'Esto recorta lo que ven los demás; no reduce el tamaño del archivo subido.',
+    trimmedTo: 'Recortado a {{seconds}}s',
+  },
   imageEditor: {
     title: 'Editar foto',
     rotate: 'Girar',

@@ -327,6 +327,16 @@ const en = {
     previous: 'Previous',
     nextStory: 'Next',
   },
+  videoTrim: {
+    title: 'Trim video',
+    trim: 'Trim',
+    start: 'Start',
+    end: 'End',
+    selected: 'Selected',
+    apply: 'Apply',
+    note: "This trims what viewers see — it doesn't shrink the uploaded file.",
+    trimmedTo: 'Trimmed to {{seconds}}s',
+  },
   imageEditor: {
     title: 'Edit photo',
     rotate: 'Rotate',

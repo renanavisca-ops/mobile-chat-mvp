@@ -274,6 +274,8 @@ export type MessagePayload = {
   imagePath?: string;
   imagePaths?: string[];
   videoPath?: string;
+  videoTrimStart?: number;
+  videoTrimEnd?: number;
   audioPath?: string;
   gifUrl?: string;
   filePath?: string;

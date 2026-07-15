@@ -395,6 +395,53 @@ export type Database = {
           },
         ]
       }
+      payments: {
+        Row: {
+          amount_cents: number
+          chat_id: string | null
+          created_at: string
+          currency: string
+          id: string
+          provider: string | null
+          provider_ref: string | null
+          recipient_id: string | null
+          sender_id: string
+          status: string
+        }
+        Insert: {
+          amount_cents: number
+          chat_id?: string | null
+          created_at?: string
+          currency?: string
+          id?: string
+          provider?: string | null
+          provider_ref?: string | null
+          recipient_id?: string | null
+          sender_id: string
+          status?: string
+        }
+        Update: {
+          amount_cents?: number
+          chat_id?: string | null
+          created_at?: string
+          currency?: string
+          id?: string
+          provider?: string | null
+          provider_ref?: string | null
+          recipient_id?: string | null
+          sender_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payments_chat_id_fkey"
+            columns: ["chat_id"]
+            isOneToOne: false
+            referencedRelation: "chats"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       poll_votes: {
         Row: {
           chat_id: string

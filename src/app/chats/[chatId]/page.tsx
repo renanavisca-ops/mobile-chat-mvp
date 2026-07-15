@@ -25,6 +25,7 @@ import { MessageEffects, detectEffect } from '@/components/message-effects';
 import { GifPicker } from '@/components/gif-picker';
 import type { Gif } from '@/lib/giphy';
 import { useCall } from '@/lib/call/call-provider';
+import { VideoTrimmer, TrimmedVideo } from '@/components/video-trimmer';
 import { PhoneIcon, VideoIcon, PlusIcon, SmileIcon, MicIcon, PencilIcon, ReplyIcon, ForwardIcon, CopyIcon, DownloadIcon, EyeOffIcon, TrashIcon, PinIcon, FlagIcon, PaperclipIcon } from '@/components/icons';
 import type { ChatSummary, MessageRow } from '@/lib/db/types';
 
@@ -34,6 +35,8 @@ type Payload = {
   imagePath?: string;
   imagePaths?: string[];
   videoPath?: string;
+  videoTrimStart?: number;
+  videoTrimEnd?: number;
   audioPath?: string;
   gifUrl?: string;
   filePath?: string;
@@ -181,6 +184,8 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
   const [text, setText] = useState('');
   const [pendingImages, setPendingImages] = useState<File[]>([]);
   const [pendingVideo, setPendingVideo] = useState<File | null>(null);
+  const [pendingVideoTrim, setPendingVideoTrim] = useState<{ start: number; end: number } | null>(null);
+  const [trimmerOpen, setTrimmerOpen] = useState(false);
   const [cameraOpen, setCameraOpen] = useState(false);
   const [wallpaperStyle, setWallpaperStyle] = useState<React.CSSProperties | undefined>(undefined);
 
@@ -811,6 +816,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
     if (previewVideo) URL.revokeObjectURL(previewVideo);
     setPreviewVideo('');
     setPendingVideo(null);
+    setPendingVideoTrim(null);
     if (videoInputRef.current) videoInputRef.current.value = '';
     if (cameraVideoRef.current) cameraVideoRef.current.value = '';
   }
@@ -1015,6 +1021,10 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
         } catch {}
 
         const payload: Payload = t2 ? { text: t2, videoPath: path } : { videoPath: path };
+        if (pendingVideoTrim) {
+          payload.videoTrimStart = Math.round(pendingVideoTrim.start * 10) / 10;
+          payload.videoTrimEnd = Math.round(pendingVideoTrim.end * 10) / 10;
+        }
         if (replyingTo) payload.reply_to = replyingTo.id;
 
         const temp: MessageRow = {
@@ -1262,6 +1272,16 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
       />
 
       <GifPicker open={gifPickerOpen} onClose={() => setGifPickerOpen(false)} onPick={onPickGif} />
+
+      <VideoTrimmer
+        open={trimmerOpen}
+        fileUrl={previewVideo || null}
+        onClose={() => setTrimmerOpen(false)}
+        onApply={(start, end) => {
+          setPendingVideoTrim({ start, end });
+          setTrimmerOpen(false);
+        }}
+      />
 
       <PollComposer
         open={pollComposerOpen}
@@ -1713,9 +1733,10 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
                         <div className="mt-2">
                           {signedUrls[videoPath] ? (
                             <>
-                              <video
+                              <TrimmedVideo
                                 src={signedUrls[videoPath]}
-                                controls
+                                start={m.body.videoTrimStart}
+                                end={m.body.videoTrimEnd}
                                 className="max-h-96 w-full rounded-lg border border-slate-900"
                                 onError={() => setVideoPlayError((prev) => ({ ...prev, [videoPath]: true }))}
                                 onCanPlay={() => setVideoPlayError((prev) => ({ ...prev, [videoPath]: false }))}
@@ -1852,9 +1873,19 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
           {/* Preview video */}
           {previewVideo ? (
             <div className="rounded border border-slate-900 bg-slate-950/40 p-2">
-              <div className="mb-2 text-xs text-slate-400">{t('chat.previewVideo')}</div>
+              <div className="mb-2 flex items-center justify-between text-xs text-slate-400">
+                <span>{t('chat.previewVideo')}</span>
+                {pendingVideoTrim && (
+                  <span className="text-blue-400">
+                    {t('videoTrim.trimmedTo', { seconds: String(Math.round(pendingVideoTrim.end - pendingVideoTrim.start)) })}
+                  </span>
+                )}
+              </div>
               <video src={previewVideo} controls className="max-h-72 w-full rounded border border-slate-900" />
-              <div className="mt-2 flex justify-end">
+              <div className="mt-2 flex justify-end gap-2">
+                <button className="rounded bg-slate-800 px-3 py-1.5 text-xs hover:bg-slate-700" onClick={() => setTrimmerOpen(true)} disabled={busy}>
+                  ✂️ {t('videoTrim.trim')}
+                </button>
                 <button className="rounded bg-slate-800 px-3 py-1.5 text-xs hover:bg-slate-700" onClick={clearPendingVideo} disabled={busy}>
                   {t('common.remove')}
                 </button>
