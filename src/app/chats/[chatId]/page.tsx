@@ -25,6 +25,7 @@ import { MessageEffects, detectEffect } from '@/components/message-effects';
 import { GifPicker } from '@/components/gif-picker';
 import type { Gif } from '@/lib/giphy';
 import { useCall } from '@/lib/call/call-provider';
+import { PhoneIcon, VideoIcon, PlusIcon, SmileIcon, MicIcon } from '@/components/icons';
 import type { ChatSummary, MessageRow } from '@/lib/db/types';
 
 type Payload = {
@@ -1276,11 +1277,11 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
                       })
                     }
                     disabled={callBusy}
-                    className="rounded px-1.5 py-0.5 text-slate-400 hover:bg-slate-900 hover:text-slate-200 disabled:opacity-40"
+                    className="rounded px-1.5 py-1 text-slate-400 hover:bg-slate-900 hover:text-slate-200 disabled:opacity-40"
                     aria-label={t('call.startAudio')}
                     title={t('call.startAudio')}
                   >
-                    📞
+                    <PhoneIcon size={16} />
                   </button>
                   <button
                     type="button"
@@ -1292,11 +1293,11 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
                       })
                     }
                     disabled={callBusy}
-                    className="rounded px-1.5 py-0.5 text-slate-400 hover:bg-slate-900 hover:text-slate-200 disabled:opacity-40"
+                    className="rounded px-1.5 py-1 text-slate-400 hover:bg-slate-900 hover:text-slate-200 disabled:opacity-40"
                     aria-label={t('call.startVideo')}
                     title={t('call.startVideo')}
                   >
-                    📹
+                    <VideoIcon size={16} />
                   </button>
                 </>
               )}
@@ -1762,7 +1763,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
           <div ref={composerRef} className="relative flex items-center gap-2">
             {/* + button */}
             <button
-              className="rounded bg-slate-800 px-3 py-2 text-sm hover:bg-slate-700"
+              className="grid place-items-center rounded bg-slate-800 px-3 py-2 text-slate-200 hover:bg-slate-700"
               onClick={() => {
                 setEmojiOpen(false);
                 setAttachOpen(true);
@@ -1772,13 +1773,13 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
               aria-label={t('chat.attach')}
               disabled={busy}
             >
-              +
+              <PlusIcon size={18} />
             </button>
 
             {/* Emoji button */}
             <div className="relative">
               <button
-                className="rounded bg-slate-800 px-3 py-2 text-sm hover:bg-slate-700"
+                className="grid place-items-center rounded bg-slate-800 px-3 py-2 text-slate-200 hover:bg-slate-700"
                 onClick={() => {
                   setAttachOpen(false);
                   setEmojiOpen((v) => !v);
@@ -1788,7 +1789,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
                 aria-label={t('chat.emoji')}
                 disabled={busy}
               >
-                😀
+                <SmileIcon size={18} />
               </button>
 
               <EmojiPicker
@@ -1818,13 +1819,13 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
               {editingId ? t('chat.saveEdit') : t('chat.send')}
             </button>
             <button
-              className={`rounded px-3 py-2 text-sm disabled:opacity-60 ${isRecording ? 'bg-red-600 animate-pulse text-white' : 'bg-slate-800 hover:bg-slate-700'}`}
+              className={`grid place-items-center rounded px-3 py-2 disabled:opacity-60 ${isRecording ? 'bg-red-600 animate-pulse text-white' : 'bg-slate-800 text-slate-200 hover:bg-slate-700'}`}
               onClick={isRecording ? stopRecording : startRecording}
               disabled={busy}
               title={isRecording ? t('chat.stopAndSend') : t('chat.recordAudio')}
               aria-label={isRecording ? t('chat.stopAndSend') : t('chat.recordAudio')}
             >
-              🎤
+              <MicIcon size={18} />
             </button>
           </div>
         </div>

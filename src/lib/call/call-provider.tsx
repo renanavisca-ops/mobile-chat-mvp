@@ -12,6 +12,7 @@ import {
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { browserSupabase } from '@/lib/supabase/client';
 import { useT } from '@/lib/i18n/context';
+import { PhoneIcon, PhoneOffIcon, VideoIcon, VideoOffIcon, MicIcon, MicOffIcon } from '@/components/icons';
 
 type Phase = 'idle' | 'calling' | 'ringing' | 'connecting' | 'connected';
 
@@ -339,8 +340,8 @@ export function CallProvider({ children }: { children: ReactNode }) {
       {phase === 'ringing' && incoming && (
         <div className="fixed inset-0 z-[95] flex items-center justify-center bg-black/80 p-4">
           <div className="w-full max-w-xs rounded-2xl border border-slate-800 bg-slate-950 p-6 text-center shadow-xl">
-            <div className="mx-auto grid h-20 w-20 place-items-center rounded-full bg-slate-800 text-3xl">
-              {incoming.video ? '📹' : '📞'}
+            <div className="mx-auto grid h-20 w-20 place-items-center rounded-full bg-slate-800 text-slate-200">
+              {incoming.video ? <VideoIcon size={32} /> : <PhoneIcon size={32} />}
             </div>
             <div className="mt-3 text-lg font-semibold text-slate-100">{incoming.fromName}</div>
             <div className="text-sm text-slate-400">
@@ -351,17 +352,17 @@ export function CallProvider({ children }: { children: ReactNode }) {
                 type="button"
                 onClick={declineCall}
                 aria-label={t('call.decline')}
-                className="grid h-14 w-14 place-items-center rounded-full bg-rose-600 text-2xl text-white hover:bg-rose-500"
+                className="grid h-14 w-14 place-items-center rounded-full bg-rose-600 text-white hover:bg-rose-500"
               >
-                📵
+                <PhoneOffIcon size={24} />
               </button>
               <button
                 type="button"
                 onClick={acceptCall}
                 aria-label={t('call.accept')}
-                className="grid h-14 w-14 place-items-center rounded-full bg-emerald-600 text-2xl text-white hover:bg-emerald-500"
+                className="grid h-14 w-14 place-items-center rounded-full bg-emerald-600 text-white hover:bg-emerald-500"
               >
-                ✅
+                {incoming.video ? <VideoIcon size={24} /> : <PhoneIcon size={24} />}
               </button>
             </div>
           </div>
@@ -421,31 +422,31 @@ export function CallProvider({ children }: { children: ReactNode }) {
               type="button"
               onClick={toggleMute}
               aria-label={muted ? t('call.unmute') : t('call.mute')}
-              className={`grid h-12 w-12 place-items-center rounded-full text-xl ${
+              className={`grid h-12 w-12 place-items-center rounded-full ${
                 muted ? 'bg-white text-slate-900' : 'bg-slate-800 text-white hover:bg-slate-700'
               }`}
             >
-              {muted ? '🔇' : '🎙️'}
+              {muted ? <MicOffIcon size={22} /> : <MicIcon size={22} />}
             </button>
             {isVideo && (
               <button
                 type="button"
                 onClick={toggleCamera}
                 aria-label={t('call.toggleCamera')}
-                className={`grid h-12 w-12 place-items-center rounded-full text-xl ${
+                className={`grid h-12 w-12 place-items-center rounded-full ${
                   cameraOff ? 'bg-white text-slate-900' : 'bg-slate-800 text-white hover:bg-slate-700'
                 }`}
               >
-                {cameraOff ? '📷' : '📹'}
+                {cameraOff ? <VideoOffIcon size={22} /> : <VideoIcon size={22} />}
               </button>
             )}
             <button
               type="button"
               onClick={() => endCall(true)}
               aria-label={t('call.hangUp')}
-              className="grid h-12 w-12 place-items-center rounded-full bg-rose-600 text-xl text-white hover:bg-rose-500"
+              className="grid h-12 w-12 place-items-center rounded-full bg-rose-600 text-white hover:bg-rose-500"
             >
-              📵
+              <PhoneOffIcon size={22} />
             </button>
           </div>
         </div>
