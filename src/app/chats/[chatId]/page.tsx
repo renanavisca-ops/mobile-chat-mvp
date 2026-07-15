@@ -500,9 +500,14 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
       const context = recent
         .map((m) => `${isMine(m) ? 'Me' : senderName(m) || 'Them'}: ${m.body.text || '[media]'}`)
         .join('\n');
-      const { configured, replies } = await suggestReplies(context);
+      const { configured, error, replies } = await suggestReplies(context);
       if (!configured) {
         toast(t('ai.notConfigured'));
+        setSuggestions([]);
+        return;
+      }
+      if (error) {
+        toast(error);
         setSuggestions([]);
         return;
       }
@@ -520,9 +525,13 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
     setTranslatingId(messageId);
     try {
       const target = lang === 'es' ? 'Spanish' : 'English';
-      const { configured, text: out } = await translateText(text, target);
+      const { configured, error, text: out } = await translateText(text, target);
       if (!configured) {
         toast(t('ai.notConfigured'));
+        return;
+      }
+      if (error) {
+        toast(error);
         return;
       }
       if (out) setTranslations((prev) => ({ ...prev, [messageId]: out }));

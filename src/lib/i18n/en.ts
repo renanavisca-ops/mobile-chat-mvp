@@ -274,7 +274,7 @@ const en = {
     photo: 'Photo',
     video: 'Video',
     desktopNote: '* On desktop this may open the regular file picker; on mobile it opens the camera.',
-    file: 'File (pending)',
+    file: 'File',
     poll: 'Poll',
     gif: 'GIF',
     cancel: 'Cancel',

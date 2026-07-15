@@ -8,7 +8,9 @@ import { browserSupabase } from '@/lib/supabase/client';
  * the server, so callers can hide AI affordances instead of erroring.
  */
 
-async function callAI(body: Record<string, unknown>): Promise<{ ok: boolean; configured: boolean; data: any }> {
+type AIResult = { configured: boolean; error: string | null; data: any };
+
+async function callAI(body: Record<string, unknown>): Promise<AIResult> {
   const supabase = browserSupabase();
   const { data: sess } = await supabase.auth.getSession();
   const res = await fetch('/api/ai', {
@@ -16,20 +18,26 @@ async function callAI(body: Record<string, unknown>): Promise<{ ok: boolean; con
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${sess.session?.access_token}` },
     body: JSON.stringify(body),
   });
-  if (res.status === 501) return { ok: false, configured: false, data: null };
-  if (!res.ok) return { ok: false, configured: true, data: null };
-  return { ok: true, configured: true, data: await res.json() };
+  if (res.status === 501) return { configured: false, error: null, data: null };
+  const json = await res.json().catch(() => null);
+  if (!res.ok) {
+    const detail = json?.detail || json?.error || `Error ${res.status}`;
+    return { configured: true, error: String(detail), data: null };
+  }
+  return { configured: true, error: null, data: json };
 }
 
-export async function suggestReplies(context: string): Promise<{ configured: boolean; replies: string[] }> {
+export async function suggestReplies(
+  context: string
+): Promise<{ configured: boolean; error: string | null; replies: string[] }> {
   const r = await callAI({ type: 'replies', context });
-  return { configured: r.configured, replies: r.data?.replies ?? [] };
+  return { configured: r.configured, error: r.error, replies: r.data?.replies ?? [] };
 }
 
 export async function translateText(
   text: string,
   targetLang: string
-): Promise<{ configured: boolean; text: string | null }> {
+): Promise<{ configured: boolean; error: string | null; text: string | null }> {
   const r = await callAI({ type: 'translate', text, targetLang });
-  return { configured: r.configured, text: r.data?.text ?? null };
+  return { configured: r.configured, error: r.error, text: r.data?.text ?? null };
 }

@@ -31,10 +31,41 @@ async function callClaude(system: string, userText: string, maxTokens: number): 
   });
   if (!res.ok) {
     const detail = await res.text().catch(() => '');
-    throw new Error(`Claude API ${res.status}: ${detail.slice(0, 200)}`);
+    let msg = `Claude API ${res.status}`;
+    try {
+      const j = JSON.parse(detail);
+      if (j?.error?.message) msg += `: ${j.error.message}`;
+    } catch {
+      if (detail) msg += `: ${detail.slice(0, 160)}`;
+    }
+    throw new Error(msg);
   }
   const data = await res.json();
   return (data?.content?.[0]?.text ?? '').trim();
+}
+
+/** Extract a JSON string array from a model response, tolerating markdown/prose. */
+function parseReplyArray(raw: string): string[] {
+  const cleaned = raw.replace(/```json/gi, '').replace(/```/g, '').trim();
+  // Try a strict parse, then a bracket-substring parse.
+  for (const candidate of [cleaned, (cleaned.match(/\[[\s\S]*\]/) || [])[0]]) {
+    if (!candidate) continue;
+    try {
+      const parsed = JSON.parse(candidate);
+      if (Array.isArray(parsed)) {
+        const arr = parsed.map((x) => String(x).trim()).filter(Boolean).slice(0, 3);
+        if (arr.length) return arr;
+      }
+    } catch {
+      // fall through
+    }
+  }
+  // Last resort: split lines / bullets.
+  return cleaned
+    .split('\n')
+    .map((l) => l.replace(/^[-*\d.)\s"']+/, '').replace(/["']+$/, '').trim())
+    .filter(Boolean)
+    .slice(0, 3);
 }
 
 export async function POST(req: Request) {
@@ -66,18 +97,7 @@ export async function POST(req: Request) {
         'Reply in the same language as the conversation. Keep each under ~12 words. ' +
         'Return ONLY a JSON array of exactly 3 strings — no markdown, no extra text.';
       const raw = await callClaude(system, `Conversation (most recent last):\n${context}\n\nSuggest 3 replies I could send.`, 200);
-      let replies: string[] = [];
-      try {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) replies = parsed.map((x) => String(x)).slice(0, 3);
-      } catch {
-        replies = raw
-          .split('\n')
-          .map((l) => l.replace(/^[-*\d.\s"]+/, '').replace(/"$/, '').trim())
-          .filter(Boolean)
-          .slice(0, 3);
-      }
-      return NextResponse.json({ replies });
+      return NextResponse.json({ replies: parseReplyArray(raw) });
     }
 
     if (body.type === 'translate') {
@@ -92,6 +112,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Unknown type' }, { status: 400 });
   } catch (e: any) {
     console.error('AI route error:', e);
-    return NextResponse.json({ error: 'AI request failed' }, { status: 502 });
+    return NextResponse.json({ error: 'AI request failed', detail: String(e?.message ?? e).slice(0, 240) }, { status: 502 });
   }
 }

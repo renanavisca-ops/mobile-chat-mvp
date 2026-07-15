@@ -276,7 +276,7 @@ const es: Dictionary = {
     photo: 'Foto',
     video: 'Video',
     desktopNote: '* En escritorio puede abrir el selector de archivos normal; en móvil usa la cámara.',
-    file: 'Archivo (pendiente)',
+    file: 'Archivo',
     poll: 'Encuesta',
     gif: 'GIF',
     cancel: 'Cancelar',
