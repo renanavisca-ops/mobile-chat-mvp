@@ -26,7 +26,8 @@ import { GifPicker } from '@/components/gif-picker';
 import type { Gif } from '@/lib/giphy';
 import { useCall } from '@/lib/call/call-provider';
 import { VideoTrimmer, TrimmedVideo } from '@/components/video-trimmer';
-import { PhoneIcon, VideoIcon, PlusIcon, SmileIcon, MicIcon, PencilIcon, ReplyIcon, ForwardIcon, CopyIcon, DownloadIcon, EyeOffIcon, TrashIcon, PinIcon, FlagIcon, PaperclipIcon } from '@/components/icons';
+import { suggestReplies, translateText } from '@/lib/ai';
+import { PhoneIcon, VideoIcon, PlusIcon, SmileIcon, MicIcon, PencilIcon, ReplyIcon, ForwardIcon, CopyIcon, DownloadIcon, EyeOffIcon, TrashIcon, PinIcon, FlagIcon, PaperclipIcon, SparklesIcon, GlobeIcon } from '@/components/icons';
 import type { ChatSummary, MessageRow } from '@/lib/db/types';
 
 type Payload = {
@@ -327,6 +328,12 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
   // GIF picker
   const [gifPickerOpen, setGifPickerOpen] = useState(false);
 
+  // AI: smart replies + translation
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [suggestBusy, setSuggestBusy] = useState(false);
+  const [translations, setTranslations] = useState<Record<string, string>>({});
+  const [translatingId, setTranslatingId] = useState<string | null>(null);
+
   // Image editor (crop/rotate/filter/draw before sending)
   const [editorIndex, setEditorIndex] = useState<number | null>(null);
 
@@ -483,6 +490,47 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
       await votePoll(messageId, chatId, optionIndex);
     } catch (e: any) {
       setErr(e?.message ?? String(e));
+    }
+  }
+
+  async function onSuggest() {
+    setSuggestBusy(true);
+    try {
+      const recent = items.slice(-8).filter((m) => !m.body.is_deleted);
+      const context = recent
+        .map((m) => `${isMine(m) ? 'Me' : senderName(m) || 'Them'}: ${m.body.text || '[media]'}`)
+        .join('\n');
+      const { configured, replies } = await suggestReplies(context);
+      if (!configured) {
+        toast(t('ai.notConfigured'));
+        setSuggestions([]);
+        return;
+      }
+      setSuggestions(replies);
+      if (replies.length === 0) toast(t('ai.noSuggestions'));
+    } catch {
+      toast(t('ai.failed'));
+    } finally {
+      setSuggestBusy(false);
+    }
+  }
+
+  async function onTranslate(messageId: string, text: string) {
+    if (!text) return;
+    setTranslatingId(messageId);
+    try {
+      const target = lang === 'es' ? 'Spanish' : 'English';
+      const { configured, text: out } = await translateText(text, target);
+      if (!configured) {
+        toast(t('ai.notConfigured'));
+        return;
+      }
+      if (out) setTranslations((prev) => ({ ...prev, [messageId]: out }));
+      else toast(t('ai.failed'));
+    } catch {
+      toast(t('ai.failed'));
+    } finally {
+      setTranslatingId(null);
     }
   }
 
@@ -1235,6 +1283,17 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
               setReportOpen(true);
             },
           },
+          ...(actionsMsg?.body.text
+            ? [{
+                key: 'translate',
+                label: t('ai.translate'),
+                icon: <GlobeIcon size={18} />,
+                onClick: () => {
+                  if (!actionsMsg?.body.text) return;
+                  onTranslate(actionsMsg.id, actionsMsg.body.text);
+                },
+              }]
+            : []),
         ]}
       />
 
@@ -1679,6 +1738,16 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
                           )}
                           {m.body.text ? <div className="text-sm mt-1">{m.body.text}</div> : null}
 
+                      {translatingId === m.id && !translations[m.id] ? (
+                        <div className="mt-1 text-xs italic text-slate-500">{t('ai.translating')}</div>
+                      ) : null}
+                      {translations[m.id] ? (
+                        <div className="mt-1 border-l-2 border-blue-500 pl-2 text-sm text-slate-300">
+                          <span className="mr-1 text-[10px] uppercase text-slate-500">{t('ai.translated')}</span>
+                          {translations[m.id]}
+                        </div>
+                      ) : null}
+
                       {m.body.gifUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={m.body.gifUrl} alt="GIF" className="mt-2 max-h-72 w-auto rounded-lg border border-slate-900" />
@@ -1934,6 +2003,33 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
             </p>
           )}
 
+          {canPost && suggestions.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {suggestions.map((s, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => {
+                    setText(s);
+                    setSuggestions([]);
+                    textInputRef.current?.focus();
+                  }}
+                  className="rounded-full border border-blue-800 bg-blue-950/40 px-3 py-1.5 text-xs text-blue-200 hover:bg-blue-900/50"
+                >
+                  {s}
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={() => setSuggestions([])}
+                aria-label={t('common.close')}
+                className="rounded-full border border-slate-800 bg-slate-950/60 px-2 py-1.5 text-xs text-slate-400 hover:bg-slate-900"
+              >
+                ✕
+              </button>
+            </div>
+          )}
+
           {canPost ? (
           <div ref={composerRef} className="relative flex items-center gap-2">
             {/* + button */}
@@ -1976,6 +2072,18 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
                 }}
               />
             </div>
+
+            {/* AI smart replies */}
+            <button
+              className="grid place-items-center rounded bg-slate-800 px-3 py-2 text-slate-200 hover:bg-slate-700 disabled:opacity-60"
+              onClick={onSuggest}
+              type="button"
+              title={t('ai.suggest')}
+              aria-label={t('ai.suggest')}
+              disabled={busy || suggestBusy || items.length === 0}
+            >
+              <SparklesIcon size={18} />
+            </button>
 
             <input
               ref={textInputRef}

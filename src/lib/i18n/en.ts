@@ -327,6 +327,16 @@ const en = {
     previous: 'Previous',
     nextStory: 'Next',
   },
+  ai: {
+    suggest: 'Suggest replies',
+    suggesting: 'Thinking…',
+    noSuggestions: 'No suggestions right now.',
+    translate: 'Translate',
+    translating: 'Translating…',
+    translated: 'Translated',
+    notConfigured: 'AI features are not set up yet.',
+    failed: 'AI request failed. Try again.',
+  },
   videoTrim: {
     title: 'Trim video',
     trim: 'Trim',

@@ -329,6 +329,16 @@ const es: Dictionary = {
     previous: 'Anterior',
     nextStory: 'Siguiente',
   },
+  ai: {
+    suggest: 'Sugerir respuestas',
+    suggesting: 'Pensando…',
+    noSuggestions: 'No hay sugerencias por ahora.',
+    translate: 'Traducir',
+    translating: 'Traduciendo…',
+    translated: 'Traducido',
+    notConfigured: 'Las funciones de IA aún no están configuradas.',
+    failed: 'La solicitud de IA falló. Inténtalo de nuevo.',
+  },
   videoTrim: {
     title: 'Recortar video',
     trim: 'Recortar',
