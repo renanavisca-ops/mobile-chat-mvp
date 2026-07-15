@@ -284,8 +284,12 @@ const es: Dictionary = {
   call: {
     startAudio: 'Llamada de voz',
     startVideo: 'Videollamada',
+    startGroupAudio: 'Llamada de voz grupal',
+    startGroupVideo: 'Videollamada grupal',
     incomingAudio: 'Llamada de voz entrante…',
     incomingVideo: 'Videollamada entrante…',
+    incomingGroup: 'Llamada grupal de {{name}}…',
+    you: 'Tú',
     calling: 'Llamando…',
     connecting: 'Conectando…',
     connected: 'Conectado',

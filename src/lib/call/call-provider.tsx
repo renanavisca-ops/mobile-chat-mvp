@@ -14,9 +14,15 @@ import { browserSupabase } from '@/lib/supabase/client';
 import { useT } from '@/lib/i18n/context';
 import { PhoneIcon, PhoneOffIcon, VideoIcon, VideoOffIcon, MicIcon, MicOffIcon } from '@/components/icons';
 
-type Phase = 'idle' | 'calling' | 'ringing' | 'connecting' | 'connected';
+type Phase = 'idle' | 'ringing' | 'incall';
 
-type StartOpts = { peerId: string; peerName: string; video: boolean };
+type StartOpts = {
+  chatId: string;
+  peerIds: string[];
+  label: string;
+  video: boolean;
+  isGroup: boolean;
+};
 
 type CallContext = {
   startCall: (opts: StartOpts) => void;
@@ -25,47 +31,88 @@ type CallContext = {
 
 const Ctx = createContext<CallContext>({ startCall: () => {}, busy: false });
 
-type Invite = { callId: string; from: string; fromName: string; video: boolean; sdp: RTCSessionDescriptionInit };
+type Invite = {
+  callId: string;
+  chatId: string;
+  from: string;
+  fromName: string;
+  video: boolean;
+  isGroup: boolean;
+  label: string;
+};
+
+type Participant = { id: string; name: string; stream: MediaStream | null };
 
 const MEDIA = (video: boolean): MediaStreamConstraints => ({
   audio: true,
   video: video ? { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' } : false,
 });
 
+/** Attaches a MediaStream to a <video> and shows an avatar fallback for audio. */
+function RemoteTile({ p, fill }: { p: Participant; fill?: boolean }) {
+  const ref = useRef<HTMLVideoElement | null>(null);
+  useEffect(() => {
+    if (ref.current && p.stream) ref.current.srcObject = p.stream;
+  }, [p.stream]);
+  const hasVideo = p.stream?.getVideoTracks().some((t) => t.enabled) ?? false;
+  return (
+    <div className={`relative overflow-hidden bg-slate-900 ${fill ? 'h-full w-full' : 'aspect-square rounded-xl'}`}>
+      <video ref={ref} autoPlay playsInline className={`h-full w-full object-cover ${hasVideo ? '' : 'invisible'}`} />
+      {!hasVideo && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
+          <div className="grid h-16 w-16 place-items-center rounded-full bg-slate-800 text-2xl text-slate-300">
+            {(p.name || '?').charAt(0).toUpperCase()}
+          </div>
+        </div>
+      )}
+      <span className="absolute bottom-1 left-2 text-xs text-white/80 drop-shadow">{p.name}</span>
+    </div>
+  );
+}
+
 export function CallProvider({ children }: { children: ReactNode }) {
   const t = useT();
   const supabase = browserSupabase();
 
   const [myId, setMyId] = useState<string | null>(null);
+  const myIdRef = useRef<string>('');
   const myNameRef = useRef<string>('');
 
   const [phase, setPhase] = useState<Phase>('idle');
-  const [peerName, setPeerName] = useState('');
+  const phaseRef = useRef<Phase>('idle');
+  const [label, setLabel] = useState('');
   const [isVideo, setIsVideo] = useState(false);
   const [muted, setMuted] = useState(false);
   const [cameraOff, setCameraOff] = useState(false);
-  const [remoteHasVideo, setRemoteHasVideo] = useState(false);
   const [incoming, setIncoming] = useState<Invite | null>(null);
+  const [participants, setParticipants] = useState<Map<string, Participant>>(new Map());
   const [errText, setErrText] = useState('');
 
-  const pcRef = useRef<RTCPeerConnection | null>(null);
+  const pcsRef = useRef<Map<string, RTCPeerConnection>>(new Map());
+  const remoteSetRef = useRef<Map<string, boolean>>(new Map());
+  const pendingIceRef = useRef<Map<string, RTCIceCandidateInit[]>>(new Map());
   const localStreamRef = useRef<MediaStream | null>(null);
-  const sharedRef = useRef<RealtimeChannel | null>(null);
+  const channelRef = useRef<RealtimeChannel | null>(null);
   const callIdRef = useRef<string | null>(null);
-  const peerIdRef = useRef<string | null>(null);
-  const remoteSetRef = useRef(false);
-  const pendingIceRef = useRef<RTCIceCandidateInit[]>([]);
+  const invitedRef = useRef<string[]>([]);
+  const iceServersRef = useRef<RTCIceServer[]>([{ urls: 'stun:stun.cloudflare.com:3478' }]);
+  const incomingCallIdRef = useRef<string | null>(null);
 
   const localVideoRef = useRef<HTMLVideoElement | null>(null);
-  const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
 
-  // Identify the current user + cache their display name for outgoing invites.
+  function setPhaseBoth(p: Phase) {
+    phaseRef.current = p;
+    setPhase(p);
+  }
+
+  // Identify current user + cache display name.
   useEffect(() => {
     let alive = true;
     supabase.auth.getUser().then(async ({ data }) => {
       if (!alive) return;
       const u = data.user;
       setMyId(u?.id ?? null);
+      myIdRef.current = u?.id ?? '';
       if (u) {
         const { data: prof } = await supabase
           .from('profiles')
@@ -77,6 +124,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
     });
     const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
       setMyId(session?.user?.id ?? null);
+      myIdRef.current = session?.user?.id ?? '';
     });
     return () => {
       alive = false;
@@ -85,35 +133,53 @@ export function CallProvider({ children }: { children: ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const teardownPeer = useCallback((pid: string) => {
+    const pc = pcsRef.current.get(pid);
+    if (pc) {
+      try {
+        pc.close();
+      } catch {}
+    }
+    pcsRef.current.delete(pid);
+    remoteSetRef.current.delete(pid);
+    pendingIceRef.current.delete(pid);
+    setParticipants((prev) => {
+      const next = new Map(prev);
+      next.delete(pid);
+      return next;
+    });
+  }, []);
+
   const cleanup = useCallback(() => {
-    try {
-      pcRef.current?.getSenders().forEach((s) => s.track?.stop());
-      pcRef.current?.close();
-    } catch {}
-    pcRef.current = null;
+    for (const pid of Array.from(pcsRef.current.keys())) {
+      try {
+        pcsRef.current.get(pid)?.close();
+      } catch {}
+    }
+    pcsRef.current.clear();
+    remoteSetRef.current.clear();
+    pendingIceRef.current.clear();
     localStreamRef.current?.getTracks().forEach((tr) => tr.stop());
     localStreamRef.current = null;
-    if (sharedRef.current) {
-      void supabase.removeChannel(sharedRef.current);
-      sharedRef.current = null;
+    if (channelRef.current) {
+      void supabase.removeChannel(channelRef.current);
+      channelRef.current = null;
     }
     callIdRef.current = null;
-    peerIdRef.current = null;
-    remoteSetRef.current = false;
-    pendingIceRef.current = [];
-    setPhase('idle');
+    invitedRef.current = [];
+    setParticipants(new Map());
     setIncoming(null);
     setMuted(false);
     setCameraOff(false);
-    setRemoteHasVideo(false);
+    setErrText('');
+    setPhaseBoth('idle');
   }, [supabase]);
 
-  // Attach streams to <video> elements whenever they mount.
   useEffect(() => {
     if (localVideoRef.current && localStreamRef.current) {
       localVideoRef.current.srcObject = localStreamRef.current;
     }
-  }, [phase, cameraOff]);
+  }, [phase, cameraOff, participants]);
 
   async function getIceServers(): Promise<RTCIceServer[]> {
     try {
@@ -129,12 +195,11 @@ export function CallProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  function sendShared(event: string, payload: Record<string, unknown>) {
-    sharedRef.current?.send({ type: 'broadcast', event, payload });
+  function sendSignal(event: string, payload: Record<string, unknown>) {
+    channelRef.current?.send({ type: 'broadcast', event, payload });
   }
 
-  // Fire-and-forget send to another user's personal channel (used for the
-  // initial invite, before a shared call channel exists).
+  // One-off send to another user's personal channel (invite / cancel / decline).
   function sendToUser(userId: string, event: string, payload: Record<string, unknown>) {
     const ch = supabase.channel(`call-user:${userId}`);
     ch.subscribe((status) => {
@@ -145,143 +210,201 @@ export function CallProvider({ children }: { children: ReactNode }) {
     });
   }
 
-  function addIce(candidate: RTCIceCandidateInit) {
-    const pc = pcRef.current;
-    if (pc && remoteSetRef.current) {
+  function setParticipantName(pid: string, name: string) {
+    setParticipants((prev) => {
+      const next = new Map(prev);
+      const existing = next.get(pid);
+      next.set(pid, { id: pid, name: name || existing?.name || '', stream: existing?.stream ?? null });
+      return next;
+    });
+  }
+
+  function addIce(pid: string, candidate: RTCIceCandidateInit) {
+    const pc = pcsRef.current.get(pid);
+    if (pc && remoteSetRef.current.get(pid)) {
       pc.addIceCandidate(new RTCIceCandidate(candidate)).catch(() => {});
     } else {
-      pendingIceRef.current.push(candidate);
+      const arr = pendingIceRef.current.get(pid) ?? [];
+      arr.push(candidate);
+      pendingIceRef.current.set(pid, arr);
     }
   }
 
-  function flushIce() {
-    const pc = pcRef.current;
+  function flushIce(pid: string) {
+    const pc = pcsRef.current.get(pid);
     if (!pc) return;
-    for (const c of pendingIceRef.current) pc.addIceCandidate(new RTCIceCandidate(c)).catch(() => {});
-    pendingIceRef.current = [];
+    for (const c of pendingIceRef.current.get(pid) ?? []) pc.addIceCandidate(new RTCIceCandidate(c)).catch(() => {});
+    pendingIceRef.current.set(pid, []);
   }
 
-  function buildPc(iceServers: RTCIceServer[]): RTCPeerConnection {
-    const pc = new RTCPeerConnection({ iceServers });
+  function createPeer(pid: string): RTCPeerConnection {
+    const existing = pcsRef.current.get(pid);
+    if (existing) return existing;
+    const pc = new RTCPeerConnection({ iceServers: iceServersRef.current });
+    localStreamRef.current?.getTracks().forEach((tr) => pc.addTrack(tr, localStreamRef.current!));
     pc.onicecandidate = (e) => {
-      if (e.candidate) sendShared('ice', { candidate: e.candidate.toJSON() });
+      if (e.candidate) sendSignal('ice', { from: myIdRef.current, to: pid, candidate: e.candidate.toJSON() });
     };
     pc.ontrack = (e) => {
       const [stream] = e.streams;
-      if (remoteVideoRef.current && stream) remoteVideoRef.current.srcObject = stream;
-      setRemoteHasVideo(stream?.getVideoTracks().some((tr) => tr.enabled) ?? false);
+      setParticipants((prev) => {
+        const next = new Map(prev);
+        const existingP = next.get(pid);
+        next.set(pid, { id: pid, name: existingP?.name ?? '', stream: stream ?? null });
+        return next;
+      });
     };
     pc.oniceconnectionstatechange = () => {
-      const st = pc.iceConnectionState;
-      if (st === 'connected' || st === 'completed') setPhase('connected');
-      else if (st === 'failed' || st === 'disconnected' || st === 'closed') {
-        // give a brief grace period for reconnection before tearing down
-        if (st === 'failed') endCall(false);
-      }
+      if (pc.iceConnectionState === 'failed') teardownPeer(pid);
     };
+    pcsRef.current.set(pid, pc);
     return pc;
   }
 
-  // Join the shared per-call channel that both sides use for answer/ice/hangup.
-  function joinShared(callId: string) {
-    const ch = supabase.channel(`call:${callId}`, { config: { broadcast: { self: false } } });
+  async function initiateOffer(pid: string) {
+    const pc = createPeer(pid);
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    sendSignal('offer', { from: myIdRef.current, to: pid, sdp: offer });
+  }
+
+  function handlePresenceSync() {
+    const ch = channelRef.current;
+    if (!ch) return;
+    const state = ch.presenceState() as Record<string, Array<{ userId?: string; name?: string }>>;
+    const present = new Set<string>();
+    for (const key of Object.keys(state)) {
+      if (key !== myIdRef.current) present.add(key);
+    }
+    // Tear down peers that left.
+    for (const pid of Array.from(pcsRef.current.keys())) {
+      if (!present.has(pid)) teardownPeer(pid);
+    }
+    // Connect to new peers; lower id initiates the offer (avoids glare).
+    for (const pid of present) {
+      const name = state[pid]?.[0]?.name ?? '';
+      setParticipantName(pid, name);
+      if (pcsRef.current.has(pid)) continue;
+      createPeer(pid);
+      if (myIdRef.current < pid) void initiateOffer(pid);
+    }
+  }
+
+  function attachChannelHandlers(ch: RealtimeChannel) {
+    ch.on('presence', { event: 'sync' }, handlePresenceSync);
+    ch.on('presence', { event: 'leave' }, ({ leftPresences }: { leftPresences: Array<{ userId?: string }> }) => {
+      for (const p of leftPresences) if (p.userId) teardownPeer(p.userId);
+    });
+    ch.on('broadcast', { event: 'offer' }, async ({ payload }) => {
+      if (payload.to !== myIdRef.current) return;
+      const from = payload.from as string;
+      const pc = createPeer(from);
+      await pc.setRemoteDescription(new RTCSessionDescription(payload.sdp as RTCSessionDescriptionInit));
+      remoteSetRef.current.set(from, true);
+      flushIce(from);
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+      sendSignal('answer', { from: myIdRef.current, to: from, sdp: answer });
+    });
     ch.on('broadcast', { event: 'answer' }, async ({ payload }) => {
-      const pc = pcRef.current;
+      if (payload.to !== myIdRef.current) return;
+      const from = payload.from as string;
+      const pc = pcsRef.current.get(from);
       if (!pc) return;
       await pc.setRemoteDescription(new RTCSessionDescription(payload.sdp as RTCSessionDescriptionInit));
-      remoteSetRef.current = true;
-      flushIce();
-      setPhase('connecting');
+      remoteSetRef.current.set(from, true);
+      flushIce(from);
     });
-    ch.on('broadcast', { event: 'ice' }, ({ payload }) => addIce(payload.candidate as RTCIceCandidateInit));
-    ch.on('broadcast', { event: 'hangup' }, () => endCall(false));
-    ch.subscribe();
-    sharedRef.current = ch;
+    ch.on('broadcast', { event: 'ice' }, ({ payload }) => {
+      if (payload.to !== myIdRef.current) return;
+      addIce(payload.from as string, payload.candidate as RTCIceCandidateInit);
+    });
+  }
+
+  async function joinCall(callId: string) {
+    const ch = supabase.channel(`call:${callId}`, {
+      config: { presence: { key: myIdRef.current }, broadcast: { self: false } },
+    });
+    attachChannelHandlers(ch);
+    ch.subscribe(async (status) => {
+      if (status === 'SUBSCRIBED') {
+        await ch.track({ userId: myIdRef.current, name: myNameRef.current });
+      }
+    });
+    channelRef.current = ch;
   }
 
   const startCall = useCallback(
     async (opts: StartOpts) => {
-      if (phase !== 'idle' || !myId) return;
+      if (phaseRef.current !== 'idle' || !myIdRef.current || opts.peerIds.length === 0) return;
       setErrText('');
       const callId = crypto.randomUUID();
       callIdRef.current = callId;
-      peerIdRef.current = opts.peerId;
-      setPeerName(opts.peerName);
+      invitedRef.current = opts.peerIds;
+      setLabel(opts.label);
       setIsVideo(opts.video);
-      setPhase('calling');
+      setPhaseBoth('incall');
 
       try {
         const stream = await navigator.mediaDevices.getUserMedia(MEDIA(opts.video));
         localStreamRef.current = stream;
         if (localVideoRef.current) localVideoRef.current.srcObject = stream;
+        iceServersRef.current = await getIceServers();
 
-        const iceServers = await getIceServers();
-        const pc = buildPc(iceServers);
-        pcRef.current = pc;
-        stream.getTracks().forEach((tr) => pc.addTrack(tr, stream));
+        await joinCall(callId);
 
-        joinShared(callId);
-
-        const offer = await pc.createOffer();
-        await pc.setLocalDescription(offer);
-
-        sendToUser(opts.peerId, 'invite', {
-          callId,
-          from: myId,
-          fromName: myNameRef.current,
-          video: opts.video,
-          sdp: offer,
-        });
+        for (const pid of opts.peerIds) {
+          sendToUser(pid, 'invite', {
+            callId,
+            chatId: opts.chatId,
+            from: myIdRef.current,
+            fromName: myNameRef.current,
+            video: opts.video,
+            isGroup: opts.isGroup,
+            label: opts.label,
+          });
+        }
       } catch (e: any) {
         setErrText(e?.message ?? String(e));
         cleanup();
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [phase, myId]
+    []
   );
 
   async function acceptCall() {
     const inv = incoming;
     if (!inv) return;
     setIncoming(null);
-    setPhase('connecting');
-    setPeerName(inv.fromName);
+    setLabel(inv.label);
     setIsVideo(inv.video);
-    peerIdRef.current = inv.from;
     callIdRef.current = inv.callId;
-
+    setPhaseBoth('incall');
     try {
       const stream = await navigator.mediaDevices.getUserMedia(MEDIA(inv.video));
       localStreamRef.current = stream;
       if (localVideoRef.current) localVideoRef.current.srcObject = stream;
-
-      const iceServers = await getIceServers();
-      const pc = buildPc(iceServers);
-      pcRef.current = pc;
-      stream.getTracks().forEach((tr) => pc.addTrack(tr, stream));
-
-      await pc.setRemoteDescription(new RTCSessionDescription(inv.sdp));
-      remoteSetRef.current = true;
-      flushIce();
-
-      const answer = await pc.createAnswer();
-      await pc.setLocalDescription(answer);
-      sendShared('answer', { sdp: answer });
+      iceServersRef.current = await getIceServers();
+      await joinCall(inv.callId);
     } catch (e: any) {
       setErrText(e?.message ?? String(e));
-      sendShared('hangup', {});
       cleanup();
     }
   }
 
   function declineCall() {
-    sendShared('hangup', {});
-    cleanup();
+    const inv = incoming;
+    if (inv) sendToUser(inv.from, 'declined', { callId: inv.callId, from: myIdRef.current });
+    setIncoming(null);
+    setPhaseBoth('idle');
   }
 
-  function endCall(notify = true) {
-    if (notify) sendShared('hangup', {});
+  function endCall() {
+    // If still ringing others in a 1:1, tell them to stop ringing.
+    if (invitedRef.current.length > 0) {
+      for (const pid of invitedRef.current) sendToUser(pid, 'cancel', { callId: callIdRef.current });
+    }
     cleanup();
   }
 
@@ -299,53 +422,76 @@ export function CallProvider({ children }: { children: ReactNode }) {
     setCameraOff(!track.enabled);
   }
 
-  // Personal signaling channel: receive incoming invites.
+  // Personal signaling channel: incoming invites, cancels, declines.
   useEffect(() => {
     if (!myId) return;
     const ch = supabase.channel(`call-user:${myId}`, { config: { broadcast: { self: false } } });
     ch.on('broadcast', { event: 'invite' }, ({ payload }) => {
       const inv = payload as Invite;
-      // If already in a call, auto-decline by telling the caller to hang up.
-      if (phase !== 'idle') {
-        const busyCh = supabase.channel(`call:${inv.callId}`);
-        busyCh.subscribe((s) => {
-          if (s === 'SUBSCRIBED') {
-            busyCh.send({ type: 'broadcast', event: 'hangup', payload: {} });
-            setTimeout(() => void supabase.removeChannel(busyCh), 1000);
-          }
-        });
+      if (phaseRef.current !== 'idle') {
+        // Busy — auto-decline.
+        sendToUser(inv.from, 'declined', { callId: inv.callId, from: myIdRef.current });
         return;
       }
       setIncoming(inv);
-      setPhase('ringing');
-      callIdRef.current = inv.callId;
-      peerIdRef.current = inv.from;
-      // Join the shared channel now so ICE/hangup during ringing are captured.
-      joinShared(inv.callId);
+      setPhaseBoth('ringing');
+    });
+    ch.on('broadcast', { event: 'cancel' }, ({ payload }) => {
+      if (phaseRef.current === 'ringing' && incomingCallIdRef.current === payload.callId) {
+        setIncoming(null);
+        setPhaseBoth('idle');
+      }
+    });
+    ch.on('broadcast', { event: 'declined' }, ({ payload }) => {
+      // In a 1:1 outgoing call, a decline ends it. In a group call, ignore.
+      if (
+        phaseRef.current === 'incall' &&
+        invitedRef.current.length === 1 &&
+        pcsRef.current.size === 0 &&
+        callIdRef.current === payload.callId
+      ) {
+        cleanup();
+      }
     });
     ch.subscribe();
     return () => {
       void supabase.removeChannel(ch);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [myId, phase]);
+  }, [myId]);
 
-  const showOverlay = phase !== 'idle' && phase !== 'ringing';
+  // Mirror the incoming call id for the cancel handler.
+  useEffect(() => {
+    incomingCallIdRef.current = incoming?.callId ?? null;
+  }, [incoming]);
+
+  const remoteList = Array.from(participants.values());
+  const totalTiles = remoteList.length + 1; // + me
+  const oneToOne = remoteList.length <= 1;
+  const status = remoteList.some((p) => p.stream)
+    ? t('call.connected')
+    : remoteList.length === 0
+    ? t('call.calling')
+    : t('call.connecting');
 
   return (
     <Ctx.Provider value={{ startCall, busy: phase !== 'idle' }}>
       {children}
 
-      {/* Incoming call */}
+      {/* Incoming */}
       {phase === 'ringing' && incoming && (
         <div className="fixed inset-0 z-[95] flex items-center justify-center bg-black/80 p-4">
           <div className="w-full max-w-xs rounded-2xl border border-slate-800 bg-slate-950 p-6 text-center shadow-xl">
             <div className="mx-auto grid h-20 w-20 place-items-center rounded-full bg-slate-800 text-slate-200">
               {incoming.video ? <VideoIcon size={32} /> : <PhoneIcon size={32} />}
             </div>
-            <div className="mt-3 text-lg font-semibold text-slate-100">{incoming.fromName}</div>
+            <div className="mt-3 text-lg font-semibold text-slate-100">{incoming.label || incoming.fromName}</div>
             <div className="text-sm text-slate-400">
-              {incoming.video ? t('call.incomingVideo') : t('call.incomingAudio')}
+              {incoming.isGroup
+                ? t('call.incomingGroup', { name: incoming.fromName })
+                : incoming.video
+                ? t('call.incomingVideo')
+                : t('call.incomingAudio')}
             </div>
             <div className="mt-6 flex justify-center gap-6">
               <button
@@ -369,49 +515,66 @@ export function CallProvider({ children }: { children: ReactNode }) {
         </div>
       )}
 
-      {/* Active call overlay */}
-      {showOverlay && (
+      {/* Active call */}
+      {phase === 'incall' && (
         <div className="fixed inset-0 z-[95] flex flex-col bg-slate-950">
           <div className="relative flex-1 overflow-hidden">
-            {/* Remote (also carries audio for audio-only calls) */}
-            <video
-              ref={remoteVideoRef}
-              autoPlay
-              playsInline
-              className={`h-full w-full object-cover ${remoteHasVideo ? '' : 'invisible'}`}
-            />
-            {!remoteHasVideo && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
-                <div className="grid h-24 w-24 place-items-center rounded-full bg-slate-800 text-4xl text-slate-300">
-                  {(peerName || '?').charAt(0).toUpperCase()}
+            {oneToOne ? (
+              <>
+                {remoteList[0] ? (
+                  <RemoteTile p={remoteList[0]} fill />
+                ) : (
+                  <div className="flex h-full w-full flex-col items-center justify-center gap-3">
+                    <div className="grid h-24 w-24 place-items-center rounded-full bg-slate-800 text-4xl text-slate-300">
+                      {(label || '?').charAt(0).toUpperCase()}
+                    </div>
+                    <div className="text-lg font-semibold text-slate-100">{label}</div>
+                  </div>
+                )}
+                {isVideo && (
+                  <video
+                    ref={localVideoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                    className={`absolute bottom-4 right-4 h-40 w-28 rounded-xl border border-slate-700 object-cover ${
+                      cameraOff ? 'hidden' : ''
+                    }`}
+                  />
+                )}
+              </>
+            ) : (
+              <div
+                className={`grid h-full w-full gap-1 p-1 ${totalTiles <= 4 ? 'grid-cols-2' : 'grid-cols-3'}`}
+              >
+                {remoteList.map((p) => (
+                  <RemoteTile key={p.id} p={p} />
+                ))}
+                {/* Local tile */}
+                <div className="relative aspect-square overflow-hidden rounded-xl bg-slate-900">
+                  <video
+                    ref={localVideoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                    className={`h-full w-full object-cover ${isVideo && !cameraOff ? '' : 'invisible'}`}
+                  />
+                  {(!isVideo || cameraOff) && (
+                    <div className="absolute inset-0 grid place-items-center">
+                      <div className="grid h-16 w-16 place-items-center rounded-full bg-slate-800 text-2xl text-slate-300">
+                        {(myNameRef.current || '?').charAt(0).toUpperCase()}
+                      </div>
+                    </div>
+                  )}
+                  <span className="absolute bottom-1 left-2 text-xs text-white/80 drop-shadow">{t('call.you')}</span>
                 </div>
-                <div className="text-lg font-semibold text-slate-100">{peerName}</div>
               </div>
-            )}
-
-            {/* Local PiP */}
-            {isVideo && (
-              <video
-                ref={localVideoRef}
-                autoPlay
-                playsInline
-                muted
-                className={`absolute bottom-4 right-4 h-40 w-28 rounded-xl border border-slate-700 object-cover ${
-                  cameraOff ? 'hidden' : ''
-                }`}
-              />
             )}
 
             {/* Status */}
             <div className="absolute left-0 right-0 top-6 text-center">
-              <div className="text-base font-medium text-white drop-shadow">{peerName}</div>
-              <div className="text-sm text-white/70 drop-shadow">
-                {phase === 'calling'
-                  ? t('call.calling')
-                  : phase === 'connecting'
-                  ? t('call.connecting')
-                  : t('call.connected')}
-              </div>
+              <div className="text-base font-medium text-white drop-shadow">{label}</div>
+              <div className="text-sm text-white/70 drop-shadow">{status}</div>
               {errText && <div className="mt-1 text-xs text-rose-300">{errText}</div>}
             </div>
           </div>
@@ -442,7 +605,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
             )}
             <button
               type="button"
-              onClick={() => endCall(true)}
+              onClick={endCall}
               aria-label={t('call.hangUp')}
               className="grid h-12 w-12 place-items-center rounded-full bg-rose-600 text-white hover:bg-rose-500"
             >

@@ -282,8 +282,12 @@ const en = {
   call: {
     startAudio: 'Voice call',
     startVideo: 'Video call',
+    startGroupAudio: 'Group voice call',
+    startGroupVideo: 'Group video call',
     incomingAudio: 'Incoming voice call…',
     incomingVideo: 'Incoming video call…',
+    incomingGroup: 'Group call from {{name}}…',
+    you: 'You',
     calling: 'Calling…',
     connecting: 'Connecting…',
     connected: 'Connected',

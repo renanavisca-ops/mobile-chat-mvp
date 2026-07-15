@@ -1349,9 +1349,11 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
                     type="button"
                     onClick={() =>
                       startCall({
-                        peerId: otherUserId,
-                        peerName: usernameById.get(otherUserId) || chat?.title || t('chat.someone'),
+                        chatId,
+                        peerIds: [otherUserId],
+                        label: usernameById.get(otherUserId) || chat?.title || t('chat.someone'),
                         video: false,
+                        isGroup: false,
                       })
                     }
                     disabled={callBusy}
@@ -1365,15 +1367,57 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
                     type="button"
                     onClick={() =>
                       startCall({
-                        peerId: otherUserId,
-                        peerName: usernameById.get(otherUserId) || chat?.title || t('chat.someone'),
+                        chatId,
+                        peerIds: [otherUserId],
+                        label: usernameById.get(otherUserId) || chat?.title || t('chat.someone'),
                         video: true,
+                        isGroup: false,
                       })
                     }
                     disabled={callBusy}
                     className="rounded px-1.5 py-1 text-slate-400 hover:bg-slate-900 hover:text-slate-200 disabled:opacity-40"
                     aria-label={t('call.startVideo')}
                     title={t('call.startVideo')}
+                  >
+                    <VideoIcon size={16} />
+                  </button>
+                </>
+              )}
+              {isGroup && otherMemberIds.length > 0 && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      startCall({
+                        chatId,
+                        peerIds: otherMemberIds,
+                        label: chat?.title || t('chatsList.group'),
+                        video: false,
+                        isGroup: true,
+                      })
+                    }
+                    disabled={callBusy}
+                    className="rounded px-1.5 py-1 text-slate-400 hover:bg-slate-900 hover:text-slate-200 disabled:opacity-40"
+                    aria-label={t('call.startGroupAudio')}
+                    title={t('call.startGroupAudio')}
+                  >
+                    <PhoneIcon size={16} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      startCall({
+                        chatId,
+                        peerIds: otherMemberIds,
+                        label: chat?.title || t('chatsList.group'),
+                        video: true,
+                        isGroup: true,
+                      })
+                    }
+                    disabled={callBusy}
+                    className="rounded px-1.5 py-1 text-slate-400 hover:bg-slate-900 hover:text-slate-200 disabled:opacity-40"
+                    aria-label={t('call.startGroupVideo')}
+                    title={t('call.startGroupVideo')}
                   >
                     <VideoIcon size={16} />
                   </button>
