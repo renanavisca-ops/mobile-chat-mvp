@@ -9,7 +9,15 @@ import { CallProvider } from '@/lib/call/call-provider';
 export const metadata: Metadata = {
   title: 'Toky Chat',
   description: 'Toky Chat — a fast, modern messaging app.',
+  manifest: '/manifest.webmanifest',
   appleWebApp: { capable: true, statusBarStyle: 'black-translucent', title: 'Toky Chat' },
+  icons: {
+    icon: [
+      { url: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
+      { url: '/icons/icon-512.png', sizes: '512x512', type: 'image/png' },
+    ],
+    apple: [{ url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' }],
+  },
 };
 
 // Make the app fit and adapt to phone browsers (device width, safe areas, and

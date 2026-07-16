@@ -1,0 +1,90 @@
+# Codemagic cloud builds for the Toky native shells.
+#
+# Why Codemagic: it provides cloud macOS + Linux build machines, so you can
+# produce a signed iOS .ipa and an Android .aab WITHOUT owning a Mac. Connect
+# this repo in the Codemagic UI, then configure the referenced groups/secrets.
+#
+# One-time setup in the Codemagic UI:
+#   - App Store Connect integration (API key) -> lets iOS sign + upload.
+#   - iOS code signing: distribution certificate + App Store provisioning
+#     profile for bundle id `app.toky.chat` (Automatic signing is easiest).
+#   - Android keystore: upload one and expose it as `keystore_reference`.
+#   - Variable group `toky_ios`  : APP_STORE_APPLE_ID (numeric App ID).
+#   - Variable group `toky_android` (only if publishing): GCLOUD_SERVICE_ACCOUNT.
+#
+# The native shells load the hosted app, so builds do NOT need a Next.js build
+# step — only `cap sync` to copy the loader + plugins into the native projects.
+
+workflows:
+  ios:
+    name: Toky iOS (App Store)
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    integrations:
+      app_store_connect: CodemagicKey # name of your App Store Connect API key
+    environment:
+      groups:
+        - toky_ios
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: app.toky.chat
+      node: 20
+      xcode: latest
+      cocoapods: default
+    scripts:
+      - name: Install JS dependencies
+        script: npm ci
+      - name: Capacitor sync (copies loader + plugins into ios/)
+        script: npx cap sync ios
+      - name: Install CocoaPods
+        script: cd ios/App && pod install
+      - name: Set build number
+        script: |
+          cd ios/App
+          agvtool new-version -all $(($BUILD_NUMBER + 1))
+      - name: Build & sign IPA
+        script: |
+          xcode-project use-profiles
+          xcode-project build-ipa \
+            --project "ios/App/App.xcodeproj" \
+            --scheme "App"
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+        # submit_to_app_store: false  # flip to true for production submission
+
+  android:
+    name: Toky Android (Play Store)
+    instance_type: linux_x2
+    max_build_duration: 60
+    environment:
+      groups:
+        - toky_android
+      android_signing:
+        - keystore_reference
+      node: 20
+    scripts:
+      - name: Install JS dependencies
+        script: npm ci
+      - name: Capacitor sync (copies loader + plugins into android/)
+        script: npx cap sync android
+      - name: Set version code
+        script: |
+          echo "Using CI build number $BUILD_NUMBER as versionCode"
+      - name: Build release AAB
+        script: |
+          cd android
+          ./gradlew bundleRelease \
+            -PversionCode=$(($BUILD_NUMBER + 1))
+    artifacts:
+      - android/app/build/outputs/**/*.aab
+      - android/app/build/outputs/**/*.apk
+    publishing:
+      google_play:
+        credentials: $GCLOUD_SERVICE_ACCOUNT
+        track: internal
+        submit_as_draft: true
