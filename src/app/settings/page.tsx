@@ -8,6 +8,16 @@ import { WALLPAPERS, CUSTOM_WALLPAPER_ID, getWallpaperId, setWallpaperId as save
 import { uploadAvatar } from '@/lib/db/avatar';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import { subscribeToPush, unsubscribeFromPush, isPushSubscribed, pushSupported } from '@/lib/push';
+import {
+  initKeystore,
+  isUnlocked,
+  enrollNewIdentity,
+  hasPublishedIdentity,
+  hasServerBackup,
+  saveBackup,
+  restoreFromPassphrase,
+  myFingerprint,
+} from '@/lib/crypto/keystore';
 import { useLanguage, TransBold, type LangPreference } from '@/lib/i18n/context';
 import { useTheme, type Accent } from '@/lib/theme';
 import { AvatarCreator } from '@/components/avatar-creator';
@@ -98,6 +108,87 @@ export default function SettingsPage() {
       setPushErr(e?.message ?? String(e));
     } finally {
       setPushBusy(false);
+    }
+  }
+
+  // --- End-to-end encryption ---
+  const [encEnrolled, setEncEnrolled] = useState(false);
+  const [encHasBackup, setEncHasBackup] = useState(false);
+  const [encFingerprint, setEncFingerprint] = useState<string | null>(null);
+  const [encBusy, setEncBusy] = useState(false);
+  const [encMsg, setEncMsg] = useState('');
+  const [encPass, setEncPass] = useState('');
+  const [showRestore, setShowRestore] = useState(false);
+
+  async function refreshEnc() {
+    await initKeystore();
+    setEncEnrolled(isUnlocked());
+    setEncHasBackup(await hasServerBackup().catch(() => false));
+    setEncFingerprint(await myFingerprint().catch(() => null));
+  }
+
+  useEffect(() => {
+    refreshEnc().catch(() => {});
+  }, []);
+
+  async function setUpEncryption() {
+    setEncBusy(true);
+    setEncMsg('');
+    try {
+      await initKeystore();
+      if (isUnlocked()) {
+        // already set up on this device
+      } else if (await hasPublishedIdentity()) {
+        // An identity already exists for this account (set up on another
+        // device). We must restore it here rather than generate a new one.
+        setShowRestore(true);
+        setEncMsg(t('settings.encRestoreNeeded'));
+        return;
+      } else {
+        await enrollNewIdentity();
+      }
+      await refreshEnc();
+      setEncMsg(t('settings.encReady'));
+    } catch (e: any) {
+      setEncMsg(e?.message ?? String(e));
+    } finally {
+      setEncBusy(false);
+    }
+  }
+
+  async function saveBackupNow() {
+    if (encPass.length < 8) {
+      setEncMsg(t('settings.encPassTooShort'));
+      return;
+    }
+    setEncBusy(true);
+    setEncMsg('');
+    try {
+      await saveBackup(encPass);
+      setEncPass('');
+      await refreshEnc();
+      setEncMsg(t('settings.encBackupSaved'));
+    } catch (e: any) {
+      setEncMsg(e?.message ?? String(e));
+    } finally {
+      setEncBusy(false);
+    }
+  }
+
+  async function restoreNow() {
+    if (!encPass) return;
+    setEncBusy(true);
+    setEncMsg('');
+    try {
+      await restoreFromPassphrase(encPass);
+      setEncPass('');
+      setShowRestore(false);
+      await refreshEnc();
+      setEncMsg(t('settings.encReady'));
+    } catch (e: any) {
+      setEncMsg(t('settings.encRestoreFailed'));
+    } finally {
+      setEncBusy(false);
     }
   }
 
@@ -737,6 +828,90 @@ export default function SettingsPage() {
                 </button>
               )}
               {pushErr && <p className="mt-2 text-xs text-red-400">{pushErr}</p>}
+            </div>
+          </section>
+
+          <section className="space-y-3">
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500 ml-1">{t('settings.sectionEncryption')}</h2>
+            <div className="space-y-4 rounded-xl border border-slate-900 bg-slate-950/50 p-4 shadow-sm">
+              <div>
+                <div className="text-sm font-medium text-slate-200">{t('settings.encTitle')}</div>
+                <div className="mt-1 text-xs text-slate-400">{t('settings.encDesc')}</div>
+              </div>
+
+              {!encEnrolled ? (
+                <button
+                  type="button"
+                  onClick={setUpEncryption}
+                  disabled={encBusy}
+                  className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50"
+                >
+                  {encBusy ? t('settings.encWorking') : t('settings.encSetUp')}
+                </button>
+              ) : (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 text-sm text-emerald-400">
+                    <span>🔒</span> {t('settings.encActive')}
+                  </div>
+                  {encFingerprint && (
+                    <div>
+                      <div className="text-xs text-slate-400">{t('settings.encFingerprint')}</div>
+                      <code className="mt-1 block break-all rounded bg-slate-900 p-2 text-[11px] leading-relaxed text-slate-300">
+                        {encFingerprint}
+                      </code>
+                    </div>
+                  )}
+                  <div className="border-t border-slate-900 pt-3">
+                    <div className="text-sm font-medium text-slate-200">
+                      {encHasBackup ? t('settings.encBackupOnTitle') : t('settings.encBackupTitle')}
+                    </div>
+                    <div className="mt-1 text-xs text-slate-400">{t('settings.encBackupDesc')}</div>
+                    <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+                      <input
+                        type="password"
+                        value={encPass}
+                        onChange={(e) => setEncPass(e.target.value)}
+                        placeholder={t('settings.encPassPlaceholder')}
+                        className="flex-1 rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={saveBackupNow}
+                        disabled={encBusy}
+                        className="rounded-lg bg-slate-800 px-4 py-2 text-sm text-white hover:bg-slate-700 disabled:opacity-50"
+                      >
+                        {t('settings.encBackupSave')}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {showRestore && (
+                <div className="border-t border-slate-900 pt-3">
+                  <div className="text-sm font-medium text-slate-200">{t('settings.encRestoreTitle')}</div>
+                  <div className="mt-1 text-xs text-slate-400">{t('settings.encRestoreDesc')}</div>
+                  <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+                    <input
+                      type="password"
+                      value={encPass}
+                      onChange={(e) => setEncPass(e.target.value)}
+                      placeholder={t('settings.encPassPlaceholder')}
+                      className="flex-1 rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={restoreNow}
+                      disabled={encBusy}
+                      className="rounded-lg bg-indigo-600 px-4 py-2 text-sm text-white hover:bg-indigo-500 disabled:opacity-50"
+                    >
+                      {t('settings.encRestore')}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {encMsg && <p className="text-xs text-slate-300">{encMsg}</p>}
             </div>
           </section>
 

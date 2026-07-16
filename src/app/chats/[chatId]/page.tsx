@@ -12,7 +12,8 @@ import { getWallpaperId, wallpaperCss, getCustomWallpaperUrl, CUSTOM_WALLPAPER_I
 import { blockUser, unblockUser, isBlockedByMe } from '@/lib/db/safety';
 import { EmojiPicker } from '@/components/emoji-picker';
 import { useRequireAuth } from '@/lib/auth/use-require-auth';
-import { listChats, sendMessage, deleteMessage, hideMessageForMe, editMessage, pinMessage, unpinMessage, searchMessages, setChatMuted, getChatMuted, toggleReaction, createPoll, votePoll, setDisappearingMessages } from '@/lib/db/chats';
+import { listChats, sendMessage, deleteMessage, hideMessageForMe, editMessage, pinMessage, unpinMessage, searchMessages, setChatMuted, getChatMuted, toggleReaction, createPoll, votePoll, setDisappearingMessages, enableChatEncryption } from '@/lib/db/chats';
+import { initKeystore, isUnlocked } from '@/lib/crypto/keystore';
 import { forwardMessageToChats, type ForwardPayload } from '@/lib/db/forward';
 import { uploadChatImage, uploadChatMedia, uploadChatAudio, uploadChatFile, createSignedChatMediaUrl } from '@/lib/storage/upload';
 import { useChatRealtime } from '@/lib/realtime/use-chat-realtime';
@@ -32,6 +33,7 @@ import type { ChatSummary, MessageRow } from '@/lib/db/types';
 
 type Payload = {
   v?: number;
+  encrypted?: boolean;
   text?: string;
   imagePath?: string;
   imagePaths?: string[];
@@ -215,10 +217,37 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
   const [muteBusy, setMuteBusy] = useState(false);
   const [disappearingMenuOpen, setDisappearingMenuOpen] = useState(false);
   const [disappearingBusy, setDisappearingBusy] = useState(false);
+  const [encBusy, setEncBusy] = useState(false);
 
   useEffect(() => {
     getChatMuted(chatId).then(setMuted).catch(() => {});
   }, [chatId]);
+
+  useEffect(() => {
+    initKeystore().catch(() => {});
+  }, []);
+
+  async function enableEncryption() {
+    setEncBusy(true);
+    try {
+      await initKeystore();
+      if (!isUnlocked()) {
+        setErr(t('chat.encryptionSetupFirst'));
+        return;
+      }
+      const res = await enableChatEncryption(chatId);
+      if (!res.ok) {
+        setErr(t('chat.encryptionMissingMembers'));
+        return;
+      }
+      setChat((prev) => (prev ? { ...prev, encrypted: true } : prev));
+    } catch (e: any) {
+      setErr(e?.message ?? String(e));
+    } finally {
+      setEncBusy(false);
+      setSafetyMenuOpen(false);
+    }
+  }
 
   async function chooseDisappearing(seconds: number) {
     setDisappearingBusy(true);
@@ -1580,6 +1609,17 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
                       )}
                       <button
                         type="button"
+                        onClick={enableEncryption}
+                        disabled={encBusy || !!chat?.encrypted}
+                        className="flex w-full items-center justify-between px-3 py-2 text-left text-slate-200 hover:bg-slate-900 disabled:opacity-100"
+                      >
+                        <span>{t('chat.encryptionMenu')}</span>
+                        <span className="text-xs text-slate-400">
+                          {chat?.encrypted ? `🔒 ${t('chat.encryptionOn')}` : t('chat.encryptionOff')}
+                        </span>
+                      </button>
+                      <button
+                        type="button"
                         onClick={toggleBlock}
                         disabled={blockBusy}
                         className="block w-full px-3 py-2 text-left text-slate-200 hover:bg-slate-900 disabled:opacity-50"
@@ -1737,6 +1777,10 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
                       {m.body.is_deleted ? (
                         <div className="text-sm text-slate-500 italic mt-1 flex items-center gap-1">
                           <span>🚫</span> {t('chat.deletedMessage')}
+                        </div>
+                      ) : m.body.encrypted ? (
+                        <div className="text-sm text-slate-500 italic mt-1 flex items-center gap-1">
+                          <span>🔒</span> {t('chat.encryptedLocked')}
                         </div>
                       ) : (
                         <>

@@ -22,6 +22,8 @@ export type ChatSummary = {
   member_ids?: string[];
   /** Disappearing-messages timer for this chat, in seconds (null/0 = off). */
   disappearing_seconds?: number | null;
+  /** Whether this chat is end-to-end encrypted (opt-in). */
+  encrypted?: boolean | null;
 };
 
 export type ProfileLite = {

@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import type { RealtimePostgresChangesPayload, REALTIME_SUBSCRIBE_STATES } from '@supabase/supabase-js';
 import { browserSupabase } from '@/lib/supabase/client';
-import { listMessages, markMessagesAsRead, listReactions, listPollVotes, listHiddenMessages } from '@/lib/db/chats';
+import { listMessages, markMessagesAsRead, listReactions, listPollVotes, listHiddenMessages, decryptRow } from '@/lib/db/chats';
 import type { MessageRow, MessageReaction, PollVote, HiddenMessage } from '@/lib/db/types';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 
@@ -136,37 +136,47 @@ export function useChatRealtime(chatId: string) {
         },
         (payload: RealtimePostgresChangesPayload<MessageRow>) => {
           if (payload.eventType === 'INSERT') {
-            const newMsg = payload.new as MessageRow;
-            setMessages((current) => {
-              if (current.some((m) => m.id === newMsg.id)) return current;
-              // Replace the optimistic local echo (added on send with a
-              // `local-` id but the SAME ciphertext) so our own messages don't
-              // show twice when the realtime INSERT comes back.
-              const withoutEcho = current.filter(
-                (m) => !(m.id.startsWith('local-') && m.ciphertext === newMsg.ciphertext)
-              );
-              return [...withoutEcho, newMsg];
-            });
-            // Notificar si la app está en background y el mensaje no es mío
-            if (document.hidden && newMsg.sender_id && newMsg.sender_id !== userId) {
-              try {
-                let txt = 'Nuevo mensaje';
-                if (newMsg.content) {
-                  txt = newMsg.content;
-                } else if (newMsg.ciphertext) {
-                  const content = JSON.parse(newMsg.ciphertext);
-                  txt = content.text || (content.imagePaths ? 'Imagen' : (content.audioPath ? 'Nota de voz' : 'Nuevo mensaje'));
-                }
-                notify('Nuevo mensaje', { body: txt });
-              } catch {}
-            }
-            // Si el mensaje no es mío, marcar como leído
-            if (newMsg.sender_id && newMsg.sender_id !== userId) {
-              markMessagesAsRead(chatId).catch(console.error);
-            }
+            const raw = payload.new as MessageRow;
+            // Decrypt E2EE rows before they touch state so the rest of the UI
+            // treats `ciphertext` as the usual plaintext payload JSON.
+            void (async () => {
+              const newMsg = await decryptRow(chatId, raw);
+              setMessages((current) => {
+                if (current.some((m) => m.id === newMsg.id)) return current;
+                // Replace the optimistic local echo (added on send with a
+                // `local-` id but the SAME plaintext ciphertext) so our own
+                // messages don't show twice when the realtime INSERT comes back.
+                const withoutEcho = current.filter(
+                  (m) => !(m.id.startsWith('local-') && m.ciphertext === newMsg.ciphertext)
+                );
+                return [...withoutEcho, newMsg];
+              });
+              // Notificar si la app está en background y el mensaje no es mío
+              if (document.hidden && newMsg.sender_id && newMsg.sender_id !== userId) {
+                try {
+                  let txt = 'Nuevo mensaje';
+                  if (newMsg.content) {
+                    txt = newMsg.content;
+                  } else if (newMsg.ciphertext) {
+                    const content = JSON.parse(newMsg.ciphertext);
+                    txt = content.encrypted
+                      ? 'Mensaje cifrado'
+                      : content.text || (content.imagePaths ? 'Imagen' : (content.audioPath ? 'Nota de voz' : 'Nuevo mensaje'));
+                  }
+                  notify('Nuevo mensaje', { body: txt });
+                } catch {}
+              }
+              // Si el mensaje no es mío, marcar como leído
+              if (newMsg.sender_id && newMsg.sender_id !== userId) {
+                markMessagesAsRead(chatId).catch(console.error);
+              }
+            })();
           } else if (payload.eventType === 'UPDATE') {
-            const updatedMsg = payload.new as MessageRow;
-            setMessages((current) => current.map(m => m.id === updatedMsg.id ? updatedMsg : m));
+            const raw = payload.new as MessageRow;
+            void (async () => {
+              const updatedMsg = await decryptRow(chatId, raw);
+              setMessages((current) => current.map((m) => (m.id === updatedMsg.id ? updatedMsg : m)));
+            })();
           }
           else if (payload.eventType === 'DELETE') {
             const deletedId = payload.old.id;

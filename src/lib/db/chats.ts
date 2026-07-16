@@ -2,6 +2,47 @@
 
 import { browserSupabase } from '@/lib/supabase/client';
 import type { ChatSummary, MessageRow } from '@/lib/db/types';
+import {
+  encryptForChat,
+  decryptForChat,
+  lockChat as ksLockChat,
+  shareChatKeyWith,
+} from '@/lib/crypto/keystore';
+
+/** Parse a message ciphertext column into a JSON object, or null. */
+function parseEnvelope(ciphertext: string | null | undefined): Record<string, unknown> | null {
+  if (!ciphertext) return null;
+  try {
+    return JSON.parse(ciphertext) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+function isEncryptedEnvelope(env: Record<string, unknown> | null): env is { e: number; iv: string; ct: string } {
+  return !!env && env.e === 1 && typeof env.iv === 'string' && typeof env.ct === 'string';
+}
+
+/**
+ * Decrypt an E2EE message row so the rest of the app can treat `ciphertext`
+ * as the usual plaintext payload JSON. If we can't decrypt (no key on this
+ * device yet), we substitute a marker payload the UI renders as locked.
+ */
+export async function decryptRow(chatId: string, row: MessageRow): Promise<MessageRow> {
+  const env = parseEnvelope(row.ciphertext);
+  if (isEncryptedEnvelope(env)) {
+    const pt = await decryptForChat(chatId, { iv: env.iv, ct: env.ct });
+    return { ...row, ciphertext: pt ?? JSON.stringify({ v: 1, encrypted: true }) };
+  }
+  return row;
+}
+
+async function decryptRows(chatId: string, rows: MessageRow[]): Promise<MessageRow[]> {
+  if (!rows.some((r) => typeof r.ciphertext === 'string' && r.ciphertext.includes('"e":1'))) return rows;
+  const out: MessageRow[] = [];
+  for (const r of rows) out.push(await decryptRow(chatId, r));
+  return out;
+}
 
 /**
  * List the chats the current user can see.
@@ -84,7 +125,10 @@ export async function listChats(): Promise<ChatSummary[]> {
     if (!content && m.ciphertext) {
       try {
         const parsed = JSON.parse(m.ciphertext);
-        if (parsed.text) {
+        if (parsed.e === 1) {
+          content = '🔒';
+          kind = 'text';
+        } else if (parsed.text) {
           content = parsed.text;
           kind = 'text';
         } else if (parsed.imagePath || parsed.imagePaths?.length > 0) {
@@ -266,7 +310,8 @@ export async function listMessages(
 
   const now = Date.now();
   const rows = (data ?? []) as unknown as MessageRow[];
-  return rows.filter((m) => !m.expires_at || new Date(m.expires_at).getTime() > now).reverse();
+  const visible = rows.filter((m) => !m.expires_at || new Date(m.expires_at).getTime() > now).reverse();
+  return decryptRows(chatId, visible);
 }
 
 export type MessagePayload = {
@@ -286,18 +331,6 @@ export type MessagePayload = {
   is_deleted?: boolean;
 };
 
-/** Fetch the chat's disappearing-messages timer (seconds), or null if off. */
-async function getDisappearingSeconds(chatId: string): Promise<number | null> {
-  const supabase = browserSupabase();
-  const { data, error } = await supabase
-    .from('chats')
-    .select('disappearing_seconds')
-    .eq('id', chatId)
-    .maybeSingle();
-  if (error) throw error;
-  return data?.disappearing_seconds ?? null;
-}
-
 export async function sendMessage(chatId: string, payload: MessagePayload) {
   const supabase = browserSupabase();
 
@@ -306,10 +339,28 @@ export async function sendMessage(chatId: string, payload: MessagePayload) {
 
   const deviceId = await ensureLocalDevice(me.user.id);
 
-  const ciphertext = JSON.stringify({ v: 1, ...payload });
+  const { data: chatRow } = await supabase
+    .from('chats')
+    .select('disappearing_seconds, encrypted')
+    .eq('id', chatId)
+    .maybeSingle();
+
+  const plaintext = JSON.stringify({ v: 1, ...payload });
+  let ciphertext = plaintext;
+  let content: string | null = payload.text || null;
+
+  if (chatRow?.encrypted) {
+    const sealed = await encryptForChat(chatId, plaintext);
+    if (!sealed) {
+      throw new Error('Encryption is locked on this device. Unlock it in Settings to send here.');
+    }
+    ciphertext = JSON.stringify({ e: 1, ...sealed });
+    content = null; // the server must never see plaintext in a locked chat
+  }
+
   const nonce = crypto.randomUUID();
 
-  const disappearingSeconds = await getDisappearingSeconds(chatId);
+  const disappearingSeconds = chatRow?.disappearing_seconds ?? null;
   const expiresAt = disappearingSeconds
     ? new Date(Date.now() + disappearingSeconds * 1000).toISOString()
     : null;
@@ -320,7 +371,7 @@ export async function sendMessage(chatId: string, payload: MessagePayload) {
     sender_id: me.user.id,
     message_type: 'whisper',
     ciphertext,
-    content: payload.text || null,
+    content,
     sender_type: 'agent',
     nonce,
     expires_at: expiresAt,
@@ -358,20 +409,21 @@ export async function deleteMessage(messageId: string, chatId: string) {
 
   if (!msg) throw new Error('Message not found');
 
-  let currentPayload: Record<string, unknown> = {};
-  try {
-    currentPayload = JSON.parse(msg.ciphertext);
-  } catch {}
+  const currentEnv = parseEnvelope(msg.ciphertext);
 
-  const deletedPayload = JSON.stringify({
-    ...currentPayload,
-    text: '',
-    imagePaths: [],
-    imagePath: null,
-    videoPath: null,
-    audioPath: null,
-    is_deleted: true,
-  });
+  // For an encrypted message we must NOT keep the old ciphertext around (its
+  // sealed content would still decrypt). Replace it with a plaintext tombstone.
+  const deletedPayload = isEncryptedEnvelope(currentEnv)
+    ? JSON.stringify({ v: 1, is_deleted: true })
+    : JSON.stringify({
+        ...(currentEnv ?? {}),
+        text: '',
+        imagePaths: [],
+        imagePath: null,
+        videoPath: null,
+        audioPath: null,
+        is_deleted: true,
+      });
 
   const { error } = await supabase
     .from('messages')
@@ -452,6 +504,44 @@ export async function addGroupMembers(chatId: string, memberIds: string[]) {
     .from('chat_members')
     .insert(memberIds.map((user_id) => ({ chat_id: chatId, user_id })));
   if (error) throw error;
+
+  // If the chat is encrypted, wrap the existing chat key for the new members.
+  const { data: chatRow } = await supabase.from('chats').select('encrypted').eq('id', chatId).maybeSingle();
+  if (chatRow?.encrypted) {
+    for (const uid of memberIds) {
+      try {
+        await shareChatKeyWith(chatId, uid);
+      } catch {
+        // Best-effort; a member without a published key simply can't be added
+        // to the encrypted key set until they set up encryption.
+      }
+    }
+  }
+}
+
+/** List the user ids that are members of a chat. */
+export async function getChatMemberIds(chatId: string): Promise<string[]> {
+  const supabase = browserSupabase();
+  const { data, error } = await supabase.from('chat_members').select('user_id').eq('chat_id', chatId);
+  if (error) throw error;
+  return (data ?? []).map((r) => r.user_id as string);
+}
+
+/** Whether a chat is end-to-end encrypted. */
+export async function isChatEncrypted(chatId: string): Promise<boolean> {
+  const supabase = browserSupabase();
+  const { data } = await supabase.from('chats').select('encrypted').eq('id', chatId).maybeSingle();
+  return !!data?.encrypted;
+}
+
+/**
+ * Turn on E2EE for a chat: generate a chat key and wrap it for every member.
+ * Returns { ok, missing } — if any member has not set up encryption yet, we
+ * return their ids and do NOT lock the chat.
+ */
+export async function enableChatEncryption(chatId: string): Promise<{ ok: boolean; missing: string[] }> {
+  const memberIds = await getChatMemberIds(chatId);
+  return ksLockChat(chatId, memberIds);
 }
 
 /** Remove another member from a group. Only the group's creator may do this. */
@@ -485,16 +575,31 @@ export async function editMessage(messageId: string, newText: string) {
 
   const { data: msg, error: readErr } = await supabase
     .from('messages')
-    .select('ciphertext')
+    .select('ciphertext, chat_id')
     .eq('id', messageId)
     .single();
   if (readErr) throw readErr;
 
-  let payload: Record<string, unknown> = {};
-  try {
-    payload = JSON.parse(msg.ciphertext);
-  } catch {}
+  const env = parseEnvelope(msg.ciphertext);
 
+  if (isEncryptedEnvelope(env)) {
+    // Decrypt the current payload, swap the text, re-seal it.
+    const currentPt = await decryptForChat(msg.chat_id, { iv: env.iv, ct: env.ct });
+    let payload: Record<string, unknown> = {};
+    try {
+      payload = currentPt ? (JSON.parse(currentPt) as Record<string, unknown>) : {};
+    } catch {}
+    const sealed = await encryptForChat(msg.chat_id, JSON.stringify({ ...payload, text: newText }));
+    if (!sealed) throw new Error('Encryption is locked on this device.');
+    const { error } = await supabase
+      .from('messages')
+      .update({ content: null, ciphertext: JSON.stringify({ e: 1, ...sealed }), edited_at: new Date().toISOString() })
+      .eq('id', messageId);
+    if (error) throw error;
+    return;
+  }
+
+  const payload = env ?? {};
   const ciphertext = JSON.stringify({ ...payload, text: newText });
 
   const { error } = await supabase

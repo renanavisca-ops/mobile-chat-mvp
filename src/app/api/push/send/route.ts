@@ -37,7 +37,7 @@ export async function POST(req: Request) {
 
     const [{ data: members }, { data: chat }] = await Promise.all([
       supabaseAdmin.from('chat_members').select('user_id, muted').eq('chat_id', message.chat_id),
-      supabaseAdmin.from('chats').select('kind, title').eq('id', message.chat_id).single(),
+      supabaseAdmin.from('chats').select('kind, title, encrypted').eq('id', message.chat_id).single(),
     ]);
 
     const recipientIds = (members ?? [])
@@ -61,7 +61,9 @@ export async function POST(req: Request) {
     if (!subs || subs.length === 0) return NextResponse.json({ ok: true, skipped: 'no_subscriptions' });
 
     const title = chat?.kind === 'group' ? (chat.title || 'Group chat') : senderName;
-    const body = message.content || 'Sent an attachment';
+    const body = chat?.encrypted
+      ? '🔒 New encrypted message'
+      : message.content || 'Sent an attachment';
     const payload = JSON.stringify({ title, body, url: `/chats/${message.chat_id}` });
 
     const staleIds: string[] = [];

@@ -69,6 +69,7 @@ export type Database = {
           created_by: string | null
           description: string | null
           disappearing_seconds: number | null
+          encrypted: boolean
           id: string
           is_public: boolean
           kind: string
@@ -84,6 +85,7 @@ export type Database = {
           created_by?: string | null
           description?: string | null
           disappearing_seconds?: number | null
+          encrypted?: boolean
           id?: string
           is_public?: boolean
           kind: string
@@ -99,6 +101,7 @@ export type Database = {
           created_by?: string | null
           description?: string | null
           disappearing_seconds?: number | null
+          encrypted?: boolean
           id?: string
           is_public?: boolean
           kind?: string
@@ -130,6 +133,69 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      chat_keys: {
+        Row: {
+          chat_id: string
+          created_at: string
+          created_by: string
+          key_epoch: number
+          user_id: string
+          wrapped: Json
+        }
+        Insert: {
+          chat_id: string
+          created_at?: string
+          created_by?: string
+          key_epoch?: number
+          user_id: string
+          wrapped: Json
+        }
+        Update: {
+          chat_id?: string
+          created_at?: string
+          created_by?: string
+          key_epoch?: number
+          user_id?: string
+          wrapped?: Json
+        }
+        Relationships: []
+      }
+      user_keys: {
+        Row: {
+          identity_pub: Json
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          identity_pub: Json
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          identity_pub?: Json
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      key_backups: {
+        Row: {
+          backup: Json
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          backup: Json
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          backup?: Json
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       contacts: {
         Row: {
