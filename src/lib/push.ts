@@ -1,6 +1,12 @@
 'use client';
 
 import { browserSupabase } from '@/lib/supabase/client';
+import {
+  isNativeApp,
+  isNativeRegistered,
+  registerNativePush,
+  unregisterNativePush,
+} from '@/lib/native-push';
 
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
@@ -12,11 +18,15 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
 }
 
 export function pushSupported(): boolean {
+  // Inside the native shell, push is delivered via APNs/FCM instead of the
+  // browser PushManager, so report supported there regardless.
+  if (isNativeApp()) return true;
   return typeof window !== 'undefined' && 'serviceWorker' in navigator && 'PushManager' in window;
 }
 
 /** Whether this device currently has an active push subscription. */
 export async function isPushSubscribed(): Promise<boolean> {
+  if (isNativeApp()) return isNativeRegistered();
   if (!pushSupported()) return false;
   try {
     const reg = await navigator.serviceWorker.getRegistration('/sw.js');
@@ -33,6 +43,7 @@ export async function isPushSubscribed(): Promise<boolean> {
  * server can send to it later (even when the tab is closed).
  */
 export async function subscribeToPush(userId: string): Promise<void> {
+  if (isNativeApp()) return registerNativePush(userId);
   if (!pushSupported()) throw new Error('Push notifications are not supported in this browser.');
 
   const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
@@ -71,6 +82,7 @@ export async function subscribeToPush(userId: string): Promise<void> {
 }
 
 export async function unsubscribeFromPush(): Promise<void> {
+  if (isNativeApp()) return unregisterNativePush();
   if (!pushSupported()) return;
   const registration = await navigator.serviceWorker.getRegistration('/sw.js');
   const subscription = await registration?.pushManager.getSubscription();

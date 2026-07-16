@@ -17,11 +17,11 @@
     "cap:android": "cap sync android && cap open android"
   },
   "dependencies": {
+    "@capacitor-firebase/messaging": "^6.3.1",
     "@capacitor/android": "^6.2.1",
     "@capacitor/app": "^6.0.3",
     "@capacitor/core": "^6.2.1",
     "@capacitor/ios": "^6.2.1",
-    "@capacitor/push-notifications": "^6.0.5",
     "@capacitor/splash-screen": "^6.0.4",
     "@capacitor/status-bar": "^6.0.3",
     "@privacyresearch/libsignal-protocol-typescript": "0.0.16",

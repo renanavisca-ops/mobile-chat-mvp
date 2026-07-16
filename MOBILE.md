@@ -70,21 +70,43 @@ browser-based — no Mac needed).
   and **push notifications**, plus iOS background modes (`audio`,
   `remote-notification`).
 - ✅ Thin loader with an offline screen and connectivity retry.
+- ✅ **Native push wired end to end** — `@capacitor-firebase/messaging` on the
+  client stores an FCM token in the `device_tokens` table; the server
+  (`src/lib/fcm.ts`) delivers to it from `/api/push/send` and `/api/push/call`
+  alongside the existing Web Push. Needs the Firebase config below to go live.
+
+## Setting up native push (Firebase / FCM)
+
+The code path is done; it stays dormant until Firebase is configured. FCM
+delivers to Android directly and to iOS via APNs, so there's one server path.
+
+1. Create a **free Firebase project** and add an **Android app** (package
+   `app.toky.chat`) and an **iOS app** (bundle id `app.toky.chat`).
+2. **Android:** download `google-services.json` → drop it in `android/app/`.
+   (The Gradle wiring is already present and auto-applies when the file exists.)
+3. **iOS:** download `GoogleService-Info.plist` → add it to the Xcode `App`
+   target. Upload your **APNs Auth Key (.p8)** to Firebase → Project Settings →
+   Cloud Messaging, and enable the **Push Notifications** capability on the App
+   target (an `App/App.entitlements` template with `aps-environment` is
+   included — point the target's *Code Signing Entitlements* at it if it isn't
+   already). The `Podfile` pulls the Firebase pod automatically on `pod install`.
+4. **Server:** Firebase → Project Settings → Service accounts → *Generate new
+   private key*. Paste that JSON into the **`FCM_SERVICE_ACCOUNT`** env var in
+   Vercel (see `.env.example`). Redeploy.
+
+That's it — no schema work; the `device_tokens` table already exists. Turning on
+push in the app's Settings registers the device and starts delivery.
 
 ## Still required before you can ship (not code I can finish here)
 
 1. **Developer accounts** — Apple Developer Program ($99/yr) and Google Play
    Console ($25 one-time).
-2. **Push notifications rework** — the current web push (VAPID) does **not**
-   fire inside the native wrapper. You need:
-   - iOS: **APNs** key in App Store Connect + the `@capacitor/push-notifications`
-     registration flow; add the Push Notifications capability in Xcode.
-   - Android: a **Firebase** project → `google-services.json` dropped into
-     `android/app/`, and FCM.
-   - Server: branch `/api/push/send` to deliver to native device tokens vs. the
-     existing web `push_subscriptions`. (A `device_tokens` table is the usual
-     addition.)
+2. **Firebase config for push** — the delivery code is done (see "Setting up
+   native push" above); you just need to create the free Firebase project, drop
+   in the two config files, upload the APNs key, and set `FCM_SERVICE_ACCOUNT`.
 3. **In-app account deletion** — Apple requires it (Guideline 5.1.1(v)).
+   *(An `/api/account/delete` route already exists — confirm it's reachable from
+   a Settings screen in the app UI.)*
 4. **Privacy policy + Terms** finalized and lawyer-reviewed (both stores
    require a public privacy policy URL; Apple privacy "nutrition labels" and
    Google "Data Safety" form must match what the app collects).

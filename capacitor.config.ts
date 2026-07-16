@@ -29,9 +29,9 @@ const config: CapacitorConfig = {
       showSpinner: false,
       androidScaleType: 'CENTER_CROP',
     },
-    PushNotifications: {
-      presentationOptions: ['badge', 'sound', 'alert'],
-    },
+    // Native push runs through @capacitor-firebase/messaging (FCM). It reads the
+    // Firebase config files (google-services.json / GoogleService-Info.plist);
+    // no extra Capacitor config is required here. See MOBILE.md.
   },
 };
 

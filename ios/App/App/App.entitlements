@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Enables Apple Push Notifications (FCM delivers to iOS via APNs).
+	     For a distribution build this should be "production". If the Xcode
+	     target doesn't already reference an entitlements file, set
+	     "Code Signing Entitlements" for the App target to App/App.entitlements
+	     (or enable the Push Notifications capability, which creates this). -->
+	<key>aps-environment</key>
+	<string>production</string>
+</dict>
+</plist>
