@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "990998766528",
+    "project_id": "toky-chat",
+    "storage_bucket": "toky-chat.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:990998766528:android:5f100847c3fc87de745e25",
+        "android_client_info": {
+          "package_name": "app.toky.chat"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC8Pyj_xCylOarT6ws6ozJj_V0QoXKnfCs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
