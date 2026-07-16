@@ -12,7 +12,17 @@ import {
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { browserSupabase } from '@/lib/supabase/client';
 import { useT } from '@/lib/i18n/context';
-import { PhoneIcon, PhoneOffIcon, VideoIcon, VideoOffIcon, MicIcon, MicOffIcon, SwitchCameraIcon } from '@/components/icons';
+import {
+  PhoneIcon,
+  PhoneOffIcon,
+  VideoIcon,
+  VideoOffIcon,
+  MicIcon,
+  MicOffIcon,
+  SwitchCameraIcon,
+  SpeakerIcon,
+  SpeakerOffIcon,
+} from '@/components/icons';
 
 type Phase = 'idle' | 'ringing' | 'incall';
 
@@ -49,11 +59,28 @@ const MEDIA = (video: boolean): MediaStreamConstraints => ({
 });
 
 /** Attaches a MediaStream to a <video> and shows an avatar fallback for audio. */
-function RemoteTile({ p, fill }: { p: Participant; fill?: boolean }) {
+function RemoteTile({
+  p,
+  fill,
+  register,
+}: {
+  p: Participant;
+  fill?: boolean;
+  register?: (el: HTMLVideoElement, attach: boolean) => void;
+}) {
   const ref = useRef<HTMLVideoElement | null>(null);
   useEffect(() => {
     if (ref.current && p.stream) ref.current.srcObject = p.stream;
   }, [p.stream]);
+  // Register this element so the provider can route its audio output (speaker).
+  useEffect(() => {
+    const el = ref.current;
+    if (el) register?.(el, true);
+    return () => {
+      if (el) register?.(el, false);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [register]);
   const hasVideo = p.stream?.getVideoTracks().some((t) => t.enabled) ?? false;
   return (
     <div className={`relative overflow-hidden bg-slate-900 ${fill ? 'h-full w-full' : 'aspect-square rounded-xl'}`}>
@@ -84,6 +111,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
   const [isVideo, setIsVideo] = useState(false);
   const [muted, setMuted] = useState(false);
   const [cameraOff, setCameraOff] = useState(false);
+  const [speakerOn, setSpeakerOn] = useState(true);
   const [incoming, setIncoming] = useState<Invite | null>(null);
   const [participants, setParticipants] = useState<Map<string, Participant>>(new Map());
   const [errText, setErrText] = useState('');
@@ -99,8 +127,61 @@ export function CallProvider({ children }: { children: ReactNode }) {
   const incomingCallIdRef = useRef<string | null>(null);
   const facingRef = useRef<'user' | 'environment'>('user');
   const hadPeersRef = useRef(false);
+  const mediaElsRef = useRef<Set<HTMLVideoElement>>(new Set());
 
   const localVideoRef = useRef<HTMLVideoElement | null>(null);
+
+  // setSinkId lets us pick the audio output device; absent on iOS Safari.
+  const speakerSupported =
+    typeof window !== 'undefined' &&
+    typeof (HTMLMediaElement.prototype as unknown as { setSinkId?: unknown }).setSinkId === 'function';
+
+  // Route every remote audio/video element to the chosen output device.
+  const applySpeaker = useCallback(async (on: boolean) => {
+    if (!speakerSupported) return;
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const outs = devices.filter((d) => d.kind === 'audiooutput');
+      let sinkId = 'default';
+      if (on) {
+        const spk = outs.find((d) => /speaker|speakerphone/i.test(d.label));
+        sinkId = spk?.deviceId ?? 'default';
+      } else {
+        const ear = outs.find((d) => /earpiece|receiver|handset|headphone|headset/i.test(d.label));
+        sinkId = ear?.deviceId ?? 'default';
+      }
+      for (const el of mediaElsRef.current) {
+        try {
+          await (el as unknown as { setSinkId: (id: string) => Promise<void> }).setSinkId(sinkId);
+        } catch {}
+      }
+    } catch {}
+  }, [speakerSupported]);
+
+  const registerMediaEl = useCallback(
+    (el: HTMLVideoElement, attach: boolean) => {
+      if (attach) {
+        mediaElsRef.current.add(el);
+        // Apply the current speaker choice to a newly-mounted remote tile.
+        if (speakerSupported) void applySpeaker(speakerOn);
+      } else {
+        mediaElsRef.current.delete(el);
+      }
+    },
+    [applySpeaker, speakerOn, speakerSupported]
+  );
+
+  const toggleSpeaker = useCallback(() => {
+    if (!speakerSupported) {
+      setErrText(t('call.speakerUnsupported'));
+      return;
+    }
+    setSpeakerOn((prev) => {
+      const next = !prev;
+      void applySpeaker(next);
+      return next;
+    });
+  }, [applySpeaker, speakerSupported, t]);
 
   function setPhaseBoth(p: Phase) {
     phaseRef.current = p;
@@ -187,10 +268,12 @@ export function CallProvider({ children }: { children: ReactNode }) {
     invitedRef.current = [];
     hadPeersRef.current = false;
     facingRef.current = 'user';
+    mediaElsRef.current.clear();
     setParticipants(new Map());
     setIncoming(null);
     setMuted(false);
     setCameraOff(false);
+    setSpeakerOn(true);
     setErrText('');
     setPhaseBoth('idle');
   }, [supabase]);
@@ -597,7 +680,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
             {oneToOne ? (
               <>
                 {remoteList[0] ? (
-                  <RemoteTile p={remoteList[0]} fill />
+                  <RemoteTile p={remoteList[0]} fill register={registerMediaEl} />
                 ) : (
                   <div className="flex h-full w-full flex-col items-center justify-center gap-3">
                     <div className="grid h-24 w-24 place-items-center rounded-full bg-slate-800 text-4xl text-slate-300">
@@ -623,7 +706,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
                 className={`grid h-full w-full gap-1 p-1 ${totalTiles <= 4 ? 'grid-cols-2' : 'grid-cols-3'}`}
               >
                 {remoteList.map((p) => (
-                  <RemoteTile key={p.id} p={p} />
+                  <RemoteTile key={p.id} p={p} register={registerMediaEl} />
                 ))}
                 {/* Local tile */}
                 <div className="relative aspect-square overflow-hidden rounded-xl bg-slate-900">
@@ -688,6 +771,16 @@ export function CallProvider({ children }: { children: ReactNode }) {
                 <SwitchCameraIcon size={22} />
               </button>
             )}
+            <button
+              type="button"
+              onClick={toggleSpeaker}
+              aria-label={speakerOn ? t('call.speakerOn') : t('call.speakerOff')}
+              className={`grid h-12 w-12 place-items-center rounded-full ${
+                speakerOn ? 'bg-slate-800 text-white hover:bg-slate-700' : 'bg-white text-slate-900'
+              } ${speakerSupported ? '' : 'opacity-50'}`}
+            >
+              {speakerOn ? <SpeakerIcon size={22} /> : <SpeakerOffIcon size={22} />}
+            </button>
             <button
               type="button"
               onClick={endCall}

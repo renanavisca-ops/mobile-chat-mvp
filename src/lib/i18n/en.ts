@@ -298,6 +298,9 @@ const en = {
     unmute: 'Unmute',
     toggleCamera: 'Toggle camera',
     flipCamera: 'Flip camera',
+    speakerOn: 'Speaker on',
+    speakerOff: 'Speaker off',
+    speakerUnsupported: 'Your browser controls call audio output — use the phone’s speaker button.',
   },
   gif: {
     searchPlaceholder: 'Search GIFs…',

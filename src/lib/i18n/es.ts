@@ -300,6 +300,9 @@ const es: Dictionary = {
     unmute: 'Activar micrófono',
     toggleCamera: 'Cámara',
     flipCamera: 'Girar cámara',
+    speakerOn: 'Altavoz activado',
+    speakerOff: 'Altavoz desactivado',
+    speakerUnsupported: 'Tu navegador controla la salida de audio — usa el botón de altavoz del teléfono.',
   },
   gif: {
     searchPlaceholder: 'Buscar GIFs…',
