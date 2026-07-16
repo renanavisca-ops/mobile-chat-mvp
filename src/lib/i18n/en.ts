@@ -297,6 +297,7 @@ const en = {
     mute: 'Mute',
     unmute: 'Unmute',
     toggleCamera: 'Toggle camera',
+    flipCamera: 'Flip camera',
   },
   gif: {
     searchPlaceholder: 'Search GIFs…',

@@ -6,8 +6,22 @@
   color-scheme: light dark;
 }
 
+html {
+  /* Stop mobile browsers from inflating font sizes in landscape. */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
 body {
   @apply bg-slate-950 text-slate-100;
+}
+
+/* Respect iOS/Android safe areas (notches, home indicator). */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.pt-safe {
+  padding-top: env(safe-area-inset-top);
 }
 
 /* Story progress bar fill (used by the full-screen story viewer). */

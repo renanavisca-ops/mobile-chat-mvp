@@ -299,6 +299,7 @@ const es: Dictionary = {
     mute: 'Silenciar',
     unmute: 'Activar micrófono',
     toggleCamera: 'Cámara',
+    flipCamera: 'Girar cámara',
   },
   gif: {
     searchPlaceholder: 'Buscar GIFs…',

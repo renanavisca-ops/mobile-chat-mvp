@@ -12,7 +12,7 @@ import {
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { browserSupabase } from '@/lib/supabase/client';
 import { useT } from '@/lib/i18n/context';
-import { PhoneIcon, PhoneOffIcon, VideoIcon, VideoOffIcon, MicIcon, MicOffIcon } from '@/components/icons';
+import { PhoneIcon, PhoneOffIcon, VideoIcon, VideoOffIcon, MicIcon, MicOffIcon, SwitchCameraIcon } from '@/components/icons';
 
 type Phase = 'idle' | 'ringing' | 'incall';
 
@@ -97,6 +97,8 @@ export function CallProvider({ children }: { children: ReactNode }) {
   const invitedRef = useRef<string[]>([]);
   const iceServersRef = useRef<RTCIceServer[]>([{ urls: 'stun:stun.cloudflare.com:3478' }]);
   const incomingCallIdRef = useRef<string | null>(null);
+  const facingRef = useRef<'user' | 'environment'>('user');
+  const hadPeersRef = useRef(false);
 
   const localVideoRef = useRef<HTMLVideoElement | null>(null);
 
@@ -137,6 +139,13 @@ export function CallProvider({ children }: { children: ReactNode }) {
     const pc = pcsRef.current.get(pid);
     if (pc) {
       try {
+        // Detach senders first so closing this one peer never affects the
+        // shared local mic/camera tracks used by the other peers.
+        pc.getSenders().forEach((s) => {
+          try {
+            s.replaceTrack(null);
+          } catch {}
+        });
         pc.close();
       } catch {}
     }
@@ -148,7 +157,16 @@ export function CallProvider({ children }: { children: ReactNode }) {
       next.delete(pid);
       return next;
     });
+    // If everyone who had joined has now left, end the call for the last person.
+    if (hadPeersRef.current && pcsRef.current.size === 0) {
+      window.setTimeout(() => {
+        if (pcsRef.current.size === 0) cleanupRef.current?.();
+      }, 800);
+    }
   }, []);
+
+  // Forward ref so teardownPeer (defined before cleanup) can call it.
+  const cleanupRef = useRef<(() => void) | null>(null);
 
   const cleanup = useCallback(() => {
     for (const pid of Array.from(pcsRef.current.keys())) {
@@ -167,6 +185,8 @@ export function CallProvider({ children }: { children: ReactNode }) {
     }
     callIdRef.current = null;
     invitedRef.current = [];
+    hadPeersRef.current = false;
+    facingRef.current = 'user';
     setParticipants(new Map());
     setIncoming(null);
     setMuted(false);
@@ -174,6 +194,8 @@ export function CallProvider({ children }: { children: ReactNode }) {
     setErrText('');
     setPhaseBoth('idle');
   }, [supabase]);
+
+  cleanupRef.current = cleanup;
 
   useEffect(() => {
     if (localVideoRef.current && localStreamRef.current) {
@@ -247,6 +269,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
     };
     pc.ontrack = (e) => {
       const [stream] = e.streams;
+      hadPeersRef.current = true;
       setParticipants((prev) => {
         const next = new Map(prev);
         const existingP = next.get(pid);
@@ -364,6 +387,23 @@ export function CallProvider({ children }: { children: ReactNode }) {
             label: opts.label,
           });
         }
+
+        // Also push a notification so callees with the app closed get alerted.
+        try {
+          const { data: sess } = await supabase.auth.getSession();
+          void fetch('/api/push/call', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${sess.session?.access_token}` },
+            body: JSON.stringify({
+              calleeIds: opts.peerIds,
+              callerName: myNameRef.current,
+              video: opts.video,
+              chatId: opts.chatId,
+            }),
+          });
+        } catch {
+          // best-effort; realtime invite already sent
+        }
       } catch (e: any) {
         setErrText(e?.message ?? String(e));
         cleanup();
@@ -420,6 +460,41 @@ export function CallProvider({ children }: { children: ReactNode }) {
     if (!track) return;
     track.enabled = !track.enabled;
     setCameraOff(!track.enabled);
+  }
+
+  async function flipCamera() {
+    if (!isVideo) return;
+    const next = facingRef.current === 'user' ? 'environment' : 'user';
+    try {
+      const gum = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: next } },
+        audio: false,
+      });
+      const newTrack = gum.getVideoTracks()[0];
+      if (!newTrack) return;
+      newTrack.enabled = !cameraOff;
+
+      // Swap the outgoing track on every peer connection.
+      for (const pc of pcsRef.current.values()) {
+        const sender = pc.getSenders().find((s) => s.track && s.track.kind === 'video');
+        if (sender) await sender.replaceTrack(newTrack);
+      }
+
+      // Swap it into the local preview stream too.
+      const local = localStreamRef.current;
+      if (local) {
+        const old = local.getVideoTracks()[0];
+        if (old) {
+          local.removeTrack(old);
+          old.stop();
+        }
+        local.addTrack(newTrack);
+        if (localVideoRef.current) localVideoRef.current.srcObject = local;
+      }
+      facingRef.current = next;
+    } catch (e: any) {
+      setErrText(e?.message ?? String(e));
+    }
   }
 
   // Personal signaling channel: incoming invites, cancels, declines.
@@ -601,6 +676,16 @@ export function CallProvider({ children }: { children: ReactNode }) {
                 }`}
               >
                 {cameraOff ? <VideoOffIcon size={22} /> : <VideoIcon size={22} />}
+              </button>
+            )}
+            {isVideo && !cameraOff && (
+              <button
+                type="button"
+                onClick={flipCamera}
+                aria-label={t('call.flipCamera')}
+                className="grid h-12 w-12 place-items-center rounded-full bg-slate-800 text-white hover:bg-slate-700"
+              >
+                <SwitchCameraIcon size={22} />
               </button>
             )}
             <button

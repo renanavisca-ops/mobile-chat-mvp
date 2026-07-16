@@ -59,6 +59,47 @@ export function useChatRealtime(chatId: string) {
     };
   }, [chatId]);
 
+  // Catch up after the realtime socket may have missed events (phone sleep,
+  // network blip, tab backgrounded). Re-pulls the latest page and merges,
+  // de-duping our own optimistic echoes against their real rows.
+  const refetch = useCallback(async () => {
+    try {
+      const rows = await listMessages(chatId, PAGE_SIZE, 0);
+      setMessages((prev) => {
+        const map = new Map<string, MessageRow>();
+        for (const m of prev) map.set(m.id, m);
+        for (const r of rows) map.set(r.id, r);
+        const realCiphertexts = new Set(rows.map((r) => r.ciphertext ?? ''));
+        const merged = Array.from(map.values()).filter(
+          (m) => !(String(m.id).startsWith('local-') && realCiphertexts.has(m.ciphertext ?? ''))
+        );
+        merged.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+        return merged;
+      });
+      listReactions(chatId).then(setReactions).catch(() => {});
+      listPollVotes(chatId).then(setPollVotes).catch(() => {});
+      listHiddenMessages(chatId)
+        .then((r) => setHiddenIds(new Set(r.map((x) => x.message_id))))
+        .catch(() => {});
+    } catch {
+      // ignore transient failures
+    }
+  }, [chatId]);
+
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') refetch();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('online', refetch);
+    window.addEventListener('focus', refetch);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('online', refetch);
+      window.removeEventListener('focus', refetch);
+    };
+  }, [refetch]);
+
   const loadMore = useCallback(async () => {
     if (loadingMore || !hasMore || loading) return;
     setLoadingMore(true);
@@ -208,6 +249,8 @@ export function useChatRealtime(chatId: string) {
       .subscribe(async (status: REALTIME_SUBSCRIBE_STATES) => {
         if (status === 'SUBSCRIBED') {
           await channel.track({ typing: false, userId });
+          // Catch up on anything missed before/while (re)subscribing.
+          refetch();
         }
       });
       
@@ -216,6 +259,7 @@ export function useChatRealtime(chatId: string) {
     return () => {
       void supabase.removeChannel(channel);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chatId, notify]);
 
   // Update presence typing status
