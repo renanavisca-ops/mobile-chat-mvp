@@ -15,6 +15,18 @@ export function pushSupported(): boolean {
   return typeof window !== 'undefined' && 'serviceWorker' in navigator && 'PushManager' in window;
 }
 
+/** Whether this device currently has an active push subscription. */
+export async function isPushSubscribed(): Promise<boolean> {
+  if (!pushSupported()) return false;
+  try {
+    const reg = await navigator.serviceWorker.getRegistration('/sw.js');
+    const sub = await reg?.pushManager.getSubscription();
+    return !!sub;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Registers the service worker, requests notification permission if needed,
  * subscribes to Web Push, and stores the subscription for this user so the

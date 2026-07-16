@@ -512,6 +512,7 @@ const es: Dictionary = {
     pushPrompt: 'Recibe un aviso cuando llega un mensaje nuevo, aunque la app esté cerrada.',
     enable: 'Activar',
     enabling: 'Activando…',
+    pushResubscribe: 'Volver a suscribir este dispositivo',
     privacyPolicy: 'Política de privacidad',
     termsOfService: 'Términos de servicio',
     languageAuto: 'Automático (sistema)',

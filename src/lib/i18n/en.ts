@@ -510,6 +510,7 @@ const en = {
     pushPrompt: "Get an alert when a new message arrives, even if the app is closed.",
     enable: 'Enable',
     enabling: 'Enabling…',
+    pushResubscribe: 'Re-subscribe this device',
     privacyPolicy: 'Privacy Policy',
     termsOfService: 'Terms of Service',
     languageAuto: 'Automatic (system)',

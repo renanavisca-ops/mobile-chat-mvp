@@ -7,7 +7,7 @@ import { browserSupabase } from '@/lib/supabase/client';
 import { WALLPAPERS, CUSTOM_WALLPAPER_ID, getWallpaperId, setWallpaperId as saveWallpaperId, uploadCustomWallpaper, getCustomWallpaperUrl } from '@/lib/wallpaper';
 import { uploadAvatar } from '@/lib/db/avatar';
 import { useNotifications } from '@/lib/hooks/useNotifications';
-import { subscribeToPush, pushSupported } from '@/lib/push';
+import { subscribeToPush, unsubscribeFromPush, isPushSubscribed, pushSupported } from '@/lib/push';
 import { useLanguage, TransBold, type LangPreference } from '@/lib/i18n/context';
 import { useTheme, type Accent } from '@/lib/theme';
 import { AvatarCreator } from '@/components/avatar-creator';
@@ -59,13 +59,41 @@ export default function SettingsPage() {
   const { permission } = useNotifications();
   const [pushBusy, setPushBusy] = useState(false);
   const [pushErr, setPushErr] = useState('');
+  const [pushOn, setPushOn] = useState(false);
 
-  async function enablePush() {
+  useEffect(() => {
+    isPushSubscribed().then(setPushOn).catch(() => {});
+  }, []);
+
+  async function togglePush() {
     if (!user) return;
     setPushBusy(true);
     setPushErr('');
     try {
+      if (pushOn) {
+        await unsubscribeFromPush();
+        setPushOn(false);
+      } else {
+        await subscribeToPush(user.id);
+        setPushOn(true);
+      }
+    } catch (e: any) {
+      setPushErr(e?.message ?? String(e));
+    } finally {
+      setPushBusy(false);
+    }
+  }
+
+  // Re-subscribe from scratch (e.g. after the server's VAPID keys changed and
+  // the old subscription became stale).
+  async function resubscribePush() {
+    if (!user) return;
+    setPushBusy(true);
+    setPushErr('');
+    try {
+      await unsubscribeFromPush().catch(() => {});
       await subscribeToPush(user.id);
+      setPushOn(true);
     } catch (e: any) {
       setPushErr(e?.message ?? String(e));
     } finally {
@@ -674,22 +702,40 @@ export default function SettingsPage() {
                       ? t('settings.pushUnsupported')
                       : permission === 'denied'
                       ? t('settings.pushBlocked')
-                      : permission === 'granted'
+                      : pushOn
                       ? t('settings.pushGranted')
                       : t('settings.pushPrompt')}
                   </div>
                 </div>
-                {permission !== 'granted' && pushSupported() && (
+                {pushSupported() && (
                   <button
-                    type="button"
-                    onClick={enablePush}
+                    onClick={togglePush}
                     disabled={pushBusy || permission === 'denied'}
-                    className="rounded-lg bg-slate-800 px-3 py-1.5 text-sm text-slate-200 hover:bg-slate-700 disabled:opacity-50"
+                    role="switch"
+                    aria-checked={pushOn}
+                    aria-label={t('settings.pushNotifications')}
+                    className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors disabled:opacity-50 ${
+                      pushOn ? 'bg-emerald-600' : 'bg-slate-700'
+                    }`}
                   >
-                    {pushBusy ? t('settings.enabling') : t('settings.enable')}
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        pushOn ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                    />
                   </button>
                 )}
               </div>
+              {pushOn && pushSupported() && (
+                <button
+                  type="button"
+                  onClick={resubscribePush}
+                  disabled={pushBusy}
+                  className="mt-3 text-xs text-blue-400 hover:text-blue-300 disabled:opacity-50"
+                >
+                  {pushBusy ? t('settings.enabling') : t('settings.pushResubscribe')}
+                </button>
+              )}
               {pushErr && <p className="mt-2 text-xs text-red-400">{pushErr}</p>}
             </div>
           </section>
