@@ -155,7 +155,7 @@ export async function listChats(): Promise<ChatSummary[]> {
   // list must only show chats I actually belong to (plus store chats I staff).
   const myChats = chatList.filter((c) => myMemberChatIds.has(c.id) || !!c.store_id);
 
-  return myChats.map((c) => {
+  const summaries = myChats.map((c) => {
     let title = c.title;
     if (c.kind === 'direct') {
       const others = (otherIdsByChat.get(c.id) ?? [])
@@ -186,6 +186,16 @@ export async function listChats(): Promise<ChatSummary[]> {
       member_ids: otherIds,
     };
   });
+
+  // Most recently active chats first (fall back to chat creation time for
+  // chats with no messages yet).
+  summaries.sort((a, b) => {
+    const ta = new Date(a.last_message_at ?? a.created_at).getTime();
+    const tb = new Date(b.last_message_at ?? b.created_at).getTime();
+    return tb - ta;
+  });
+
+  return summaries;
 }
 
 export async function createDirectChatWith(userId: string): Promise<string> {

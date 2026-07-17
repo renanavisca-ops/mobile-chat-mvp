@@ -3,62 +3,72 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useT } from '@/lib/i18n/context';
+import {
+  ChatBubbleIcon,
+  UsersIcon,
+  HashIcon,
+  UserPlusIcon,
+  GearIcon,
+} from '@/components/icons';
 
-function NavLink({ href, label }: { href: string; label: string }) {
+const NAV_ITEMS = [
+  { href: '/chats', key: 'nav.chats', Icon: ChatBubbleIcon },
+  { href: '/contacts', key: 'nav.contacts', Icon: UsersIcon },
+  { href: '/channels', key: 'nav.channels', Icon: HashIcon },
+  { href: '/groups/new', key: 'nav.newGroup', Icon: UserPlusIcon },
+  { href: '/settings', key: 'nav.settings', Icon: GearIcon },
+] as const;
+
+function BottomNav() {
   const pathname = usePathname();
-  const active = pathname === href || pathname?.startsWith(href + '/');
+  const t = useT();
   return (
-    <Link
-      href={href}
-      className={[
-        'rounded-full px-3 py-1.5 text-sm transition',
-        active ? 'bg-slate-800 text-white' : 'text-slate-300 hover:bg-slate-900 hover:text-white'
-      ].join(' ')}
-    >
-      {label}
-    </Link>
+    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-800 bg-slate-950/95 pb-safe backdrop-blur">
+      <ul className="mx-auto flex max-w-2xl items-stretch justify-around">
+        {NAV_ITEMS.map(({ href, key, Icon }) => {
+          const active = pathname === href || pathname?.startsWith(href + '/');
+          return (
+            <li key={href} className="flex-1">
+              <Link
+                href={href}
+                aria-current={active ? 'page' : undefined}
+                className={[
+                  'flex flex-col items-center gap-1 py-2 text-[11px] font-medium transition-colors',
+                  active ? 'text-blue-500' : 'text-slate-400 hover:text-slate-200',
+                ].join(' ')}
+              >
+                <Icon className="h-6 w-6" size={24} />
+                <span className="leading-none">{t(key)}</span>
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+    </nav>
   );
 }
 
 export function PageShell({
   title,
   right,
-  children
+  children,
 }: {
   title: string;
   right?: React.ReactNode;
   children: React.ReactNode;
 }) {
-  const t = useT();
-
   return (
     <main className="min-h-screen bg-slate-950 text-slate-50">
-      <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 p-4 sm:p-6">
-        <header className="flex flex-col gap-3 rounded-2xl border border-slate-900 bg-slate-950/50 p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center justify-between gap-3">
-            <h1 className="text-xl font-semibold">{title}</h1>
-            <div className="sm:hidden">{right}</div>
-          </div>
+      <header className="sticky top-0 z-30 border-b border-slate-900 bg-slate-950/90 pt-safe backdrop-blur">
+        <div className="mx-auto flex max-w-2xl items-center justify-between gap-3 px-4 py-3">
+          <h1 className="truncate text-lg font-semibold">{title}</h1>
+          {right ? <div className="shrink-0">{right}</div> : null}
+        </div>
+      </header>
 
-          <nav className="flex flex-wrap items-center gap-2">
-            <NavLink href="/chats" label={t('nav.chats')} />
-            <NavLink href="/contacts" label={t('nav.contacts')} />
-            <NavLink href="/channels" label={t('nav.channels')} />
-            <NavLink href="/groups/new" label={t('nav.newGroup')} />
-            <NavLink href="/settings" label={t('nav.settings')} />
-          </nav>
+      <div className="mx-auto w-full max-w-2xl px-3 pb-28 pt-3">{children}</div>
 
-          <div className="hidden sm:block">{right}</div>
-        </header>
-
-        <section className="rounded-2xl border border-slate-900 bg-slate-950/60 p-4 shadow-sm">
-          {children}
-        </section>
-
-        <footer className="pb-6 text-center text-xs text-slate-500">
-          {t('footer.tagline')}
-        </footer>
-      </div>
+      <BottomNav />
     </main>
   );
 }
