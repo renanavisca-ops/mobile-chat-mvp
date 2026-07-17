@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { PageShell } from '@/components/page-shell';
+import Link from 'next/link';
+import { ChevronLeftIcon } from '@/components/icons';
 import { ForwardModal } from '@/components/forward-modal';
 import { MessageActionsSheet } from '@/components/message-actions-sheet';
 import { AttachSheet } from '@/components/attach-sheet';
@@ -1196,7 +1197,20 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
   const loading = authLoading || msgLoading;
 
   return (
-    <PageShell title={t('chat.title')}>
+    <div className="flex h-[100dvh] flex-col overflow-hidden bg-slate-950 text-slate-50">
+      <header className="flex items-center gap-1 border-b border-slate-900 bg-slate-950/90 px-2 py-2 pt-safe backdrop-blur">
+        <Link
+          href="/chats"
+          className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-slate-300 hover:bg-slate-900 hover:text-white"
+          aria-label={t('messageActions.back')}
+        >
+          <ChevronLeftIcon size={24} />
+        </Link>
+        <h1 className="min-w-0 flex-1 truncate text-base font-semibold">
+          {chat?.title || t('chat.title')}
+        </h1>
+      </header>
+
       <MessageEffects trigger={effectTrigger} onDone={() => setEffectTrigger(null)} />
 
       <ForwardModal
@@ -1438,9 +1452,9 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
       <input ref={fileInputRef} type="file" hidden onChange={onFileChange} />
 
       {loading ? (
-        <p className="text-sm text-slate-300">{t('chat.loading')}</p>
+        <div className="grid flex-1 place-items-center text-sm text-slate-300">{t('chat.loading')}</div>
       ) : (
-        <div className="flex flex-col gap-3">
+        <div className="flex min-h-0 flex-1 flex-col gap-2 px-3 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
           <div className="flex items-center justify-between gap-2 text-xs text-slate-400">
             <div className="flex items-center gap-2">
               <span>{t('chat.members')}: {membersLoading ? t('chat.loading') : members.length ? members.join(', ') : '—'}</span>
@@ -1723,7 +1737,7 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
             </button>
           )}
 
-          <div ref={scrollRef} onScroll={handleScroll} style={wallpaperStyle} className="h-[55vh] overflow-auto rounded-xl border border-slate-900 bg-slate-950/40 p-3">
+          <div ref={scrollRef} onScroll={handleScroll} style={wallpaperStyle} className="min-h-0 flex-1 overflow-auto rounded-xl border border-slate-900 bg-slate-950/40 p-3">
             {loadingMore && <div className="text-center text-xs text-slate-500 my-2">{t('chat.loadingOlder')}</div>}
             {items.length === 0 ? (
               <p className="text-sm text-slate-400">{t('chat.noMessagesYet')}</p>
@@ -2171,6 +2185,6 @@ export default function ChatPage({ params }: { params: { chatId: string } }) {
           )}
         </div>
       )}
-    </PageShell>
+    </div>
   );
 }

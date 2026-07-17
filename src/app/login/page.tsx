@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { PageShell } from '@/components/page-shell';
 import { browserSupabase } from '@/lib/supabase/client';
 import { useT } from '@/lib/i18n/context';
 
@@ -115,8 +114,16 @@ export default function LoginPage() {
   }
 
   return (
-    <PageShell title={mode === 'forgot' ? t('auth.titleForgot') : mode === 'signin' ? t('auth.signIn') : t('auth.signUp')}>
-      <div className="mx-auto max-w-md space-y-4">
+    <main className="flex min-h-[100dvh] flex-col items-center justify-center bg-slate-950 px-5 py-10 text-slate-50 pt-safe pb-safe">
+      <div className="w-full max-w-md space-y-6">
+        <div className="flex flex-col items-center text-center">
+          <div className="grid h-16 w-16 place-items-center rounded-2xl bg-gradient-to-br from-blue-600 to-emerald-500 text-3xl font-extrabold text-white shadow-lg shadow-blue-600/30">
+            T
+          </div>
+          <h1 className="mt-4 text-2xl font-bold">{t('auth.welcomeTitle')}</h1>
+          <p className="mt-1 text-sm text-slate-400">{t('auth.welcomeSubtitle')}</p>
+        </div>
+
         {mode !== 'forgot' && (
           <div className="flex gap-2">
             <button
@@ -216,6 +223,6 @@ export default function LoginPage() {
           )}
         </div>
       </div>
-    </PageShell>
+    </main>
   );
 }

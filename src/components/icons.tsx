@@ -352,6 +352,14 @@ export function TypeIcon(props: IconProps) {
   );
 }
 
+export function ChevronLeftIcon(props: IconProps) {
+  return (
+    <Base {...props}>
+      <polyline points="15 18 9 12 15 6" />
+    </Base>
+  );
+}
+
 // --- Bottom-navigation icons ---
 
 export function ChatBubbleIcon(props: IconProps) {

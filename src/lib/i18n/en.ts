@@ -23,7 +23,7 @@ const en = {
     statusClosed: 'Closed',
   },
   footer: {
-    tagline: 'Toky Chat • built on Next.js + Supabase',
+    tagline: 'Toky Chat',
   },
   nav: {
     chats: 'Chats',
@@ -56,6 +56,8 @@ const en = {
     agree: "I'm {{age}} or older — I agree",
   },
   auth: {
+    welcomeTitle: 'Welcome to Toky',
+    welcomeSubtitle: 'The best way to chat with the people who matter.',
     titleForgot: 'Recover access',
     signIn: 'Sign in',
     signUp: 'Sign up',

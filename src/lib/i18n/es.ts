@@ -25,7 +25,7 @@ const es: Dictionary = {
     statusClosed: 'Cerrado',
   },
   footer: {
-    tagline: 'Toky Chat • hecho con Next.js + Supabase',
+    tagline: 'Toky Chat',
   },
   nav: {
     chats: 'Chats',
@@ -58,6 +58,8 @@ const es: Dictionary = {
     agree: 'Tengo {{age}} años o más — Acepto',
   },
   auth: {
+    welcomeTitle: 'Bienvenido a Toky',
+    welcomeSubtitle: 'La mejor forma de chatear con quienes importan.',
     titleForgot: 'Recuperar acceso',
     signIn: 'Iniciar sesión',
     signUp: 'Crear cuenta',
