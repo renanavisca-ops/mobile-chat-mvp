@@ -19,7 +19,7 @@ const NAV_ITEMS = [
   { href: '/settings', key: 'nav.settings', Icon: GearIcon },
 ] as const;
 
-function BottomNav() {
+export function BottomNav() {
   const pathname = usePathname();
   const t = useT();
   return (

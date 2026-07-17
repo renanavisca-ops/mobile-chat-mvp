@@ -359,7 +359,8 @@ export default function SettingsPage() {
   async function signOut() {
     setStatus('');
     await supabase.auth.signOut();
-    setStatus(`✅ ${t('settings.signedOut')}`);
+    // Send the user back to the front page, not the (now signed-out) settings.
+    window.location.href = '/login';
   }
 
   async function toggleShowOnline() {

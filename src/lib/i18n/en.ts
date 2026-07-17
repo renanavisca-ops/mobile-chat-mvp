@@ -103,6 +103,7 @@ const en = {
   chatsList: {
     title: 'Chats',
     newChat: 'New chat',
+    pickChat: 'Select a conversation to start chatting',
     loading: 'Loading…',
     noChatsYet: 'No chats yet.',
     goToContacts: 'Go to Contacts',

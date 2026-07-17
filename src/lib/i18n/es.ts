@@ -105,6 +105,7 @@ const es: Dictionary = {
   chatsList: {
     title: 'Chats',
     newChat: 'Nuevo chat',
+    pickChat: 'Selecciona una conversación para empezar a chatear',
     loading: 'Cargando…',
     noChatsYet: 'Aún no tienes chats.',
     goToContacts: 'Ir a Contactos',
