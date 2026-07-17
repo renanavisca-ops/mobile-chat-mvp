@@ -161,7 +161,9 @@ export default function ChatsPage() {
 
   return (
     <div className="flex h-[100dvh] flex-col bg-slate-950 text-slate-50">
-      <div className="mx-auto flex min-h-0 w-full max-w-6xl flex-1">
+      {/* Reserve space for the fixed bottom nav so the conversation composer
+          isn't hidden behind it. Fill the full width on wide screens. */}
+      <div className="flex min-h-0 w-full flex-1 pb-[calc(3.75rem+env(safe-area-inset-bottom))]">
         {/* LEFT — conversation list */}
         <aside className="flex min-h-0 w-full flex-col lg:w-96 lg:shrink-0 lg:border-r lg:border-slate-900">
           <header className="sticky top-0 z-20 flex items-center justify-between gap-3 border-b border-slate-900 bg-slate-950/90 px-4 py-3 pt-safe backdrop-blur">
@@ -171,7 +173,7 @@ export default function ChatsPage() {
             </Link>
           </header>
 
-          <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-24 pt-3 lg:pb-4">
+          <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4 pt-3">
             <StoriesBar />
 
             {err ? <p className="text-sm text-red-300">{err}</p> : null}

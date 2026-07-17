@@ -25,6 +25,9 @@ export function StoryViewer({
   const [storyIndex, setStoryIndex] = useState(0);
   const [mediaUrl, setMediaUrl] = useState<string | null>(null);
   const [viewCount, setViewCount] = useState<number | null>(null);
+  // Only start the auto-advance countdown once the story's content is actually
+  // on screen — otherwise a slow-loading image gets skipped before it appears.
+  const [loaded, setLoaded] = useState(false);
   const timerRef = useRef<number | null>(null);
 
   const group = groups[groupIndex];
@@ -67,6 +70,8 @@ export function StoryViewer({
     let alive = true;
     setMediaUrl(null);
     setViewCount(null);
+    // Text stories have nothing to download, so they're "loaded" right away.
+    setLoaded(!story.media_path);
 
     markStoryViewed(story.id).then(onChanged).catch(() => {});
 
@@ -77,15 +82,22 @@ export function StoryViewer({
       countStoryViews(story.id).then((n) => alive && setViewCount(n)).catch(() => {});
     }
 
-    if (timerRef.current) window.clearTimeout(timerRef.current);
-    timerRef.current = window.setTimeout(next, DURATION);
-
     return () => {
       alive = false;
-      if (timerRef.current) window.clearTimeout(timerRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [groupIndex, storyIndex]);
+
+  // Arm the auto-advance timer only once the content is loaded (see `loaded`).
+  useEffect(() => {
+    if (!story || !loaded) return;
+    if (timerRef.current) window.clearTimeout(timerRef.current);
+    timerRef.current = window.setTimeout(next, DURATION);
+    return () => {
+      if (timerRef.current) window.clearTimeout(timerRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loaded, groupIndex, storyIndex]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -130,7 +142,7 @@ export function StoryViewer({
                 style={
                   i < storyIndex
                     ? { width: '100%' }
-                    : i === storyIndex
+                    : i === storyIndex && loaded
                     ? { animation: `storyProgress ${DURATION}ms linear forwards` }
                     : { width: '0%' }
                 }
@@ -170,7 +182,13 @@ export function StoryViewer({
           {story.media_path ? (
             mediaUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={mediaUrl} alt="" className="max-h-full max-w-full object-contain" />
+              <img
+                src={mediaUrl}
+                alt=""
+                className="max-h-full max-w-full object-contain"
+                onLoad={() => setLoaded(true)}
+                onError={() => setLoaded(true)}
+              />
             ) : (
               <div className="h-16 w-16 animate-pulse rounded-full bg-white/10" />
             )
