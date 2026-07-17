@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { PageShell } from '@/components/page-shell';
 import { createLocalDeviceBundle } from '@/lib/crypto/device';
 import { browserSupabase } from '@/lib/supabase/client';
+import { useSession } from '@/lib/auth/use-session';
 import { useT, TransBold } from '@/lib/i18n/context';
 
 const USERNAME_RE = /^[A-Za-z0-9_]{3,20}$/;
@@ -12,10 +13,24 @@ const USERNAME_RE = /^[A-Za-z0-9_]{3,20}$/;
 export default function OnboardingPage() {
   const router = useRouter();
   const t = useT();
+  const { user, profile, loading } = useSession();
   const [status, setStatus] = useState<string>('');
   const [busy, setBusy] = useState(false);
   const [username, setUsername] = useState<string>('');
   const [avail, setAvail] = useState<'idle' | 'checking' | 'ok' | 'taken' | 'invalid'>('idle');
+
+  // Recognize returning users: if this account already has a username (even on
+  // a fresh device with empty localStorage), skip onboarding and go to chats.
+  useEffect(() => {
+    if (loading) return;
+    if (!user) {
+      router.replace('/login');
+      return;
+    }
+    if (profile?.username) {
+      router.replace('/chats');
+    }
+  }, [loading, user, profile, router]);
 
   useEffect(() => {
     try {

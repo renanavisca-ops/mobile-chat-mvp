@@ -105,7 +105,9 @@ export default function LoginPage() {
         throw new Error(t('auth.errorNoSession'));
       }
 
-      router.replace('/onboarding');
+      // Existing users go straight to their chats; the auth guard sends them
+      // to onboarding only if they genuinely have no username yet.
+      router.replace('/chats');
     } catch (err: any) {
       setStatus(`❌ ${err?.message ?? String(err)}`);
     } finally {
