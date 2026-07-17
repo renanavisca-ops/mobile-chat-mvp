@@ -29,7 +29,7 @@ import type { Gif } from '@/lib/giphy';
 import { useCall } from '@/lib/call/call-provider';
 import { VideoTrimmer, TrimmedVideo } from '@/components/video-trimmer';
 import { suggestReplies, translateText } from '@/lib/ai';
-import { PhoneIcon, VideoIcon, PlusIcon, SmileIcon, MicIcon, PencilIcon, ReplyIcon, ForwardIcon, CopyIcon, DownloadIcon, EyeOffIcon, TrashIcon, PinIcon, FlagIcon, PaperclipIcon, SparklesIcon, GlobeIcon } from '@/components/icons';
+import { PhoneIcon, VideoIcon, PlusIcon, SmileIcon, MicIcon, PencilIcon, ReplyIcon, ForwardIcon, CopyIcon, DownloadIcon, EyeOffIcon, TrashIcon, PinIcon, FlagIcon, PaperclipIcon, SparklesIcon, GlobeIcon, SendIcon, CheckIcon } from '@/components/icons';
 import type { ChatSummary, MessageRow } from '@/lib/db/types';
 
 type Payload = {
@@ -1738,7 +1738,7 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
             </button>
           )}
 
-          <div ref={scrollRef} onScroll={handleScroll} style={wallpaperStyle} className="min-h-0 flex-1 overflow-auto rounded-xl border border-slate-900 bg-slate-950/40 p-3">
+          <div ref={scrollRef} onScroll={handleScroll} style={wallpaperStyle} className="-mx-3 min-h-0 flex-1 overflow-auto border-y border-slate-900 bg-slate-950/40 px-3 py-3">
             {loadingMore && <div className="text-center text-xs text-slate-500 my-2">{t('chat.loadingOlder')}</div>}
             {items.length === 0 ? (
               <p className="text-sm text-slate-400">{t('chat.noMessagesYet')}</p>
@@ -1755,10 +1755,10 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
                     <li
                       key={m.id}
                       id={`msg-${m.id}`}
-                      className={`flex flex-col mb-2 p-2 rounded-lg max-w-[80%] transition-shadow ${
-                        m.sender_type === 'system' ? 'mx-auto bg-slate-800 text-center text-xs text-slate-400 border border-slate-700' :
-                        isMine(m) ? 'ml-auto bg-blue-900/40 border border-blue-800' :
-                        'mr-auto bg-slate-900 border border-slate-800'
+                      className={`flex flex-col mb-2 px-3 py-2 rounded-2xl max-w-[80%] shadow-sm transition-shadow ${
+                        m.sender_type === 'system' ? 'mx-auto bg-slate-800 text-center text-xs text-slate-400' :
+                        isMine(m) ? 'ml-auto rounded-br-md bg-blue-600 text-white' :
+                        'mr-auto rounded-bl-md bg-slate-800 text-slate-100'
                       }`}
                       onContextMenu={(e) => {
                         e.preventDefault();
@@ -1777,13 +1777,13 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
                       {isGroup && !isMine(m) && m.sender_type !== 'system' && (
                         <div className="text-[10px] font-semibold text-blue-300 mb-0.5">{senderName(m)}</div>
                       )}
-                      <div className="text-[10px] text-slate-500 flex items-center justify-between mb-1">
+                      <div className={`text-[10px] flex items-center justify-between mb-1 ${isMine(m) ? 'text-blue-100/70' : 'text-slate-500'}`}>
                         <span>
-                          {new Date(m.created_at).toLocaleString(lang)}
-                          {m.edited_at && <span className="ml-1 italic text-slate-600">{t('chat.edited')}</span>}
+                          {new Date(m.created_at).toLocaleTimeString(lang, { hour: '2-digit', minute: '2-digit' })}
+                          {m.edited_at && <span className="ml-1 italic">{t('chat.edited')}</span>}
                         </span>
                         {isMine(m) ? (
-                          <span className={m.read ? 'text-blue-400 ml-2' : 'text-slate-600 ml-2'}>
+                          <span className={m.read ? 'text-sky-200 ml-2' : 'text-blue-200/60 ml-2'}>
                             {m.read ? '✓✓' : '✓'}
                           </span>
                         ) : null}
@@ -2099,85 +2099,95 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
           )}
 
           {canPost ? (
-          <div ref={composerRef} className="relative -mx-3 flex items-center gap-2 border-t border-slate-900 bg-slate-950/80 px-3 py-2">
-            {/* + button */}
-            <button
-              className="grid place-items-center rounded bg-slate-800 px-3 py-2 text-slate-200 hover:bg-slate-700"
-              onClick={() => {
-                setEmojiOpen(false);
-                setAttachOpen(true);
-              }}
-              type="button"
-              title={t('chat.attach')}
-              aria-label={t('chat.attach')}
-              disabled={busy}
-            >
-              <PlusIcon size={18} />
-            </button>
+          <div ref={composerRef} className="relative -mx-3 flex items-end gap-2 border-t border-slate-900 bg-slate-950/80 px-2 py-2">
+            {/* Rounded input pill: emoji · text · AI · attach */}
+            <div className="flex min-w-0 flex-1 items-center gap-0.5 rounded-3xl border border-slate-800 bg-slate-900 px-1.5">
+              <div className="relative shrink-0">
+                <button
+                  className="grid h-9 w-9 place-items-center rounded-full text-slate-400 hover:text-slate-200 disabled:opacity-40"
+                  onClick={() => {
+                    setAttachOpen(false);
+                    setEmojiOpen((v) => !v);
+                  }}
+                  type="button"
+                  title={t('chat.emoji')}
+                  aria-label={t('chat.emoji')}
+                  disabled={busy}
+                >
+                  <SmileIcon size={22} />
+                </button>
 
-            {/* Emoji button */}
-            <div className="relative">
-              <button
-                className="grid place-items-center rounded bg-slate-800 px-3 py-2 text-slate-200 hover:bg-slate-700"
-                onClick={() => {
-                  setAttachOpen(false);
-                  setEmojiOpen((v) => !v);
+                <EmojiPicker
+                  open={emojiOpen}
+                  onClose={() => setEmojiOpen(false)}
+                  onPick={(e) => {
+                    insertEmoji(e);
+                    setEmojiOpen(false);
+                  }}
+                />
+              </div>
+
+              <input
+                ref={textInputRef}
+                className="min-w-0 flex-1 bg-transparent px-1 py-2.5 text-[15px] text-slate-100 placeholder:text-slate-500 focus:outline-none"
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                placeholder={t('chat.composerPlaceholder')}
+                onFocus={() => setEmojiOpen(false)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') onSend();
                 }}
+                disabled={blocked}
+              />
+
+              <button
+                className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-slate-400 hover:text-slate-200 disabled:opacity-40"
+                onClick={onSuggest}
                 type="button"
-                title={t('chat.emoji')}
-                aria-label={t('chat.emoji')}
-                disabled={busy}
+                title={t('ai.suggest')}
+                aria-label={t('ai.suggest')}
+                disabled={busy || suggestBusy || items.length === 0}
               >
-                <SmileIcon size={18} />
+                <SparklesIcon size={20} />
               </button>
 
-              <EmojiPicker
-                open={emojiOpen}
-                onClose={() => setEmojiOpen(false)}
-                onPick={(e) => {
-                  insertEmoji(e);
+              <button
+                className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-slate-400 hover:text-slate-200 disabled:opacity-40"
+                onClick={() => {
                   setEmojiOpen(false);
+                  setAttachOpen(true);
                 }}
-              />
+                type="button"
+                title={t('chat.attach')}
+                aria-label={t('chat.attach')}
+                disabled={busy}
+              >
+                <PlusIcon size={22} />
+              </button>
             </div>
 
-            {/* AI smart replies */}
-            <button
-              className="grid place-items-center rounded bg-slate-800 px-3 py-2 text-slate-200 hover:bg-slate-700 disabled:opacity-60"
-              onClick={onSuggest}
-              type="button"
-              title={t('ai.suggest')}
-              aria-label={t('ai.suggest')}
-              disabled={busy || suggestBusy || items.length === 0}
-            >
-              <SparklesIcon size={18} />
-            </button>
-
-            <input
-              ref={textInputRef}
-              className="min-w-0 flex-1 rounded border border-slate-800 bg-slate-950 px-3 py-2 text-slate-100"
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              placeholder={t('chat.composerPlaceholder')}
-              onFocus={() => setEmojiOpen(false)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') onSend();
-              }}
-              disabled={blocked}
-            />
-
-            <button className="rounded bg-blue-600 px-3 py-2 text-sm hover:bg-blue-500 disabled:opacity-60" onClick={onSend} disabled={busy || isRecording || blocked}>
-              {editingId ? t('chat.saveEdit') : t('chat.send')}
-            </button>
-            <button
-              className={`grid place-items-center rounded px-3 py-2 disabled:opacity-60 ${isRecording ? 'bg-red-600 animate-pulse text-white' : 'bg-slate-800 text-slate-200 hover:bg-slate-700'}`}
-              onClick={isRecording ? stopRecording : startRecording}
-              disabled={busy}
-              title={isRecording ? t('chat.stopAndSend') : t('chat.recordAudio')}
-              aria-label={isRecording ? t('chat.stopAndSend') : t('chat.recordAudio')}
-            >
-              <MicIcon size={18} />
-            </button>
+            {/* Circular send (when typing/editing) or mic button */}
+            {text.trim() || editingId ? (
+              <button
+                className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-blue-600 text-white hover:bg-blue-500 disabled:opacity-60"
+                onClick={onSend}
+                disabled={busy || isRecording || blocked}
+                title={editingId ? t('chat.saveEdit') : t('chat.send')}
+                aria-label={editingId ? t('chat.saveEdit') : t('chat.send')}
+              >
+                {editingId ? <CheckIcon size={20} /> : <SendIcon size={20} />}
+              </button>
+            ) : (
+              <button
+                className={`grid h-11 w-11 shrink-0 place-items-center rounded-full text-white disabled:opacity-60 ${isRecording ? 'animate-pulse bg-red-600' : 'bg-blue-600 hover:bg-blue-500'}`}
+                onClick={isRecording ? stopRecording : startRecording}
+                disabled={busy}
+                title={isRecording ? t('chat.stopAndSend') : t('chat.recordAudio')}
+                aria-label={isRecording ? t('chat.stopAndSend') : t('chat.recordAudio')}
+              >
+                <MicIcon size={20} />
+              </button>
+            )}
           </div>
           ) : (
             <p className="rounded-lg border border-slate-900 bg-slate-950/60 px-3 py-3 text-center text-xs text-slate-400">
