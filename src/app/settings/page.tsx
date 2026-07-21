@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { PageShell } from '@/components/page-shell';
 import { browserSupabase } from '@/lib/supabase/client';
+import { clearLocalIdentity } from '@/lib/auth/local-identity';
 import { WALLPAPERS, CUSTOM_WALLPAPER_ID, getWallpaperId, setWallpaperId as saveWallpaperId, uploadCustomWallpaper, getCustomWallpaperUrl } from '@/lib/wallpaper';
 import { uploadAvatar } from '@/lib/db/avatar';
 import { useNotifications } from '@/lib/hooks/useNotifications';
@@ -359,6 +360,9 @@ export default function SettingsPage() {
   async function signOut() {
     setStatus('');
     await supabase.auth.signOut();
+    // Wipe this account's local device/keys so the next user to sign in on this
+    // browser doesn't inherit them.
+    clearLocalIdentity();
     // Send the user back to the front page, not the (now signed-out) settings.
     window.location.href = '/login';
   }

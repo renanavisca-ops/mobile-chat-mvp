@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { browserSupabase } from '@/lib/supabase/client';
+import { reconcileLocalIdentity } from '@/lib/auth/local-identity';
 import { useT } from '@/lib/i18n/context';
 
 type Mode = 'signin' | 'signup' | 'forgot';
@@ -83,6 +84,7 @@ export default function LoginPage() {
         }
 
         if (data.session) {
+          reconcileLocalIdentity(data.session.user.id);
           setStatus(`✅ ${t('auth.statusAccountSessionCreated')}`);
           router.replace('/onboarding');
           return;
@@ -104,6 +106,10 @@ export default function LoginPage() {
       if (!data.session) {
         throw new Error(t('auth.errorNoSession'));
       }
+
+      // Clear any previous account's local device/keys before continuing, so a
+      // second user on this browser doesn't inherit the first user's identity.
+      reconcileLocalIdentity(data.session.user.id);
 
       // Existing users go straight to their chats; the auth guard sends them
       // to onboarding only if they genuinely have no username yet.
