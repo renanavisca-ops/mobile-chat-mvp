@@ -1196,7 +1196,7 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
   const loading = authLoading || msgLoading;
 
   return (
-    <div className={`flex ${embedded ? 'h-full' : 'h-[100dvh]'} flex-col overflow-hidden bg-slate-950 text-slate-50`}>
+    <div className={`flex ${embedded ? 'h-full w-full' : 'h-[100dvh]'} flex-col overflow-hidden bg-slate-950 text-slate-50`}>
       <header className={`flex items-center gap-1 border-b border-slate-900 bg-slate-950/90 px-2 py-2 backdrop-blur ${embedded ? '' : 'pt-safe'}`}>
         {!embedded && (
           <Link
