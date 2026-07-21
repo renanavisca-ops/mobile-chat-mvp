@@ -105,6 +105,7 @@ const es: Dictionary = {
   chatsList: {
     title: 'Chats',
     newChat: 'Nuevo chat',
+    searchPlaceholder: 'Buscar chats…',
     pickChat: 'Selecciona una conversación para empezar a chatear',
     loading: 'Cargando…',
     noChatsYet: 'Aún no tienes chats.',
@@ -127,6 +128,7 @@ const es: Dictionary = {
     members: 'Miembros',
     online: '● En línea',
     offline: '● Desconectado',
+    lastSeen: 'últ. vez {{when}}',
     searchInChat: 'Buscar en el chat',
     groupInfo: 'Info del grupo',
     chatOptions: 'Opciones del chat',

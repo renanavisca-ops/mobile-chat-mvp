@@ -7,6 +7,7 @@ import { useEffect, useState, useRef } from 'react';
 import { BottomNav } from '@/components/page-shell';
 import { StoriesBar } from '@/components/stories-bar';
 import { ChatConversation } from '@/components/chat-conversation';
+import { PlusIcon, SearchIcon, UsersIcon, UserPlusIcon, HashIcon } from '@/components/icons';
 import { useRequireAuth } from '@/lib/auth/use-require-auth';
 import { browserSupabase } from '@/lib/supabase/client';
 import { listChats } from '@/lib/db/chats';
@@ -57,6 +58,8 @@ export default function ChatsPage() {
   const [chats, setChats] = useState<ChatSummary[]>([]);
   const [err, setErr] = useState<string>('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [search, setSearch] = useState('');
   const [, setUnreadCount] = useState(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -166,15 +169,53 @@ export default function ChatsPage() {
       <div className="flex min-h-0 w-full flex-1 pb-[calc(3.75rem+env(safe-area-inset-bottom))]">
         {/* LEFT — conversation list */}
         <aside className="flex min-h-0 w-full flex-col lg:w-96 lg:shrink-0 lg:border-r lg:border-slate-900">
-          <header className="sticky top-0 z-20 flex items-center justify-between gap-3 border-b border-slate-900 bg-slate-950/90 px-4 py-3 pt-safe backdrop-blur">
-            <h1 className="text-lg font-semibold">{t('chatsList.title')}</h1>
-            <Link className="text-sm text-blue-400 hover:text-blue-300" href="/contacts">
-              {t('chatsList.newChat')}
-            </Link>
+          <header className="sticky top-0 z-20 flex flex-col gap-2 border-b border-slate-900 bg-slate-950/90 px-3 py-3 pt-safe backdrop-blur">
+            <div className="flex items-center justify-between gap-3">
+              <h1 className="text-lg font-semibold">{t('chatsList.title')}</h1>
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setMenuOpen((v) => !v)}
+                  className="grid h-9 w-9 place-items-center rounded-full text-slate-300 hover:bg-slate-900 hover:text-white"
+                  aria-label={t('chatsList.newChat')}
+                >
+                  <PlusIcon size={22} />
+                </button>
+                {menuOpen && (
+                  <>
+                    <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
+                    <div className="absolute right-0 top-11 z-20 w-56 overflow-hidden rounded-xl border border-slate-800 bg-slate-950 py-1 shadow-xl">
+                      <Link href="/contacts" onClick={() => setMenuOpen(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-200 hover:bg-slate-900">
+                        <UsersIcon size={18} /> {t('nav.contacts')}
+                      </Link>
+                      <Link href="/contacts" onClick={() => setMenuOpen(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-200 hover:bg-slate-900">
+                        <UserPlusIcon size={18} /> {t('chatsList.newChat')}
+                      </Link>
+                      <Link href="/groups/new" onClick={() => setMenuOpen(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-200 hover:bg-slate-900">
+                        <UsersIcon size={18} /> {t('nav.newGroup')}
+                      </Link>
+                      <Link href="/channels" onClick={() => setMenuOpen(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-200 hover:bg-slate-900">
+                        <HashIcon size={18} /> {t('nav.channels')}
+                      </Link>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+            {/* Search chats */}
+            <div className="flex items-center gap-2 rounded-full border border-slate-800 bg-slate-900 px-3 py-1.5">
+              <SearchIcon size={16} />
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder={t('chatsList.searchPlaceholder')}
+                className="min-w-0 flex-1 bg-transparent text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none"
+              />
+            </div>
           </header>
 
           <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4 pt-3">
-            <StoriesBar />
+            {!search && <StoriesBar />}
 
             {err ? <p className="text-sm text-red-300">{err}</p> : null}
 
@@ -187,9 +228,13 @@ export default function ChatsPage() {
                   {t('chatsList.goToContacts')}
                 </Link>
               </div>
+            ) : chats.filter((c) => (c.title || '').toLowerCase().includes(search.trim().toLowerCase())).length === 0 ? (
+              <p className="p-3 text-sm text-slate-400">{t('emoji.noMatches')}</p>
             ) : (
               <ul className="space-y-1">
-                {chats.map((c) => {
+                {chats
+                  .filter((c) => (c.title || '').toLowerCase().includes(search.trim().toLowerCase()))
+                  .map((c) => {
                   const active = c.id === selectedId;
                   return (
                     <li key={c.id}>

@@ -103,6 +103,7 @@ const en = {
   chatsList: {
     title: 'Chats',
     newChat: 'New chat',
+    searchPlaceholder: 'Search chats…',
     pickChat: 'Select a conversation to start chatting',
     loading: 'Loading…',
     noChatsYet: 'No chats yet.',
@@ -125,6 +126,7 @@ const en = {
     members: 'Members',
     online: '● Online',
     offline: '● Offline',
+    lastSeen: 'last seen {{when}}',
     searchInChat: 'Search in chat',
     groupInfo: 'Group info',
     chatOptions: 'Chat options',

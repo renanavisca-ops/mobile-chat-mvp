@@ -89,6 +89,15 @@ function getMessagePayload(message: MessageRow): Payload {
   return parsed;
 }
 
+function formatLastSeen(iso: string, lang: string): string {
+  const d = new Date(iso);
+  const now = new Date();
+  const sameDay = d.toDateString() === now.toDateString();
+  return sameDay
+    ? d.toLocaleTimeString(lang, { hour: '2-digit', minute: '2-digit' })
+    : d.toLocaleDateString(lang, { day: '2-digit', month: 'short' });
+}
+
 function shortId(id: string) {
   return id.length > 10 ? `${id.slice(0, 6)}…${id.slice(-4)}` : id;
 }
@@ -128,7 +137,7 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
 
   // members
   const [members, setMembers] = useState<string[]>([]);
-  const [memberProfiles, setMemberProfiles] = useState<{ id: string; username: string | null; display_name: string | null; avatar_url: string | null }[]>([]);
+  const [memberProfiles, setMemberProfiles] = useState<{ id: string; username: string | null; display_name: string | null; avatar_url: string | null; last_seen: string | null }[]>([]);
   const [membersLoading, setMembersLoading] = useState(true);
 
   const onlineUsers = useOnlineUsers();
@@ -438,7 +447,7 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
 
       const { data: profs, error: pErr } = await supabase
         .from('profiles')
-        .select('id, username, display_name, avatar_url')
+        .select('id, username, display_name, avatar_url, last_seen')
         .in('id', userIds);
 
       if (!alive) return;
@@ -453,7 +462,7 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
       for (const p of profs ?? []) byId.set((p as any).id, (p as any).username ?? '');
 
       setMembers(userIds.map((id: string) => byId.get(id) || shortId(id)));
-      setMemberProfiles((profs ?? []).map((p: any) => ({ id: p.id, username: p.username ?? null, display_name: p.display_name ?? null, avatar_url: p.avatar_url ?? null })));
+      setMemberProfiles((profs ?? []).map((p: any) => ({ id: p.id, username: p.username ?? null, display_name: p.display_name ?? null, avatar_url: p.avatar_url ?? null, last_seen: p.last_seen ?? null })));
       setMembersLoading(false);
     }
 
@@ -618,6 +627,8 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
   const headerStatus = isDirect
     ? someoneOnline
       ? t('chat.online')
+      : otherProfile?.last_seen
+      ? t('chat.lastSeen', { when: formatLastSeen(otherProfile.last_seen, lang) })
       : t('chat.offline')
     : members.length
     ? members.join(', ')
@@ -2111,6 +2122,10 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
                   onPick={(e) => {
                     insertEmoji(e);
                     setEmojiOpen(false);
+                  }}
+                  onGif={() => {
+                    setEmojiOpen(false);
+                    setGifPickerOpen(true);
                   }}
                 />
               </div>

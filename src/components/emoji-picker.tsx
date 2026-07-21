@@ -2,59 +2,10 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useT } from '@/lib/i18n/context';
-
-type EmojiItem = { e: string; n: string; k: string }; // emoji, name, keywords
+import { EMOJI_CATEGORIES, ALL_EMOJIS } from '@/lib/emoji-data';
 
 const RECENTS_KEY = 'tokychat:emoji_recents:v1';
-const MAX_RECENTS = 24;
-
-const EMOJIS: EmojiItem[] = [
-  // Smileys
-  { e: '😀', n: 'grinning', k: 'smile happy' },
-  { e: '😄', n: 'smile', k: 'happy joy' },
-  { e: '😂', n: 'joy', k: 'lol laugh' },
-  { e: '🤣', n: 'rofl', k: 'lol laugh' },
-  { e: '😊', n: 'blush', k: 'happy' },
-  { e: '😉', n: 'wink', k: 'flirt' },
-  { e: '😍', n: 'heart eyes', k: 'love' },
-  { e: '😘', n: 'kiss', k: 'love' },
-  { e: '😎', n: 'sunglasses', k: 'cool' },
-  { e: '🤔', n: 'thinking', k: 'hmm' },
-  { e: '😴', n: 'sleeping', k: 'tired' },
-  { e: '😭', n: 'cry', k: 'sad' },
-  { e: '😡', n: 'angry', k: 'mad' },
-
-  // Gestures
-  { e: '👍', n: 'thumbs up', k: 'ok yes' },
-  { e: '👎', n: 'thumbs down', k: 'no' },
-  { e: '👏', n: 'clap', k: 'congrats' },
-  { e: '🙏', n: 'pray', k: 'thanks please' },
-  { e: '🙌', n: 'raised hands', k: 'yay' },
-  { e: '🤝', n: 'handshake', k: 'deal' },
-  { e: '✌️', n: 'peace', k: 'victory' },
-
-  // Hearts
-  { e: '❤️', n: 'heart', k: 'love' },
-  { e: '💙', n: 'blue heart', k: 'love' },
-  { e: '💚', n: 'green heart', k: 'love' },
-  { e: '💛', n: 'yellow heart', k: 'love' },
-  { e: '💜', n: 'purple heart', k: 'love' },
-  { e: '🔥', n: 'fire', k: 'lit hot' },
-  { e: '✨', n: 'sparkles', k: 'shine' },
-
-  // Objects
-  { e: '🎉', n: 'party', k: 'celebrate' },
-  { e: '✅', n: 'check', k: 'done' },
-  { e: '❌', n: 'cross', k: 'no' },
-  { e: '⚠️', n: 'warning', k: 'alert' },
-  { e: '📌', n: 'pin', k: 'pinned' },
-  { e: '📎', n: 'paperclip', k: 'attach' },
-  { e: '🖼️', n: 'photo', k: 'image' },
-  { e: '🎥', n: 'video', k: 'movie' },
-  { e: '🎵', n: 'music', k: 'song' },
-  { e: '💾', n: 'save', k: 'disk' },
-  { e: '🗑️', n: 'delete', k: 'trash' },
-];
+const MAX_RECENTS = 32;
 
 function safeReadRecents(): string[] {
   try {
@@ -81,15 +32,16 @@ function pushRecent(emoji: string) {
   return next;
 }
 
-type Tab = 'recents' | 'all';
+type Tab = 'recents' | 'all' | 'gif';
 
 export function EmojiPicker(props: {
   open: boolean;
   onClose: () => void;
   onPick: (emoji: string) => void;
+  onGif?: () => void;
   anchor?: 'left' | 'right';
 }) {
-  const { open, onClose, onPick, anchor = 'left' } = props;
+  const { open, onClose, onPick, onGif, anchor = 'left' } = props;
   const t = useT();
 
   const [q, setQ] = useState('');
@@ -99,154 +51,143 @@ export function EmojiPicker(props: {
 
   useEffect(() => {
     if (!open) return;
-
     setQ('');
     setTab('recents');
-    // load recents on open
     setRecents(safeReadRecents());
 
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
     };
     window.addEventListener('keydown', onKey);
-
     const onClickOutside = (e: MouseEvent) => {
       const el = boxRef.current;
-      if (!el) return;
-      if (!el.contains(e.target as Node)) onClose();
+      if (el && !el.contains(e.target as Node)) onClose();
     };
     window.addEventListener('mousedown', onClickOutside);
-
     return () => {
       window.removeEventListener('keydown', onKey);
       window.removeEventListener('mousedown', onClickOutside);
     };
   }, [open, onClose]);
 
-  const filteredAll = useMemo(() => {
+  const searchResults = useMemo(() => {
     const s = q.trim().toLowerCase();
-    if (!s) return EMOJIS;
-    return EMOJIS.filter((x) => (x.n + ' ' + x.k).toLowerCase().includes(s));
+    if (!s) return null;
+    return ALL_EMOJIS.filter((x) => x.k.includes(s)).map((x) => x.e);
   }, [q]);
 
-  const recentsAsItems = useMemo(() => {
-    if (recents.length === 0) return [];
-    // Keep order from recents; include only if it exists in our dataset (or allow any)
-    const setAll = new Set(EMOJIS.map((x) => x.e));
-    return recents.filter((e) => setAll.has(e)).map((e) => ({ e, n: 'recent', k: '' }));
+  const recentItems = useMemo(() => {
+    const known = new Set(ALL_EMOJIS.map((x) => x.e));
+    return recents.filter((e) => known.has(e));
   }, [recents]);
 
   function pick(emoji: string) {
-    // update recents first
-    const next = pushRecent(emoji);
-    setRecents(next);
+    setRecents(pushRecent(emoji));
     onPick(emoji);
   }
 
   if (!open) return null;
 
-  const showSearch = tab === 'all';
+  function EmojiButton({ e }: { e: string }) {
+    return (
+      <button
+        type="button"
+        className="flex h-9 w-9 items-center justify-center rounded-lg hover:bg-slate-900"
+        onClick={() => pick(e)}
+      >
+        <span className="text-xl">{e}</span>
+      </button>
+    );
+  }
 
   return (
     <div
       ref={boxRef}
       className={[
-        'absolute bottom-14 z-[70] w-72 rounded-2xl border border-slate-900 bg-slate-950 shadow-xl',
+        'absolute bottom-14 z-[70] w-80 rounded-2xl border border-slate-900 bg-slate-950 shadow-xl',
         anchor === 'right' ? 'right-0' : 'left-0',
       ].join(' ')}
     >
-      <div className="flex items-center justify-between border-b border-slate-900 p-3">
-        <div className="text-sm font-semibold text-slate-100">{t('emoji.title')}</div>
-        <button
-          className="rounded bg-slate-800 px-2 py-1 text-xs text-slate-100 hover:bg-slate-700"
-          onClick={onClose}
-          type="button"
-        >
-          {t('emoji.close')}
-        </button>
-      </div>
-
       {/* Tabs */}
-      <div className="flex gap-2 border-b border-slate-900 p-2">
+      <div className="flex gap-1 border-b border-slate-900 p-2">
         <button
           type="button"
-          className={[
-            'flex-1 rounded-lg px-3 py-2 text-xs',
-            tab === 'recents' ? 'bg-slate-800 text-slate-100' : 'bg-slate-950 text-slate-300 hover:bg-slate-900',
-          ].join(' ')}
-          onClick={() => {
-            setTab('recents');
-            setQ('');
-          }}
+          className={`flex-1 rounded-lg px-2 py-1.5 text-xs ${tab === 'recents' ? 'bg-slate-800 text-slate-100' : 'text-slate-300 hover:bg-slate-900'}`}
+          onClick={() => { setTab('recents'); setQ(''); }}
         >
           🕘 {t('emoji.recents')}
         </button>
         <button
           type="button"
-          className={[
-            'flex-1 rounded-lg px-3 py-2 text-xs',
-            tab === 'all' ? 'bg-slate-800 text-slate-100' : 'bg-slate-950 text-slate-300 hover:bg-slate-900',
-          ].join(' ')}
+          className={`flex-1 rounded-lg px-2 py-1.5 text-xs ${tab === 'all' ? 'bg-slate-800 text-slate-100' : 'text-slate-300 hover:bg-slate-900'}`}
           onClick={() => setTab('all')}
         >
           😀 {t('emoji.all')}
         </button>
+        <button
+          type="button"
+          className={`flex-1 rounded-lg px-2 py-1.5 text-xs ${tab === 'gif' ? 'bg-slate-800 text-slate-100' : 'text-slate-300 hover:bg-slate-900'}`}
+          onClick={() => {
+            setTab('gif');
+            onGif?.();
+          }}
+        >
+          🎞️ GIF
+        </button>
       </div>
 
-      <div className="p-3">
-        {showSearch ? (
-          <input
-            className="mb-3 w-full rounded border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-100"
-            placeholder={t('emoji.searchPlaceholder')}
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            autoFocus
-          />
-        ) : null}
-
-        <div className="max-h-56 overflow-auto rounded-xl border border-slate-900">
-          {tab === 'recents' ? (
-            recentsAsItems.length === 0 ? (
-              <div className="p-3 text-sm text-slate-400">{t('emoji.noRecents')}</div>
-            ) : (
-              <div className="grid grid-cols-8 gap-1 p-2">
-                {recentsAsItems.map((x) => (
-                  <button
-                    key={`r:${x.e}`}
-                    type="button"
-                    className="flex h-9 w-9 items-center justify-center rounded-lg hover:bg-slate-900"
-                    title="recent"
-                    onClick={() => pick(x.e)}
-                  >
-                    <span className="text-lg">{x.e}</span>
-                  </button>
-                ))}
-              </div>
-            )
+      <div className="p-2">
+        {tab === 'gif' ? (
+          <div className="p-4 text-center text-sm text-slate-400">
+            {onGif ? t('gif.searchPlaceholder') : t('gif.notConfigured')}
+          </div>
+        ) : tab === 'recents' ? (
+          recentItems.length === 0 ? (
+            <div className="p-4 text-sm text-slate-400">{t('emoji.noRecents')}</div>
           ) : (
-            <>
-              {filteredAll.length === 0 ? (
-                <div className="p-3 text-sm text-slate-400">{t('emoji.noMatches')}</div>
+            <div className="grid grid-cols-8 gap-0.5">
+              {recentItems.map((e) => (
+                <EmojiButton key={`r:${e}`} e={e} />
+              ))}
+            </div>
+          )
+        ) : (
+          <>
+            <input
+              className="mb-2 w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+              placeholder={t('emoji.searchPlaceholder')}
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              autoFocus
+            />
+            <div className="max-h-64 overflow-auto">
+              {searchResults ? (
+                searchResults.length === 0 ? (
+                  <div className="p-3 text-sm text-slate-400">{t('emoji.noMatches')}</div>
+                ) : (
+                  <div className="grid grid-cols-8 gap-0.5">
+                    {searchResults.map((e) => (
+                      <EmojiButton key={e} e={e} />
+                    ))}
+                  </div>
+                )
               ) : (
-                <div className="grid grid-cols-8 gap-1 p-2">
-                  {filteredAll.map((x) => (
-                    <button
-                      key={x.e}
-                      type="button"
-                      className="flex h-9 w-9 items-center justify-center rounded-lg hover:bg-slate-900"
-                      title={x.n}
-                      onClick={() => pick(x.e)}
-                    >
-                      <span className="text-lg">{x.e}</span>
-                    </button>
-                  ))}
-                </div>
+                EMOJI_CATEGORIES.map((cat) => (
+                  <div key={cat.key}>
+                    <div className="sticky top-0 bg-slate-950 px-1 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                      {cat.label}
+                    </div>
+                    <div className="grid grid-cols-8 gap-0.5 pb-1">
+                      {cat.emojis.map(([e]) => (
+                        <EmojiButton key={e} e={e} />
+                      ))}
+                    </div>
+                  </div>
+                ))
               )}
-            </>
-          )}
-        </div>
-
-        <div className="mt-2 text-[11px] text-slate-500">{t('emoji.tip')}</div>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
