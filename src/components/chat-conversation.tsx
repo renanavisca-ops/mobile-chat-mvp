@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { ChevronLeftIcon } from '@/components/icons';
+import { ChevronLeftIcon, SearchIcon, InfoIcon, MoreVerticalIcon } from '@/components/icons';
 import { ForwardModal } from '@/components/forward-modal';
 import { MessageActionsSheet } from '@/components/message-actions-sheet';
 import { AttachSheet } from '@/components/attach-sheet';
@@ -128,7 +128,7 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
 
   // members
   const [members, setMembers] = useState<string[]>([]);
-  const [memberProfiles, setMemberProfiles] = useState<{ id: string; username: string | null }[]>([]);
+  const [memberProfiles, setMemberProfiles] = useState<{ id: string; username: string | null; display_name: string | null; avatar_url: string | null }[]>([]);
   const [membersLoading, setMembersLoading] = useState(true);
 
   const onlineUsers = useOnlineUsers();
@@ -438,7 +438,7 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
 
       const { data: profs, error: pErr } = await supabase
         .from('profiles')
-        .select('id, username')
+        .select('id, username, display_name, avatar_url')
         .in('id', userIds);
 
       if (!alive) return;
@@ -453,7 +453,7 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
       for (const p of profs ?? []) byId.set((p as any).id, (p as any).username ?? '');
 
       setMembers(userIds.map((id: string) => byId.get(id) || shortId(id)));
-      setMemberProfiles((profs ?? []).map((p: any) => ({ id: p.id, username: p.username ?? null })));
+      setMemberProfiles((profs ?? []).map((p: any) => ({ id: p.id, username: p.username ?? null, display_name: p.display_name ?? null, avatar_url: p.avatar_url ?? null })));
       setMembersLoading(false);
     }
 
@@ -609,6 +609,19 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
   const isChannel = chat?.kind === 'channel';
   const isDirect = chat?.kind === 'direct';
   const otherUserId = isDirect ? otherMemberIds[0] ?? null : null;
+  const otherProfile = otherUserId ? memberProfiles.find((p) => p.id === otherUserId) ?? null : null;
+  // Header identity: the other person for 1:1, the chat title for groups.
+  const headerName = isDirect
+    ? otherProfile?.display_name || otherProfile?.username || chat?.title || t('chat.someone')
+    : chat?.title || (isGroup ? t('chatsList.group') : t('chat.title'));
+  const headerAvatar = isDirect ? otherProfile?.avatar_url ?? null : chat?.avatar_url ?? null;
+  const headerStatus = isDirect
+    ? someoneOnline
+      ? t('chat.online')
+      : t('chat.offline')
+    : members.length
+    ? members.join(', ')
+    : '';
   const isGroupCreator = isGroup && chat?.created_by === myId;
   // In a channel only the owner may post; everyone else is read-only.
   const canPost = !isChannel || chat?.created_by === myId;
@@ -1197,7 +1210,7 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
 
   return (
     <div className={`flex ${embedded ? 'h-full w-full' : 'h-[100dvh]'} flex-col overflow-hidden bg-slate-950 text-slate-50`}>
-      <header className={`flex items-center gap-1 border-b border-slate-900 bg-slate-950/90 px-2 py-2 backdrop-blur ${embedded ? '' : 'pt-safe'}`}>
+      <header className={`flex items-center gap-1.5 border-b border-slate-900 bg-slate-950/90 px-2 py-2 backdrop-blur ${embedded ? '' : 'pt-safe'}`}>
         {!embedded && (
           <Link
             href="/chats"
@@ -1207,9 +1220,196 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
             <ChevronLeftIcon size={24} />
           </Link>
         )}
-        <h1 className="min-w-0 flex-1 truncate px-1 text-base font-semibold">
-          {chat?.title || t('chat.title')}
-        </h1>
+
+        {/* Rounded-square avatar of the person/group you're chatting with */}
+        <button
+          type="button"
+          onClick={() => { if (isGroup) setGroupInfoOpen(true); }}
+          className="shrink-0"
+          aria-label={headerName}
+        >
+          {headerAvatar ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={headerAvatar} alt="" className="h-10 w-10 rounded-xl border border-slate-800 object-cover" />
+          ) : (
+            <span className="grid h-10 w-10 place-items-center rounded-xl bg-slate-800 text-sm font-semibold text-slate-300">
+              {headerName.trim().charAt(0).toUpperCase()}
+            </span>
+          )}
+        </button>
+
+        {/* Name + connection status */}
+        <button
+          type="button"
+          onClick={() => { if (isGroup) setGroupInfoOpen(true); }}
+          className="min-w-0 flex-1 px-1 text-left"
+        >
+          <div className="truncate text-base font-semibold leading-tight">{headerName}</div>
+          {headerStatus && (
+            <div className={`truncate text-xs leading-tight ${isDirect && someoneOnline ? 'text-emerald-400' : 'text-slate-400'}`}>
+              {headerStatus}
+            </div>
+          )}
+        </button>
+
+        {/* Actions: audio call, video call, search, options */}
+        {otherUserId && (
+          <>
+            <button
+              type="button"
+              onClick={() => startCall({ chatId, peerIds: [otherUserId], label: headerName, video: false, isGroup: false })}
+              disabled={callBusy}
+              className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-slate-300 hover:bg-slate-900 hover:text-white disabled:opacity-40"
+              aria-label={t('call.startAudio')}
+              title={t('call.startAudio')}
+            >
+              <PhoneIcon size={20} />
+            </button>
+            <button
+              type="button"
+              onClick={() => startCall({ chatId, peerIds: [otherUserId], label: headerName, video: true, isGroup: false })}
+              disabled={callBusy}
+              className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-slate-300 hover:bg-slate-900 hover:text-white disabled:opacity-40"
+              aria-label={t('call.startVideo')}
+              title={t('call.startVideo')}
+            >
+              <VideoIcon size={20} />
+            </button>
+          </>
+        )}
+        {isGroup && otherMemberIds.length > 0 && (
+          <>
+            <button
+              type="button"
+              onClick={() => startCall({ chatId, peerIds: otherMemberIds, label: chat?.title || t('chatsList.group'), video: false, isGroup: true })}
+              disabled={callBusy}
+              className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-slate-300 hover:bg-slate-900 hover:text-white disabled:opacity-40"
+              aria-label={t('call.startGroupAudio')}
+              title={t('call.startGroupAudio')}
+            >
+              <PhoneIcon size={20} />
+            </button>
+            <button
+              type="button"
+              onClick={() => startCall({ chatId, peerIds: otherMemberIds, label: chat?.title || t('chatsList.group'), video: true, isGroup: true })}
+              disabled={callBusy}
+              className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-slate-300 hover:bg-slate-900 hover:text-white disabled:opacity-40"
+              aria-label={t('call.startGroupVideo')}
+              title={t('call.startGroupVideo')}
+            >
+              <VideoIcon size={20} />
+            </button>
+          </>
+        )}
+        <button
+          type="button"
+          onClick={() => setSearchOpen((v) => !v)}
+          className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-slate-300 hover:bg-slate-900 hover:text-white"
+          aria-label={t('chat.searchInChat')}
+          title={t('chat.searchInChat')}
+        >
+          <SearchIcon size={20} />
+        </button>
+        {isGroup && (
+          <button
+            type="button"
+            onClick={() => setGroupInfoOpen(true)}
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-slate-300 hover:bg-slate-900 hover:text-white"
+            aria-label={t('chat.groupInfo')}
+            title={t('chat.groupInfo')}
+          >
+            <InfoIcon size={20} />
+          </button>
+        )}
+        {otherUserId && (
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setSafetyMenuOpen((v) => !v)}
+              className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-slate-300 hover:bg-slate-900 hover:text-white"
+              aria-label={t('chat.chatOptions')}
+            >
+              <MoreVerticalIcon size={20} />
+            </button>
+            {safetyMenuOpen && (
+              <div
+                className="absolute right-0 top-11 z-30 w-52 overflow-hidden rounded-lg border border-slate-800 bg-slate-950 text-sm shadow-xl"
+                onMouseLeave={() => {
+                  setSafetyMenuOpen(false);
+                  setDisappearingMenuOpen(false);
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={toggleMute}
+                  disabled={muteBusy}
+                  className="block w-full px-3 py-2 text-left text-slate-200 hover:bg-slate-900 disabled:opacity-50"
+                >
+                  {muted ? t('common.unmute') : t('common.mute')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDisappearingMenuOpen((v) => !v)}
+                  disabled={disappearingBusy}
+                  className="flex w-full items-center justify-between px-3 py-2 text-left text-slate-200 hover:bg-slate-900 disabled:opacity-50"
+                >
+                  <span>{t('chat.disappearingMenu')}</span>
+                  <span className="text-xs text-slate-500">
+                    {DISAPPEARING_OPTIONS.find((o) => o.seconds === (chat?.disappearing_seconds ?? 0))
+                      ? t(DISAPPEARING_OPTIONS.find((o) => o.seconds === (chat?.disappearing_seconds ?? 0))!.labelKey)
+                      : ''}
+                  </span>
+                </button>
+                {disappearingMenuOpen && (
+                  <div className="border-t border-slate-900 bg-slate-950/60">
+                    {DISAPPEARING_OPTIONS.map((opt) => (
+                      <button
+                        key={opt.seconds}
+                        type="button"
+                        onClick={() => chooseDisappearing(opt.seconds)}
+                        disabled={disappearingBusy}
+                        className={`block w-full px-4 py-1.5 text-left text-xs hover:bg-slate-900 disabled:opacity-50 ${
+                          (chat?.disappearing_seconds ?? 0) === opt.seconds ? 'text-blue-400' : 'text-slate-300'
+                        }`}
+                      >
+                        {t(opt.labelKey)}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <button
+                  type="button"
+                  onClick={enableEncryption}
+                  disabled={encBusy || !!chat?.encrypted}
+                  className="flex w-full items-center justify-between px-3 py-2 text-left text-slate-200 hover:bg-slate-900 disabled:opacity-100"
+                >
+                  <span>{t('chat.encryptionMenu')}</span>
+                  <span className="text-xs text-slate-400">
+                    {chat?.encrypted ? `🔒 ${t('chat.encryptionOn')}` : t('chat.encryptionOff')}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={toggleBlock}
+                  disabled={blockBusy}
+                  className="block w-full px-3 py-2 text-left text-slate-200 hover:bg-slate-900 disabled:opacity-50"
+                >
+                  {blocked ? t('common.unblock') : t('common.block')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSafetyMenuOpen(false);
+                    setReportOpen(true);
+                  }}
+                  className="block w-full px-3 py-2 text-left text-red-400 hover:bg-slate-900"
+                >
+                  {t('common.report')}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </header>
 
       <MessageEffects trigger={effectTrigger} onDone={() => setEffectTrigger(null)} />
@@ -1456,240 +1656,28 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
         <div className="grid flex-1 place-items-center text-sm text-slate-300">{t('chat.loading')}</div>
       ) : (
         <div className="flex min-h-0 flex-1 flex-col gap-2 px-3 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
-          <div className="flex items-center justify-between gap-2 text-xs text-slate-400">
-            <div className="flex items-center gap-2">
-              <span>{t('chat.members')}: {membersLoading ? t('chat.loading') : members.length ? members.join(', ') : '—'}</span>
-              {!membersLoading && otherMemberIds.length > 0 && (
-                someoneOnline ? (
-                  <span className="text-emerald-400">{t('chat.online')}</span>
-                ) : (
-                  <span className="text-slate-500">{t('chat.offline')}</span>
-                )
-              )}
-              <button
-                type="button"
-                onClick={() => setSearchOpen((v) => !v)}
-                className="rounded px-1.5 py-0.5 text-slate-400 hover:bg-slate-900 hover:text-slate-200"
-                aria-label={t('chat.searchInChat')}
-                title={t('chat.searchInChat')}
-              >
-                🔍
-              </button>
-              {otherUserId && (
-                <>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      startCall({
-                        chatId,
-                        peerIds: [otherUserId],
-                        label: usernameById.get(otherUserId) || chat?.title || t('chat.someone'),
-                        video: false,
-                        isGroup: false,
-                      })
-                    }
-                    disabled={callBusy}
-                    className="rounded px-1.5 py-1 text-slate-400 hover:bg-slate-900 hover:text-slate-200 disabled:opacity-40"
-                    aria-label={t('call.startAudio')}
-                    title={t('call.startAudio')}
-                  >
-                    <PhoneIcon size={16} />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      startCall({
-                        chatId,
-                        peerIds: [otherUserId],
-                        label: usernameById.get(otherUserId) || chat?.title || t('chat.someone'),
-                        video: true,
-                        isGroup: false,
-                      })
-                    }
-                    disabled={callBusy}
-                    className="rounded px-1.5 py-1 text-slate-400 hover:bg-slate-900 hover:text-slate-200 disabled:opacity-40"
-                    aria-label={t('call.startVideo')}
-                    title={t('call.startVideo')}
-                  >
-                    <VideoIcon size={16} />
-                  </button>
-                </>
-              )}
-              {isGroup && otherMemberIds.length > 0 && (
-                <>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      startCall({
-                        chatId,
-                        peerIds: otherMemberIds,
-                        label: chat?.title || t('chatsList.group'),
-                        video: false,
-                        isGroup: true,
-                      })
-                    }
-                    disabled={callBusy}
-                    className="rounded px-1.5 py-1 text-slate-400 hover:bg-slate-900 hover:text-slate-200 disabled:opacity-40"
-                    aria-label={t('call.startGroupAudio')}
-                    title={t('call.startGroupAudio')}
-                  >
-                    <PhoneIcon size={16} />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      startCall({
-                        chatId,
-                        peerIds: otherMemberIds,
-                        label: chat?.title || t('chatsList.group'),
-                        video: true,
-                        isGroup: true,
-                      })
-                    }
-                    disabled={callBusy}
-                    className="rounded px-1.5 py-1 text-slate-400 hover:bg-slate-900 hover:text-slate-200 disabled:opacity-40"
-                    aria-label={t('call.startGroupVideo')}
-                    title={t('call.startGroupVideo')}
-                  >
-                    <VideoIcon size={16} />
-                  </button>
-                </>
-              )}
-              {isGroup && (
-                <button
-                  type="button"
-                  onClick={() => setGroupInfoOpen(true)}
-                  className="rounded px-1.5 py-0.5 text-slate-400 hover:bg-slate-900 hover:text-slate-200"
-                  aria-label={t('chat.groupInfo')}
-                  title={t('chat.groupInfo')}
-                >
-                  ⓘ
+          {/* Support-console status controls only apply to store chats. */}
+          {chat && chat.store_id && (
+            <div className="flex items-center gap-2 px-1 text-xs">
+              <span className={`rounded px-1.5 py-0.5 uppercase ${
+                chat.status === 'open' ? 'bg-green-900/40 text-green-400' :
+                chat.status === 'in_progress' ? 'bg-blue-900/40 text-blue-400' :
+                'bg-slate-800 text-slate-400'
+              }`}>
+                {chat.status === 'open' ? t('common.statusOpen') : chat.status === 'in_progress' ? t('common.statusInProgress') : t('common.statusClosed')}
+              </span>
+              {chat.status === 'open' && (
+                <button onClick={() => updateStatus('in_progress')} className="rounded bg-blue-600 px-2 py-1 text-white hover:bg-blue-500">
+                  {t('chat.take')}
                 </button>
               )}
-              {otherUserId && (
-                <div className="relative">
-                  <button
-                    type="button"
-                    onClick={() => setSafetyMenuOpen((v) => !v)}
-                    className="rounded px-1.5 py-0.5 text-slate-400 hover:bg-slate-900 hover:text-slate-200"
-                    aria-label={t('chat.chatOptions')}
-                  >
-                    ⋯
-                  </button>
-                  {safetyMenuOpen && (
-                    <div
-                      className="absolute left-0 top-6 z-20 w-52 overflow-hidden rounded-lg border border-slate-800 bg-slate-950 text-sm shadow-xl"
-                      onMouseLeave={() => {
-                        setSafetyMenuOpen(false);
-                        setDisappearingMenuOpen(false);
-                      }}
-                    >
-                      <button
-                        type="button"
-                        onClick={toggleMute}
-                        disabled={muteBusy}
-                        className="block w-full px-3 py-2 text-left text-slate-200 hover:bg-slate-900 disabled:opacity-50"
-                      >
-                        {muted ? t('common.unmute') : t('common.mute')}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setDisappearingMenuOpen((v) => !v)}
-                        disabled={disappearingBusy}
-                        className="flex w-full items-center justify-between px-3 py-2 text-left text-slate-200 hover:bg-slate-900 disabled:opacity-50"
-                      >
-                        <span>{t('chat.disappearingMenu')}</span>
-                        <span className="text-xs text-slate-500">
-                          {DISAPPEARING_OPTIONS.find((o) => o.seconds === (chat?.disappearing_seconds ?? 0))
-                            ? t(DISAPPEARING_OPTIONS.find((o) => o.seconds === (chat?.disappearing_seconds ?? 0))!.labelKey)
-                            : ''}
-                        </span>
-                      </button>
-                      {disappearingMenuOpen && (
-                        <div className="border-t border-slate-900 bg-slate-950/60">
-                          {DISAPPEARING_OPTIONS.map((opt) => (
-                            <button
-                              key={opt.seconds}
-                              type="button"
-                              onClick={() => chooseDisappearing(opt.seconds)}
-                              disabled={disappearingBusy}
-                              className={`block w-full px-4 py-1.5 text-left text-xs hover:bg-slate-900 disabled:opacity-50 ${
-                                (chat?.disappearing_seconds ?? 0) === opt.seconds ? 'text-blue-400' : 'text-slate-300'
-                              }`}
-                            >
-                              {t(opt.labelKey)}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                      <button
-                        type="button"
-                        onClick={enableEncryption}
-                        disabled={encBusy || !!chat?.encrypted}
-                        className="flex w-full items-center justify-between px-3 py-2 text-left text-slate-200 hover:bg-slate-900 disabled:opacity-100"
-                      >
-                        <span>{t('chat.encryptionMenu')}</span>
-                        <span className="text-xs text-slate-400">
-                          {chat?.encrypted ? `🔒 ${t('chat.encryptionOn')}` : t('chat.encryptionOff')}
-                        </span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={toggleBlock}
-                        disabled={blockBusy}
-                        className="block w-full px-3 py-2 text-left text-slate-200 hover:bg-slate-900 disabled:opacity-50"
-                      >
-                        {blocked ? t('common.unblock') : t('common.block')}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSafetyMenuOpen(false);
-                          setReportOpen(true);
-                        }}
-                        className="block w-full px-3 py-2 text-left text-red-400 hover:bg-slate-900"
-                      >
-                        {t('common.report')}
-                      </button>
-                    </div>
-                  )}
-                </div>
+              {chat.status !== 'closed' && (
+                <button onClick={() => updateStatus('closed')} className="rounded bg-slate-700 px-2 py-1 text-white hover:bg-slate-600">
+                  {t('chat.closeChat')}
+                </button>
               )}
             </div>
-            {/* Support-console status controls only apply to store chats.
-                Personal 1:1 / group chats have no store_id, and hitting the
-                staff-only status API from them returns 403 ("Forbidden"). */}
-            {chat && chat.store_id && (
-              <div className="flex items-center gap-2">
-                <span className={`rounded px-1.5 py-0.5 uppercase ${
-                  chat.status === 'open' ? 'bg-green-900/40 text-green-400' :
-                  chat.status === 'in_progress' ? 'bg-blue-900/40 text-blue-400' :
-                  'bg-slate-800 text-slate-400'
-                }`}>
-                  {chat.status === 'open' ? t('common.statusOpen') : chat.status === 'in_progress' ? t('common.statusInProgress') : t('common.statusClosed')}
-                </span>
-
-                {chat.status === 'open' && (
-                  <button
-                    onClick={() => updateStatus('in_progress')}
-                    className="rounded bg-blue-600 px-2 py-1 text-white hover:bg-blue-500"
-                  >
-                    {t('chat.take')}
-                  </button>
-                )}
-
-                {chat.status !== 'closed' && (
-                  <button
-                    onClick={() => updateStatus('closed')}
-                    className="rounded bg-slate-700 px-2 py-1 text-white hover:bg-slate-600"
-                  >
-                    {t('chat.closeChat')}
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
-
+          )}
 
           {err ? <p className="text-sm text-red-300">{err}</p> : null}
 

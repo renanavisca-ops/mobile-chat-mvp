@@ -37,10 +37,10 @@ function Avatar({ url, name }: { url?: string | null; name?: string | null }) {
   const initial = (name || '?').trim().charAt(0).toUpperCase() || '?';
   if (url) {
     // eslint-disable-next-line @next/next/no-img-element
-    return <img src={url} alt="" className="h-11 w-11 shrink-0 rounded-full border border-slate-800 object-cover" />;
+    return <img src={url} alt="" className="h-11 w-11 shrink-0 rounded-xl border border-slate-800 object-cover" />;
   }
   return (
-    <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-slate-800 text-sm font-semibold text-slate-300">
+    <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-slate-800 text-sm font-semibold text-slate-300">
       {initial}
     </span>
   );
