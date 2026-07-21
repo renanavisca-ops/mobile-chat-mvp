@@ -7,15 +7,16 @@ import {
   ChatBubbleIcon,
   UsersIcon,
   HashIcon,
-  UserPlusIcon,
+  PhoneIcon,
   GearIcon,
 } from '@/components/icons';
 
+// "New group" moved into the chats "+" menu, so the bottom bar surfaces Calls.
 const NAV_ITEMS = [
   { href: '/chats', key: 'nav.chats', Icon: ChatBubbleIcon },
+  { href: '/calls', key: 'nav.calls', Icon: PhoneIcon },
   { href: '/contacts', key: 'nav.contacts', Icon: UsersIcon },
   { href: '/channels', key: 'nav.channels', Icon: HashIcon },
-  { href: '/groups/new', key: 'nav.newGroup', Icon: UserPlusIcon },
   { href: '/settings', key: 'nav.settings', Icon: GearIcon },
 ] as const;
 

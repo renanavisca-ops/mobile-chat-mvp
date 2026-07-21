@@ -618,6 +618,42 @@ export type Database = {
         }
         Relationships: []
       }
+      calls: {
+        Row: {
+          answered: boolean
+          caller_id: string
+          chat_id: string | null
+          ended_at: string | null
+          id: string
+          is_group: boolean
+          is_video: boolean
+          peer_id: string | null
+          started_at: string
+        }
+        Insert: {
+          answered?: boolean
+          caller_id: string
+          chat_id?: string | null
+          ended_at?: string | null
+          id?: string
+          is_group?: boolean
+          is_video?: boolean
+          peer_id?: string | null
+          started_at?: string
+        }
+        Update: {
+          answered?: boolean
+          caller_id?: string
+          chat_id?: string | null
+          ended_at?: string | null
+          id?: string
+          is_group?: boolean
+          is_video?: boolean
+          peer_id?: string | null
+          started_at?: string
+        }
+        Relationships: []
+      }
       device_tokens: {
         Row: {
           created_at: string

@@ -29,10 +29,20 @@ const es: Dictionary = {
   },
   nav: {
     chats: 'Chats',
+    calls: 'Llamadas',
     contacts: 'Contactos',
     channels: 'Canales',
     newGroup: 'Nuevo grupo',
     settings: 'Ajustes',
+  },
+  calls: {
+    title: 'Llamadas',
+    empty: 'Aún no hay llamadas.',
+    outgoing: 'Saliente',
+    incoming: 'Entrante',
+    missed: 'Perdida',
+    audioCall: 'Llamada de voz',
+    videoCall: 'Videollamada',
   },
   channels: {
     title: 'Canales',

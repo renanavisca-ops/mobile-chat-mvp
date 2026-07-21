@@ -11,6 +11,7 @@ import {
 } from 'react';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { browserSupabase } from '@/lib/supabase/client';
+import { logCallStart, logCallAnswered, logCallEnded } from '@/lib/db/calls';
 import { useT } from '@/lib/i18n/context';
 import {
   PhoneIcon,
@@ -123,6 +124,9 @@ export function CallProvider({ children }: { children: ReactNode }) {
   const channelRef = useRef<RealtimeChannel | null>(null);
   const callIdRef = useRef<string | null>(null);
   const invitedRef = useRef<string[]>([]);
+  // True when *this* device started the call, so only the caller stamps the
+  // call log's end time (the caller owns the row).
+  const wasCallerRef = useRef(false);
   const iceServersRef = useRef<RTCIceServer[]>([{ urls: 'stun:stun.cloudflare.com:3478' }]);
   const incomingCallIdRef = useRef<string | null>(null);
   const facingRef = useRef<'user' | 'environment'>('user');
@@ -250,6 +254,9 @@ export function CallProvider({ children }: { children: ReactNode }) {
   const cleanupRef = useRef<(() => void) | null>(null);
 
   const cleanup = useCallback(() => {
+    // Caller stamps the end time before we clear the call id.
+    if (wasCallerRef.current && callIdRef.current) void logCallEnded(callIdRef.current);
+    wasCallerRef.current = false;
     for (const pid of Array.from(pcsRef.current.keys())) {
       try {
         pcsRef.current.get(pid)?.close();
@@ -447,9 +454,19 @@ export function CallProvider({ children }: { children: ReactNode }) {
       const callId = crypto.randomUUID();
       callIdRef.current = callId;
       invitedRef.current = opts.peerIds;
+      wasCallerRef.current = true;
       setLabel(opts.label);
       setIsVideo(opts.video);
       setPhaseBoth('incall');
+
+      // Record the call in history (caller-side).
+      void logCallStart({
+        id: callId,
+        chatId: opts.chatId,
+        peerId: opts.isGroup ? null : opts.peerIds[0],
+        isVideo: opts.video,
+        isGroup: opts.isGroup,
+      });
 
       try {
         const stream = await navigator.mediaDevices.getUserMedia(MEDIA(opts.video));
@@ -504,6 +521,8 @@ export function CallProvider({ children }: { children: ReactNode }) {
     setIsVideo(inv.video);
     callIdRef.current = inv.callId;
     setPhaseBoth('incall');
+    // Mark the call answered in history (callee-side).
+    void logCallAnswered(inv.callId);
     try {
       const stream = await navigator.mediaDevices.getUserMedia(MEDIA(inv.video));
       localStreamRef.current = stream;

@@ -27,10 +27,20 @@ const en = {
   },
   nav: {
     chats: 'Chats',
+    calls: 'Calls',
     contacts: 'Contacts',
     channels: 'Channels',
     newGroup: 'New group',
     settings: 'Settings',
+  },
+  calls: {
+    title: 'Calls',
+    empty: 'No calls yet.',
+    outgoing: 'Outgoing',
+    incoming: 'Incoming',
+    missed: 'Missed',
+    audioCall: 'Voice call',
+    videoCall: 'Video call',
   },
   channels: {
     title: 'Channels',
