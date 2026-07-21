@@ -317,6 +317,7 @@ const es: Dictionary = {
     connected: 'Conectado',
     accept: 'Aceptar',
     decline: 'Rechazar',
+    rejected: 'Llamada rechazada',
     hangUp: 'Colgar',
     mute: 'Silenciar',
     unmute: 'Activar micrófono',

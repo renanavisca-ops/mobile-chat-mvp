@@ -116,6 +116,8 @@ export function CallProvider({ children }: { children: ReactNode }) {
   const [incoming, setIncoming] = useState<Invite | null>(null);
   const [participants, setParticipants] = useState<Map<string, Participant>>(new Map());
   const [errText, setErrText] = useState('');
+  // Brief banner shown after a call ends for a notable reason (e.g. rejected).
+  const [endedNote, setEndedNote] = useState('');
 
   const pcsRef = useRef<Map<string, RTCPeerConnection>>(new Map());
   const remoteSetRef = useRef<Map<string, boolean>>(new Map());
@@ -627,6 +629,8 @@ export function CallProvider({ children }: { children: ReactNode }) {
         pcsRef.current.size === 0 &&
         callIdRef.current === payload.callId
       ) {
+        setEndedNote(t('call.rejected'));
+        window.setTimeout(() => setEndedNote(''), 3500);
         cleanup();
       }
     });
@@ -654,6 +658,14 @@ export function CallProvider({ children }: { children: ReactNode }) {
   return (
     <Ctx.Provider value={{ startCall, busy: phase !== 'idle' }}>
       {children}
+
+      {endedNote && (
+        <div className="fixed inset-x-0 top-4 z-[95] flex justify-center px-4">
+          <div className="rounded-full border border-slate-700 bg-slate-900/95 px-4 py-2 text-sm text-slate-100 shadow-lg">
+            {endedNote}
+          </div>
+        </div>
+      )}
 
       {/* Incoming */}
       {phase === 'ringing' && incoming && (

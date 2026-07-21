@@ -315,6 +315,7 @@ const en = {
     connected: 'Connected',
     accept: 'Accept',
     decline: 'Decline',
+    rejected: 'Call rejected',
     hangUp: 'Hang up',
     mute: 'Mute',
     unmute: 'Unmute',
