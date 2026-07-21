@@ -67,9 +67,19 @@ export async function listStoryGroups(): Promise<StoryGroup[]> {
   if (!me.user) return [];
   const myId = me.user.id;
 
+  // Only show my own status plus statuses from people in my contacts — not every
+  // user on the platform.
+  const { data: contactRows } = await supabase
+    .from('contacts')
+    .select('contact_id')
+    .eq('owner_id', myId);
+  const contactIds = (contactRows ?? []).map((r) => r.contact_id).filter(Boolean);
+  const allowedAuthors = Array.from(new Set([myId, ...contactIds]));
+
   const { data: stories, error } = await supabase
     .from('stories')
     .select('id, user_id, media_path, text_content, background, created_at, expires_at')
+    .in('user_id', allowedAuthors)
     .order('created_at', { ascending: true });
   if (error) throw error;
 
