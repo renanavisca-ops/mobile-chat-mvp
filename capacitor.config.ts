@@ -1,11 +1,10 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
-// Toky ships as a thin native shell (mobile/www) that boots into the live
-// Next.js app hosted on Vercel. Because the app is server-rendered (App Router
-// + API routes), we do NOT bundle the web build; the shell navigates to the
-// hosted origin, which is whitelisted via server.allowNavigation so it stays
-// in-app. This keeps store binaries tiny and lets web updates ship instantly
-// without an app-store review.
+// Toky runs the live Next.js app hosted on Vercel. We load it via server.url
+// (not a JS redirect from a local page): that makes the hosted origin the app's
+// own origin, so Capacitor injects its native bridge there and native plugins
+// — Firebase push, splash, etc. — actually work. mobile/www stays as the build
+// webDir / offline fallback. Web updates still ship instantly via Vercel.
 const REMOTE_HOST = 'mobile-chat-mvp.vercel.app';
 
 const config: CapacitorConfig = {
@@ -14,8 +13,9 @@ const config: CapacitorConfig = {
   webDir: 'mobile/www',
   backgroundColor: '#020617',
   server: {
+    url: `https://${REMOTE_HOST}`,
     androidScheme: 'https',
-    // The hosted app + anything it needs to navigate to stays inside the shell.
+    // Keep navigations to the hosted app in-app (with the native bridge active).
     allowNavigation: [REMOTE_HOST],
   },
   ios: {

@@ -39,6 +39,7 @@ const en = {
     outgoing: 'Outgoing',
     incoming: 'Incoming',
     missed: 'Missed',
+    unanswered: 'Unanswered',
     audioCall: 'Voice call',
     videoCall: 'Video call',
   },

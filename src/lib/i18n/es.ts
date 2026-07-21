@@ -41,6 +41,7 @@ const es: Dictionary = {
     outgoing: 'Saliente',
     incoming: 'Entrante',
     missed: 'Perdida',
+    unanswered: 'Sin respuesta',
     audioCall: 'Llamada de voz',
     videoCall: 'Videollamada',
   },

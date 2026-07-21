@@ -60,8 +60,13 @@ export default function CallsPage() {
       ) : (
         <ul className="space-y-1">
           {calls.map((c) => {
+            // Unanswered incoming = "missed" (red); unanswered outgoing =
+            // "unanswered"; answered = direction.
+            const trulyMissed = c.missed && c.direction === 'incoming';
             const label = c.missed
-              ? t('calls.missed')
+              ? c.direction === 'incoming'
+                ? t('calls.missed')
+                : t('calls.unanswered')
               : c.direction === 'outgoing'
               ? t('calls.outgoing')
               : t('calls.incoming');
@@ -70,7 +75,7 @@ export default function CallsPage() {
                 <Avatar url={c.otherAvatar} name={c.otherName} />
                 <div className="min-w-0 flex-1">
                   <div className="truncate font-medium">{c.otherName}</div>
-                  <div className={`flex items-center gap-1 text-xs ${c.missed ? 'text-rose-400' : 'text-slate-400'}`}>
+                  <div className={`flex items-center gap-1 text-xs ${trulyMissed ? 'text-rose-400' : 'text-slate-400'}`}>
                     <span>{c.direction === 'outgoing' ? '↗' : '↙'}</span>
                     <span>{label}</span>
                     <span>· {fmt(c.startedAt, lang)}</span>
