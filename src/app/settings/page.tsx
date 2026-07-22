@@ -9,6 +9,7 @@ import { WALLPAPERS, CUSTOM_WALLPAPER_ID, getWallpaperId, setWallpaperId as save
 import { uploadAvatar } from '@/lib/db/avatar';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import { subscribeToPush, unsubscribeFromPush, isPushSubscribed, pushSupported } from '@/lib/push';
+import { isNativeApp } from '@/lib/native-push';
 import {
   initKeystore,
   isUnlocked,
@@ -796,7 +797,7 @@ export default function SettingsPage() {
                   <div className="text-xs text-slate-400 mt-1">
                     {!pushSupported()
                       ? t('settings.pushUnsupported')
-                      : permission === 'denied'
+                      : !isNativeApp() && permission === 'denied'
                       ? t('settings.pushBlocked')
                       : pushOn
                       ? t('settings.pushGranted')
@@ -806,7 +807,7 @@ export default function SettingsPage() {
                 {pushSupported() && (
                   <button
                     onClick={togglePush}
-                    disabled={pushBusy || permission === 'denied'}
+                    disabled={pushBusy || (!isNativeApp() && permission === 'denied')}
                     role="switch"
                     aria-checked={pushOn}
                     aria-label={t('settings.pushNotifications')}

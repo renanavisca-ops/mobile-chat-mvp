@@ -12,6 +12,7 @@ import {
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { browserSupabase } from '@/lib/supabase/client';
 import { logCallStart, logCallAnswered, logCallEnded } from '@/lib/db/calls';
+import { startRingtone, stopRingtone } from '@/lib/call/ringtone';
 import { useT } from '@/lib/i18n/context';
 import {
   PhoneIcon,
@@ -645,6 +646,13 @@ export function CallProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     incomingCallIdRef.current = incoming?.callId ?? null;
   }, [incoming]);
+
+  // Ring (sound + vibration) while an incoming call is waiting to be answered.
+  useEffect(() => {
+    if (phase === 'ringing' && incoming) startRingtone();
+    else stopRingtone();
+    return () => stopRingtone();
+  }, [phase, incoming]);
 
   const remoteList = Array.from(participants.values());
   const totalTiles = remoteList.length + 1; // + me
