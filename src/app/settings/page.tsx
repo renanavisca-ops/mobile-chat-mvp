@@ -837,6 +837,7 @@ export default function SettingsPage() {
               {/* Diagnostic: what platform the app detects (native bridge active?). */}
               <p className="mt-2 text-[10px] text-slate-600">
                 push: {isNativeApp() ? `native · ${nativePlatform()}` : 'web'}
+                {pushBusy ? ' · registering…' : ''}
               </p>
             </div>
           </section>

@@ -98,8 +98,21 @@ export async function registerNativePush(userId: string): Promise<void> {
 
   await setupListeners();
 
-  const { token } = await FirebaseMessaging.getToken();
-  if (!token) throw new Error('Could not obtain a push token.');
+  // getToken() can hang forever if Firebase isn't configured on the device
+  // (missing/mismatched google-services.json). Time it out so the failure is
+  // visible instead of the toggle silently doing nothing.
+  const result = (await Promise.race([
+    FirebaseMessaging.getToken(),
+    new Promise((_, reject) =>
+      setTimeout(
+        () => reject(new Error('Timed out getting FCM token — Firebase not configured on the device. Check google-services.json (package app.toky.chat) and rebuild.')),
+        15000
+      )
+    ),
+  ])) as { token?: string };
+
+  const token = result?.token;
+  if (!token) throw new Error('No FCM token was returned.');
   await storeToken(userId, token);
 }
 
