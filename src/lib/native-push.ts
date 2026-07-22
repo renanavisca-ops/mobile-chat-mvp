@@ -94,8 +94,14 @@ function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
 
 /** Request permission, get the FCM token, and persist it for this user. */
 export async function registerNativePush(userId: string): Promise<void> {
+  // Overall guard: even if the plugin load or an unwrapped call stalls, this
+  // ALWAYS settles so the toggle can't spin "registering…" forever.
+  await withTimeout(doRegisterNativePush(userId), 30000, 'push registration (Firebase not initialized on device?)');
+}
+
+async function doRegisterNativePush(userId: string): Promise<void> {
   currentUserId = userId;
-  const FirebaseMessaging = await messaging();
+  const FirebaseMessaging = await withTimeout(messaging(), 8000, 'loading messaging plugin');
 
   let perm = await withTimeout(FirebaseMessaging.checkPermissions(), 8000, 'checkPermissions');
   if (perm.receive === 'prompt' || perm.receive === 'prompt-with-rationale') {
@@ -115,7 +121,7 @@ export async function registerNativePush(userId: string): Promise<void> {
 
   const token = result?.token;
   if (!token) throw new Error('No FCM token was returned.');
-  await storeToken(userId, token);
+  await withTimeout(storeToken(userId, token), 8000, 'saving token to database');
 }
 
 /** Stop delivery to this device by deleting its token (server + FCM). */
