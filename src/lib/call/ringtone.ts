@@ -17,8 +17,8 @@ function ringOnce() {
     osc.connect(gain);
     gain.connect(ctx.destination);
     gain.gain.setValueAtTime(0.0001, now);
-    gain.gain.exponentialRampToValueAtTime(0.12, now + 0.05);
-    gain.gain.setValueAtTime(0.12, now + 1.6);
+    gain.gain.exponentialRampToValueAtTime(0.32, now + 0.05);
+    gain.gain.setValueAtTime(0.32, now + 1.6);
     gain.gain.exponentialRampToValueAtTime(0.0001, now + 2.0);
     osc.start(now);
     osc.stop(now + 2.05);

@@ -13,8 +13,8 @@ self.addEventListener('push', (event) => {
   event.waitUntil(
     self.registration.showNotification(data.title, {
       body: data.body,
-      icon: '/icon',
-      badge: '/icon',
+      icon: '/icons/icon-192.png',
+      badge: '/icons/icon-192.png',
       data: { url: data.url || '/chats' },
     })
   );
@@ -22,17 +22,25 @@ self.addEventListener('push', (event) => {
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const url = event.notification.data?.url || '/chats';
+  // Resolve to an absolute, same-origin URL so navigate()/openWindow() don't
+  // land on a blank context.
+  const raw = event.notification.data && event.notification.data.url ? event.notification.data.url : '/chats';
+  const target = new URL(raw, self.location.origin).href;
 
   event.waitUntil(
-    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
+    (async () => {
+      const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+      // Reuse an already-open app tab: focus it first, then navigate.
       for (const client of clients) {
-        if ('focus' in client) {
-          client.navigate(url);
-          return client.focus();
+        try {
+          await client.focus();
+          if ('navigate' in client) await client.navigate(target);
+          return;
+        } catch {
+          // fall through to opening a new window
         }
       }
-      if (self.clients.openWindow) return self.clients.openWindow(url);
-    })
+      if (self.clients.openWindow) await self.clients.openWindow(target);
+    })()
   );
 });
