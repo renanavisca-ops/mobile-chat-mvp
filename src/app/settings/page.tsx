@@ -9,7 +9,7 @@ import { WALLPAPERS, CUSTOM_WALLPAPER_ID, getWallpaperId, setWallpaperId as save
 import { uploadAvatar } from '@/lib/db/avatar';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import { subscribeToPush, unsubscribeFromPush, isPushSubscribed, pushSupported } from '@/lib/push';
-import { isNativeApp } from '@/lib/native-push';
+import { isNativeApp, nativePlatform } from '@/lib/native-push';
 import {
   initKeystore,
   isUnlocked,
@@ -834,6 +834,10 @@ export default function SettingsPage() {
                 </button>
               )}
               {pushErr && <p className="mt-2 text-xs text-red-400">{pushErr}</p>}
+              {/* Diagnostic: what platform the app detects (native bridge active?). */}
+              <p className="mt-2 text-[10px] text-slate-600">
+                push: {isNativeApp() ? `native · ${nativePlatform()}` : 'web'}
+              </p>
             </div>
           </section>
 

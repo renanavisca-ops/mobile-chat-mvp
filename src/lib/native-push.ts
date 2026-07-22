@@ -17,6 +17,15 @@ export function isNativeApp(): boolean {
   }
 }
 
+/** 'ios' | 'android' | 'web' — for diagnosing whether the native bridge is active. */
+export function nativePlatform(): string {
+  try {
+    return Capacitor.getPlatform();
+  } catch {
+    return 'web';
+  }
+}
+
 function platform(): 'ios' | 'android' {
   return Capacitor.getPlatform() === 'ios' ? 'ios' : 'android';
 }
