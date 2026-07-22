@@ -83,33 +83,35 @@ export async function isNativeRegistered(): Promise<boolean> {
   }
 }
 
+// Any plugin call can hang forever if the native side stalls; race each with a
+// timeout that names the step, so a stuck registration surfaces WHERE it stuck.
+function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
+  return Promise.race([
+    p,
+    new Promise<T>((_, reject) => setTimeout(() => reject(new Error(`Timed out at: ${label}`)), ms)),
+  ]);
+}
+
 /** Request permission, get the FCM token, and persist it for this user. */
 export async function registerNativePush(userId: string): Promise<void> {
   currentUserId = userId;
   const FirebaseMessaging = await messaging();
 
-  let perm = await FirebaseMessaging.checkPermissions();
+  let perm = await withTimeout(FirebaseMessaging.checkPermissions(), 8000, 'checkPermissions');
   if (perm.receive === 'prompt' || perm.receive === 'prompt-with-rationale') {
-    perm = await FirebaseMessaging.requestPermissions();
+    perm = await withTimeout(FirebaseMessaging.requestPermissions(), 60000, 'requestPermissions (allow the prompt)');
   }
   if (perm.receive !== 'granted') {
     throw new Error('Notification permission was not granted.');
   }
 
-  await setupListeners();
+  await withTimeout(setupListeners(), 8000, 'addListeners');
 
-  // getToken() can hang forever if Firebase isn't configured on the device
-  // (missing/mismatched google-services.json). Time it out so the failure is
-  // visible instead of the toggle silently doing nothing.
-  const result = (await Promise.race([
+  const result = await withTimeout(
     FirebaseMessaging.getToken(),
-    new Promise((_, reject) =>
-      setTimeout(
-        () => reject(new Error('Timed out getting FCM token — Firebase not configured on the device. Check google-services.json (package app.toky.chat) and rebuild.')),
-        15000
-      )
-    ),
-  ])) as { token?: string };
+    15000,
+    'getToken (Firebase not configured on device?)'
+  );
 
   const token = result?.token;
   if (!token) throw new Error('No FCM token was returned.');
