@@ -35,12 +35,6 @@ let currentUserId: string | null = null;
 let lastToken: string | null = null;
 let listenersReady = false;
 
-// Statically imported (part of the main bundle) — a dynamic import() was
-// hanging in the native WebView because its separate chunk never loaded.
-async function messaging() {
-  return FirebaseMessaging;
-}
-
 async function storeToken(userId: string, token: string): Promise<void> {
   lastToken = token;
   const supabase = browserSupabase();
@@ -56,7 +50,6 @@ async function storeToken(userId: string, token: string): Promise<void> {
 async function setupListeners(): Promise<void> {
   if (listenersReady) return;
   listenersReady = true;
-  const FirebaseMessaging = await messaging();
   await FirebaseMessaging.addListener('tokenReceived', async (event) => {
     if (currentUserId && event?.token) {
       try {
@@ -77,7 +70,6 @@ async function setupListeners(): Promise<void> {
 export async function isNativeRegistered(): Promise<boolean> {
   if (!isNativeApp()) return false;
   try {
-    const FirebaseMessaging = await messaging();
     const perm = await FirebaseMessaging.checkPermissions();
     return perm.receive === 'granted';
   } catch {
@@ -103,11 +95,17 @@ export async function registerNativePush(userId: string): Promise<void> {
 
 async function doRegisterNativePush(userId: string): Promise<void> {
   currentUserId = userId;
-  const FirebaseMessaging = await withTimeout(messaging(), 8000, 'loading messaging plugin');
 
-  let perm = await withTimeout(FirebaseMessaging.checkPermissions(), 8000, 'checkPermissions');
+  // Touch the plugin object directly — no async indirection, no separate chunk.
+  // If this build is fresh, the old 'loading messaging plugin' label is GONE,
+  // so seeing it again proves the device is running stale cached JS.
+  if (!FirebaseMessaging || typeof FirebaseMessaging.checkPermissions !== 'function') {
+    throw new Error('build3: FirebaseMessaging plugin object unavailable.');
+  }
+
+  let perm = await withTimeout(FirebaseMessaging.checkPermissions(), 8000, 'build3 checkPermissions (native plugin silent)');
   if (perm.receive === 'prompt' || perm.receive === 'prompt-with-rationale') {
-    perm = await withTimeout(FirebaseMessaging.requestPermissions(), 60000, 'requestPermissions (allow the prompt)');
+    perm = await withTimeout(FirebaseMessaging.requestPermissions(), 60000, 'build3 requestPermissions (allow the prompt)');
   }
   if (perm.receive !== 'granted') {
     throw new Error('Notification permission was not granted.');
@@ -118,7 +116,7 @@ async function doRegisterNativePush(userId: string): Promise<void> {
   const result = await withTimeout(
     FirebaseMessaging.getToken(),
     15000,
-    'getToken (Firebase not configured on device?)'
+    'build3 getToken (Firebase not configured on device?)'
   );
 
   const token = result?.token;
@@ -130,7 +128,6 @@ async function doRegisterNativePush(userId: string): Promise<void> {
 export async function unregisterNativePush(): Promise<void> {
   if (!isNativeApp()) return;
   try {
-    const FirebaseMessaging = await messaging();
     await FirebaseMessaging.deleteToken();
     await FirebaseMessaging.removeAllListeners();
   } catch {

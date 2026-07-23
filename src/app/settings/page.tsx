@@ -839,7 +839,7 @@ export default function SettingsPage() {
                   if it's missing, the device is serving a stale cached build. */}
               <p className="mt-2 text-[10px] text-slate-600">
                 push: {isNativeApp() ? `native · ${nativePlatform()}` : 'web'}
-                {pushBusy ? ' · registering…' : ''} · build fcm-static-2
+                {pushBusy ? ' · registering…' : ''} · build fcm-static-3
               </p>
             </div>
           </section>
