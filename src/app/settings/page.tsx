@@ -834,10 +834,12 @@ export default function SettingsPage() {
                 </button>
               )}
               {pushErr && <p className="mt-2 text-xs text-red-400">{pushErr}</p>}
-              {/* Diagnostic: what platform the app detects (native bridge active?). */}
+              {/* Diagnostic: what platform the app detects (native bridge active?).
+                  The build tag proves which code the app is actually running —
+                  if it's missing, the device is serving a stale cached build. */}
               <p className="mt-2 text-[10px] text-slate-600">
                 push: {isNativeApp() ? `native · ${nativePlatform()}` : 'web'}
-                {pushBusy ? ' · registering…' : ''}
+                {pushBusy ? ' · registering…' : ''} · build fcm-static-2
               </p>
             </div>
           </section>
