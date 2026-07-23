@@ -15,31 +15,38 @@ self.addEventListener('push', (event) => {
       body: data.body,
       icon: '/icons/icon-192.png',
       badge: '/icons/icon-192.png',
-      data: { url: data.url || '/chats' },
+      // Carry the type through so the click handler can treat calls specially.
+      data: { url: data.url || '/chats', type: data.type || 'message' },
     })
   );
 });
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  // Resolve to an absolute, same-origin URL so navigate()/openWindow() don't
-  // land on a blank context.
-  const raw = event.notification.data && event.notification.data.url ? event.notification.data.url : '/chats';
+  const info = event.notification.data || {};
+  const raw = info.url || '/chats';
   const target = new URL(raw, self.location.origin).href;
 
   event.waitUntil(
     (async () => {
       const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-      // Reuse an already-open app tab: focus it first, then navigate.
+
+      // If an app tab is already open, FOCUS it and ask the SPA to route in
+      // place. We must NOT call client.navigate() here: a full navigation
+      // reloads the page and tears down any in-progress call — the incoming
+      // call UI and its realtime signaling live in React state — which is what
+      // made clicking an incoming-call notification hang up the call.
       for (const client of clients) {
         try {
           await client.focus();
-          if ('navigate' in client) await client.navigate(target);
+          client.postMessage({ type: 'notification-click', url: raw, kind: info.type || 'message' });
           return;
         } catch {
           // fall through to opening a new window
         }
       }
+
+      // No app tab open: open one at the target (nothing to tear down).
       if (self.clients.openWindow) await self.clients.openWindow(target);
     })()
   );

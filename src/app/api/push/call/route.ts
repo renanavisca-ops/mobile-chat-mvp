@@ -51,7 +51,9 @@ export async function POST(req: Request) {
 
     let webSent = 0;
     if (hasWeb) {
-      const payload = JSON.stringify({ title, body: text, url });
+      // type:'call' tells the service worker to focus (not reload) an open tab,
+      // so clicking the notification never tears down the ringing call UI.
+      const payload = JSON.stringify({ title, body: text, url, type: 'call' });
       const staleIds: string[] = [];
       await Promise.all(
         subs!.map(async (sub) => {

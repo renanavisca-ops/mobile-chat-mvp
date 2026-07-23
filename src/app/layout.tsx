@@ -5,6 +5,7 @@ import { ConsentGate } from '@/components/consent-gate';
 import { LanguageProvider } from '@/lib/i18n/context';
 import { ThemeProvider } from '@/lib/theme';
 import { CallProvider } from '@/lib/call/call-provider';
+import { NotificationRouter } from '@/components/notification-router';
 
 export const metadata: Metadata = {
   title: 'Toky Chat',
@@ -39,6 +40,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ThemeProvider>
           <LanguageProvider>
             <ConsentGate />
+            <NotificationRouter />
             <CallProvider>
               <PresenceProvider>{children}</PresenceProvider>
             </CallProvider>
