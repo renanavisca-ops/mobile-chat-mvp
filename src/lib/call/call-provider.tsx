@@ -111,6 +111,10 @@ export function CallProvider({ children }: { children: ReactNode }) {
   const phaseRef = useRef<Phase>('idle');
   const [label, setLabel] = useState('');
   const [isVideo, setIsVideo] = useState(false);
+  // Whether OUR local stream currently has a video track. Distinct from isVideo
+  // (which means "this call shows the video UI"): after a voice→video upgrade a
+  // peer can be in video mode while still deciding to turn their own camera on.
+  const [localHasVideo, setLocalHasVideo] = useState(false);
   const [muted, setMuted] = useState(false);
   const [cameraOff, setCameraOff] = useState(false);
   const [speakerOn, setSpeakerOn] = useState(true);
@@ -285,6 +289,8 @@ export function CallProvider({ children }: { children: ReactNode }) {
     setCameraOff(false);
     setSpeakerOn(true);
     setErrText('');
+    setIsVideo(false);
+    setLocalHasVideo(false);
     setPhaseBoth('idle');
   }, [supabase]);
 
@@ -363,6 +369,10 @@ export function CallProvider({ children }: { children: ReactNode }) {
     pc.ontrack = (e) => {
       const [stream] = e.streams;
       hadPeersRef.current = true;
+      // If a peer starts sending video (e.g. they upgraded a voice call), flip
+      // this side into the video UI so the remote video shows and the "switch
+      // to video" control appears for us too.
+      if (e.track.kind === 'video') setIsVideo(true);
       setParticipants((prev) => {
         const next = new Map(prev);
         const existingP = next.get(pid);
@@ -474,6 +484,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
       try {
         const stream = await navigator.mediaDevices.getUserMedia(MEDIA(opts.video));
         localStreamRef.current = stream;
+        setLocalHasVideo(opts.video);
         if (localVideoRef.current) localVideoRef.current.srcObject = stream;
         iceServersRef.current = await getIceServers();
 
@@ -529,6 +540,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
     try {
       const stream = await navigator.mediaDevices.getUserMedia(MEDIA(inv.video));
       localStreamRef.current = stream;
+      setLocalHasVideo(inv.video);
       if (localVideoRef.current) localVideoRef.current.srcObject = stream;
       iceServersRef.current = await getIceServers();
       await joinCall(inv.callId);
@@ -597,6 +609,49 @@ export function CallProvider({ children }: { children: ReactNode }) {
         if (localVideoRef.current) localVideoRef.current.srcObject = local;
       }
       facingRef.current = next;
+    } catch (e: any) {
+      setErrText(e?.message ?? String(e));
+    }
+  }
+
+  // Upgrade an ongoing voice call to video: capture a camera track, add it to
+  // every peer connection, and renegotiate (send a fresh offer — the existing
+  // offer/answer handlers complete it). The other side sees our video via
+  // ontrack and flips into video mode automatically.
+  async function upgradeToVideo() {
+    if (localHasVideo) return;
+    try {
+      const gum = await navigator.mediaDevices.getUserMedia({
+        video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' },
+        audio: false,
+      });
+      const videoTrack = gum.getVideoTracks()[0];
+      if (!videoTrack) return;
+
+      const local = localStreamRef.current;
+      if (local) {
+        local.addTrack(videoTrack);
+        if (localVideoRef.current) localVideoRef.current.srcObject = local;
+      }
+
+      // Add the track to each peer, then renegotiate with a new offer.
+      for (const [pid, pc] of pcsRef.current.entries()) {
+        const sender = pc.getSenders().find((s) => s.track && s.track.kind === 'video');
+        if (sender) await sender.replaceTrack(videoTrack);
+        else if (local) pc.addTrack(videoTrack, local);
+        try {
+          const offer = await pc.createOffer();
+          await pc.setLocalDescription(offer);
+          sendSignal('offer', { from: myIdRef.current, to: pid, sdp: offer });
+        } catch (e: any) {
+          setErrText(e?.message ?? String(e));
+        }
+      }
+
+      facingRef.current = 'user';
+      setCameraOff(false);
+      setLocalHasVideo(true);
+      setIsVideo(true);
     } catch (e: any) {
       setErrText(e?.message ?? String(e));
     }
@@ -728,7 +783,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
                     <div className="text-lg font-semibold text-slate-100">{label}</div>
                   </div>
                 )}
-                {isVideo && (
+                {localHasVideo && (
                   <video
                     ref={localVideoRef}
                     autoPlay
@@ -754,9 +809,9 @@ export function CallProvider({ children }: { children: ReactNode }) {
                     autoPlay
                     playsInline
                     muted
-                    className={`h-full w-full object-cover ${isVideo && !cameraOff ? '' : 'invisible'}`}
+                    className={`h-full w-full object-cover ${localHasVideo && !cameraOff ? '' : 'invisible'}`}
                   />
-                  {(!isVideo || cameraOff) && (
+                  {(!localHasVideo || cameraOff) && (
                     <div className="absolute inset-0 grid place-items-center">
                       <div className="grid h-16 w-16 place-items-center rounded-full bg-slate-800 text-2xl text-slate-300">
                         {(myNameRef.current || '?').charAt(0).toUpperCase()}
@@ -788,7 +843,18 @@ export function CallProvider({ children }: { children: ReactNode }) {
             >
               {muted ? <MicOffIcon size={22} /> : <MicIcon size={22} />}
             </button>
-            {isVideo && (
+            {!localHasVideo && (
+              <button
+                type="button"
+                onClick={upgradeToVideo}
+                aria-label={t('call.switchToVideo')}
+                title={t('call.switchToVideo')}
+                className="grid h-12 w-12 place-items-center rounded-full bg-slate-800 text-white hover:bg-slate-700"
+              >
+                <VideoIcon size={22} />
+              </button>
+            )}
+            {localHasVideo && (
               <button
                 type="button"
                 onClick={toggleCamera}
@@ -800,7 +866,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
                 {cameraOff ? <VideoOffIcon size={22} /> : <VideoIcon size={22} />}
               </button>
             )}
-            {isVideo && !cameraOff && (
+            {localHasVideo && !cameraOff && (
               <button
                 type="button"
                 onClick={flipCamera}

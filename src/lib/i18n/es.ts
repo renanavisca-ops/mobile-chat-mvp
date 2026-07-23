@@ -322,6 +322,7 @@ const es: Dictionary = {
     mute: 'Silenciar',
     unmute: 'Activar micrófono',
     toggleCamera: 'Cámara',
+    switchToVideo: 'Cambiar a vídeo',
     flipCamera: 'Girar cámara',
     speakerOn: 'Altavoz activado',
     speakerOff: 'Altavoz desactivado',

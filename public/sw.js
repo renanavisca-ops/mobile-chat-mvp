@@ -2,6 +2,12 @@
 // and focuses/opens the app on click. No caching/offline behavior — that's a
 // separate concern from push delivery.
 
+// Take over as soon as a new version is deployed, instead of waiting for every
+// tab to close. Without this the browser keeps running the OLD service worker
+// (whose click handler reloaded the page and hung up in-progress calls).
+self.addEventListener('install', () => self.skipWaiting());
+self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim()));
+
 self.addEventListener('push', (event) => {
   let data = { title: 'Toky Chat', body: 'New message', url: '/chats' };
   try {

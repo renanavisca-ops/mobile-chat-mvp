@@ -320,6 +320,7 @@ const en = {
     mute: 'Mute',
     unmute: 'Unmute',
     toggleCamera: 'Toggle camera',
+    switchToVideo: 'Switch to video',
     flipCamera: 'Flip camera',
     speakerOn: 'Speaker on',
     speakerOff: 'Speaker off',
