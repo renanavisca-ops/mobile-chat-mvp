@@ -7,6 +7,7 @@
 // device_tokens. The web-push path (src/lib/push.ts) is unchanged and delegates
 // here when running natively.
 import { Capacitor } from '@capacitor/core';
+import { FirebaseMessaging } from '@capacitor-firebase/messaging';
 import { browserSupabase } from '@/lib/supabase/client';
 
 export function isNativeApp(): boolean {
@@ -34,9 +35,10 @@ let currentUserId: string | null = null;
 let lastToken: string | null = null;
 let listenersReady = false;
 
+// Statically imported (part of the main bundle) — a dynamic import() was
+// hanging in the native WebView because its separate chunk never loaded.
 async function messaging() {
-  const mod = await import('@capacitor-firebase/messaging');
-  return mod.FirebaseMessaging;
+  return FirebaseMessaging;
 }
 
 async function storeToken(userId: string, token: string): Promise<void> {
