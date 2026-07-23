@@ -90,22 +90,19 @@ function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
 export async function registerNativePush(userId: string): Promise<void> {
   // Overall guard: even if the plugin load or an unwrapped call stalls, this
   // ALWAYS settles so the toggle can't spin "registering…" forever.
-  await withTimeout(doRegisterNativePush(userId), 30000, 'push registration (Firebase not initialized on device?)');
+  await withTimeout(doRegisterNativePush(userId), 30000, 'enabling notifications');
 }
 
 async function doRegisterNativePush(userId: string): Promise<void> {
   currentUserId = userId;
 
-  // Touch the plugin object directly — no async indirection, no separate chunk.
-  // If this build is fresh, the old 'loading messaging plugin' label is GONE,
-  // so seeing it again proves the device is running stale cached JS.
   if (!FirebaseMessaging || typeof FirebaseMessaging.checkPermissions !== 'function') {
-    throw new Error('build3: FirebaseMessaging plugin object unavailable.');
+    throw new Error('Notifications are unavailable on this device.');
   }
 
-  let perm = await withTimeout(FirebaseMessaging.checkPermissions(), 8000, 'build3 checkPermissions (native plugin silent)');
+  let perm = await withTimeout(FirebaseMessaging.checkPermissions(), 8000, 'checking notification permission');
   if (perm.receive === 'prompt' || perm.receive === 'prompt-with-rationale') {
-    perm = await withTimeout(FirebaseMessaging.requestPermissions(), 60000, 'build3 requestPermissions (allow the prompt)');
+    perm = await withTimeout(FirebaseMessaging.requestPermissions(), 60000, 'waiting for the permission prompt');
   }
   if (perm.receive !== 'granted') {
     throw new Error('Notification permission was not granted.');
@@ -116,7 +113,7 @@ async function doRegisterNativePush(userId: string): Promise<void> {
   const result = await withTimeout(
     FirebaseMessaging.getToken(),
     15000,
-    'build3 getToken (Firebase not configured on device?)'
+    'getting the notification token'
   );
 
   const token = result?.token;
