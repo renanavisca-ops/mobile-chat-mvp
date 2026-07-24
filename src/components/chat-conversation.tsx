@@ -1754,7 +1754,7 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
                     <li
                       key={m.id}
                       id={`msg-${m.id}`}
-                      className={`flex flex-col mb-2 px-3 py-2 rounded-2xl max-w-[80%] shadow-sm transition-shadow ${
+                      className={`flex flex-col mb-2 px-3 py-2 rounded-2xl w-fit max-w-[80%] shadow-sm transition-shadow ${
                         m.sender_type === 'system' ? 'mx-auto bg-slate-800 text-center text-xs text-slate-400' :
                         isMine(m) ? 'ml-auto rounded-br-md bg-blue-600 text-white' :
                         'mr-auto rounded-bl-md bg-slate-800 text-slate-100'
