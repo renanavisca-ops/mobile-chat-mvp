@@ -924,9 +924,15 @@ export default function SettingsPage() {
           <section className="space-y-3">
             <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500 ml-1">{t('settings.sectionLegal')}</h2>
             <div className="rounded-xl border border-slate-900 bg-slate-950/50 p-4 shadow-sm text-sm">
-              <Link href="/privacy" className="text-blue-400 hover:text-blue-300">{t('settings.privacyPolicy')}</Link>
-              <span className="mx-2 text-slate-600">·</span>
-              <Link href="/terms" className="text-blue-400 hover:text-blue-300">{t('settings.termsOfService')}</Link>
+              <div className="flex flex-wrap gap-x-2 gap-y-1">
+                <Link href="/privacy" className="text-blue-400 hover:text-blue-300">{t('settings.privacyPolicy')}</Link>
+                <span className="text-slate-600">·</span>
+                <Link href="/terms" className="text-blue-400 hover:text-blue-300">{t('settings.termsOfService')}</Link>
+                <span className="text-slate-600">·</span>
+                <Link href="/guidelines" className="text-blue-400 hover:text-blue-300">{t('settings.communityGuidelines')}</Link>
+                <span className="text-slate-600">·</span>
+                <Link href="/support" className="text-blue-400 hover:text-blue-300">{t('settings.support')}</Link>
+              </div>
             </div>
           </section>
 

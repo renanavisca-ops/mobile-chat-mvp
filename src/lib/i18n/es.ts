@@ -562,6 +562,8 @@ const es: Dictionary = {
     encPassTooShort: 'Usa una frase de al menos 8 caracteres.',
     privacyPolicy: 'Política de privacidad',
     termsOfService: 'Términos de servicio',
+    communityGuidelines: 'Normas de la comunidad',
+    support: 'Ayuda y soporte',
     languageAuto: 'Automático (sistema)',
     languageEnglish: 'English',
     languageSpanish: 'Español',

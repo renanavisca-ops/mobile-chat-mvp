@@ -5,28 +5,22 @@ export const metadata = { title: 'Privacy Policy — Toky Chat' };
 export default function PrivacyPage() {
   return (
     <main className="mx-auto max-w-3xl px-5 py-10 text-slate-200">
-      <div className="mb-6 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-300">
-        DRAFT TEMPLATE — this is a thorough starting point, not legal advice. Have a
-        qualified lawyer review and adapt it, and replace every [BRACKETED] value,
-        before you rely on it in production.
-      </div>
-
       <Link href="/" className="text-sm text-blue-400 hover:text-blue-300">← Back to app</Link>
       <h1 className="mt-3 text-3xl font-bold tracking-tight">Privacy Policy</h1>
       <p className="mt-1 text-xs text-slate-500">
-        Effective date: [DATE] · Last updated: [DATE]
+        Effective date: July 24, 2026 · Last updated: July 24, 2026
       </p>
 
       <div className="mt-8 space-y-9 text-sm leading-relaxed text-slate-300">
         <section>
           <p>
-            This Privacy Policy describes how <b>[COMPANY LEGAL NAME]</b> (&quot;Toky
+            This Privacy Policy describes how <b>Toky Chat</b> (&quot;Toky
             Chat&quot;, &quot;we&quot;, &quot;us&quot;, or &quot;our&quot;) collects,
             uses, discloses, and safeguards your information when you use our messaging
             application and related services (collectively, the &quot;Service&quot;).
             It also explains your rights and choices. For the purposes of the EU/UK
             General Data Protection Regulation (&quot;GDPR&quot;), the data controller
-            is [COMPANY LEGAL NAME], [REGISTERED ADDRESS]. If you do not agree with this
+            is Toky Chat, an independent app operated by its individual creators, contactable at renanavisca@gmail.com. If you do not agree with this
             Policy, please do not use the Service.
           </p>
         </section>
@@ -86,7 +80,7 @@ export default function PrivacyPage() {
           <h2 className="mb-3 text-lg font-semibold text-slate-100">4. How we share information</h2>
           <ul className="list-disc space-y-1 pl-5">
             <li><b>With other users:</b> your profile (username, display name, avatar, presence) and the content you send are visible to the participants of your chats and groups.</li>
-            <li><b>With service providers (processors):</b> we use Supabase (database, authentication, file storage, realtime) and Vercel (application hosting) to run the Service. They process data on our behalf under contractual and security obligations. [List any analytics, email, or push providers you add.]</li>
+            <li><b>With service providers (processors):</b> we use Supabase (database, authentication, file storage, realtime) and Vercel (application hosting) to run the Service. They process data on our behalf under contractual and security obligations. We also use Google Firebase Cloud Messaging to deliver push notifications.</li>
             <li><b>For legal reasons &amp; safety:</b> to comply with law, respond to lawful requests, enforce our Terms, or protect the rights, property, and safety of our users and the public.</li>
             <li><b>Business transfers:</b> in connection with a merger, acquisition, or sale of assets, subject to this Policy.</li>
           </ul>
@@ -112,9 +106,9 @@ export default function PrivacyPage() {
             purposes described here. Indicative periods:
           </p>
           <ul className="mt-2 list-disc space-y-1 pl-5">
-            <li><b>Account &amp; profile:</b> until you delete your account, then removed or anonymized within [X days].</li>
-            <li><b>Messages &amp; media:</b> retained until deleted by participants or account deletion; backups purged within [X days]. [Define your policy.]</li>
-            <li><b>Logs &amp; diagnostics:</b> [X days/months].</li>
+            <li><b>Account &amp; profile:</b> until you delete your account, then removed or anonymized within 30 days.</li>
+            <li><b>Messages &amp; media:</b> retained until deleted by participants or account deletion; backups purged within 30 days.</li>
+            <li><b>Logs &amp; diagnostics:</b> 90 days.</li>
           </ul>
         </section>
 
@@ -164,7 +158,7 @@ export default function PrivacyPage() {
             information as those terms are defined under California law.
           </p>
           <p className="mt-3">
-            To exercise any right, contact us at <b>[PRIVACY EMAIL]</b>. We will verify
+            To exercise any right, contact us at <b>renanavisca@gmail.com</b>. We will verify
             your request and respond within the timeframe required by law.
           </p>
         </section>
@@ -201,10 +195,8 @@ export default function PrivacyPage() {
         <section>
           <h2 className="mb-3 text-lg font-semibold text-slate-100">12. Contact us</h2>
           <p>
-            [COMPANY LEGAL NAME]<br />
-            [REGISTERED ADDRESS]<br />
-            Privacy contact: [PRIVACY EMAIL]<br />
-            [If applicable] Data Protection Officer / EU or UK Representative: [NAME &amp; CONTACT]
+            Toky Chat — an independent app operated by its individual creators.<br />
+            Privacy &amp; data-protection contact: renanavisca@gmail.com
           </p>
         </section>
       </div>

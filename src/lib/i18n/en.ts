@@ -560,6 +560,8 @@ const en = {
     encPassTooShort: 'Use a passphrase of at least 8 characters.',
     privacyPolicy: 'Privacy Policy',
     termsOfService: 'Terms of Service',
+    communityGuidelines: 'Community Guidelines',
+    support: 'Help & Support',
     languageAuto: 'Automatic (system)',
     languageEnglish: 'English',
     languageSpanish: 'Español',

@@ -5,23 +5,17 @@ export const metadata = { title: 'Terms of Service — Toky Chat' };
 export default function TermsPage() {
   return (
     <main className="mx-auto max-w-3xl px-5 py-10 text-slate-200">
-      <div className="mb-6 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-300">
-        DRAFT TEMPLATE — this is a thorough starting point, not legal advice. Have a
-        qualified lawyer review and adapt it, and replace every [BRACKETED] value,
-        before you rely on it in production.
-      </div>
-
       <Link href="/" className="text-sm text-blue-400 hover:text-blue-300">← Back to app</Link>
       <h1 className="mt-3 text-3xl font-bold tracking-tight">Terms of Service</h1>
       <p className="mt-1 text-xs text-slate-500">
-        Effective date: [DATE] · Last updated: [DATE]
+        Effective date: July 24, 2026 · Last updated: July 24, 2026
       </p>
 
       <div className="mt-8 space-y-9 text-sm leading-relaxed text-slate-300">
         <section>
           <p>
             These Terms of Service (&quot;Terms&quot;) are a binding agreement between you
-            and <b>[COMPANY LEGAL NAME]</b> (&quot;Toky Chat&quot;, &quot;we&quot;,
+            and <b>Toky Chat</b> (&quot;Toky Chat&quot;, &quot;we&quot;,
             &quot;us&quot;) governing your access to and use of the Toky Chat application
             and related services (the &quot;Service&quot;). By creating an account,
             clicking to accept, or using the Service, you agree to these Terms and to our{' '}
@@ -33,7 +27,7 @@ export default function TermsPage() {
         <section>
           <h2 className="mb-3 text-lg font-semibold text-slate-100">1. Eligibility &amp; age</h2>
           <p>
-            You must be at least <b>[MINIMUM AGE — e.g. 13, or 16 in parts of the EU]</b>{' '}
+            You must be at least <b>13</b>{' '}
             years old (or the minimum age of digital consent in your country) to use the
             Service. If you are under the age of majority, you represent that a parent or
             legal guardian has reviewed and agreed to these Terms. You must have the legal
@@ -59,7 +53,7 @@ export default function TermsPage() {
           <ul className="list-disc space-y-1 pl-5">
             <li>You must provide accurate information and keep it up to date.</li>
             <li>You are responsible for all activity that occurs under your account.</li>
-            <li>Keep your credentials confidential and notify us immediately of any unauthorized use at [SECURITY EMAIL].</li>
+            <li>Keep your credentials confidential and notify us immediately of any unauthorized use at renanavisca@gmail.com.</li>
             <li>You may not share, sell, or transfer your account, or use another person&apos;s account without permission.</li>
           </ul>
         </section>
@@ -114,7 +108,7 @@ export default function TermsPage() {
           <h2 className="mb-3 text-lg font-semibold text-slate-100">7. Our intellectual property</h2>
           <p>
             The Service, including its software, design, trademarks, and content we
-            provide, is owned by [COMPANY LEGAL NAME] or its licensors and is protected by
+            provide, is owned by Toky Chat or its licensors and is protected by
             law. We grant you a limited, revocable, non-exclusive, non-transferable license
             to use the Service for your personal, non-commercial use in accordance with
             these Terms. All rights not expressly granted are reserved.
@@ -158,11 +152,11 @@ export default function TermsPage() {
         <section>
           <h2 className="mb-3 text-lg font-semibold text-slate-100">11. Limitation of liability</h2>
           <p>
-            TO THE MAXIMUM EXTENT PERMITTED BY LAW, [COMPANY LEGAL NAME] AND ITS AFFILIATES
+            TO THE MAXIMUM EXTENT PERMITTED BY LAW, Toky Chat AND ITS AFFILIATES
             WILL NOT BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR
             PUNITIVE DAMAGES, OR ANY LOSS OF DATA, PROFITS, OR GOODWILL, ARISING FROM OR
             RELATING TO YOUR USE OF THE SERVICE. OUR TOTAL LIABILITY FOR ANY CLAIM WILL NOT
-            EXCEED [THE GREATER OF THE AMOUNT YOU PAID US IN THE PAST 12 MONTHS OR USD 100].
+            EXCEED USD 100.
             Nothing in these Terms limits liability that cannot be limited under
             applicable law.
           </p>
@@ -171,7 +165,7 @@ export default function TermsPage() {
         <section>
           <h2 className="mb-3 text-lg font-semibold text-slate-100">12. Indemnification</h2>
           <p>
-            You agree to indemnify and hold harmless [COMPANY LEGAL NAME] and its
+            You agree to indemnify and hold harmless Toky Chat and its
             affiliates from any claims, damages, liabilities, and expenses (including
             reasonable legal fees) arising from your User Content, your use of the Service,
             or your violation of these Terms or of any law or third-party right.
@@ -181,11 +175,10 @@ export default function TermsPage() {
         <section>
           <h2 className="mb-3 text-lg font-semibold text-slate-100">13. Governing law &amp; disputes</h2>
           <p>
-            These Terms are governed by the laws of [JURISDICTION], without regard to its
-            conflict-of-laws rules. [Choose a dispute-resolution mechanism: courts of
-            [LOCATION], and/or binding arbitration and a class-action waiver where
-            enforceable. Consumer-protection laws in your users&apos; countries may
-            override these choices — confirm with counsel.]
+            These Terms are governed by the laws of your country of residence, and any
+            dispute will be subject to the competent courts of that country. Nothing in
+            these Terms removes mandatory consumer-protection rights you have under the
+            laws of the country where you live.
           </p>
         </section>
 
@@ -212,8 +205,7 @@ export default function TermsPage() {
         <section>
           <h2 className="mb-3 text-lg font-semibold text-slate-100">16. Contact</h2>
           <p>
-            Questions about these Terms? Contact [COMPANY LEGAL NAME] at [SUPPORT EMAIL],
-            [REGISTERED ADDRESS].
+            Questions about these Terms? Contact Toky Chat at renanavisca@gmail.com.
           </p>
         </section>
       </div>

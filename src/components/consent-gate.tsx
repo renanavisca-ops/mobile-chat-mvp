@@ -28,7 +28,9 @@ export function ConsentGate() {
   }, []);
 
   // Never gate the policy pages themselves (the user needs to read them here).
-  const isPolicyPage = pathname === '/privacy' || pathname === '/terms';
+  const isPolicyPage = ['/privacy', '/terms', '/guidelines', '/support', '/delete-account'].includes(
+    pathname
+  );
 
   if (!ready || accepted || isPolicyPage) return null;
 
