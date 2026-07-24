@@ -15,7 +15,7 @@ export default function DeleteAccountPage() {
           <ol className="list-decimal space-y-1 pl-5">
             <li>Open <b>Settings</b>.</li>
             <li>Scroll to <b>Delete account</b>.</li>
-            <li>Confirm. Your account is deleted immediately.</li>
+            <li>Confirm. Your account and personal data are removed right away; residual copies in encrypted backups are purged within 90 days.</li>
           </ol>
         </section>
 

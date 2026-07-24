@@ -158,6 +158,7 @@ const en = {
     previewVideo: 'Video preview:',
     typingSuffix: 'is typing…',
     someone: 'Someone',
+    deletedUser: 'Deleted user',
     editingMessage: '✏️ Editing message',
     replyingTo: 'Replying to:',
     blockedNotice: "You've blocked this user. Unblock them (⋯ menu above) to send messages.",

@@ -106,9 +106,9 @@ export default function PrivacyPage() {
             purposes described here. Indicative periods:
           </p>
           <ul className="mt-2 list-disc space-y-1 pl-5">
-            <li><b>Account &amp; profile:</b> until you delete your account, then removed or anonymized within 30 days.</li>
-            <li><b>Messages &amp; media:</b> retained until deleted by participants or account deletion; backups purged within 30 days.</li>
-            <li><b>Logs &amp; diagnostics:</b> 90 days.</li>
+            <li><b>Account &amp; profile:</b> kept until you delete your account, then removed right away; residual copies in backups are purged within 90 days.</li>
+            <li><b>Messages &amp; media:</b> kept until deleted by participants. When you delete your account, messages you already sent remain visible to the other participants but are <b>anonymized</b> — they are shown as coming from a deleted user, with no name or profile. Backups are purged within 90 days.</li>
+            <li><b>Logs &amp; diagnostics:</b> up to 90 days.</li>
           </ul>
         </section>
 
@@ -121,12 +121,14 @@ export default function PrivacyPage() {
             database level).
           </p>
           <p className="mt-2">
-            <b>End-to-end encryption.</b> Direct (one-to-one) chats are end-to-end
-            encrypted by default. The encryption keys are generated on your device; we
-            store only public keys and encrypted ciphertext, so we cannot read the
-            contents of those messages. If you lose access to your device and have not
-            saved a passphrase backup of your key, your encrypted message history may be
-            unrecoverable.
+            <b>End-to-end encryption.</b> In direct (one-to-one) chats, the text and
+            details of your messages are end-to-end encrypted by default. The encryption
+            keys are generated on your device; we store only public keys and encrypted
+            ciphertext for that content, so we cannot read it. <b>Media attachments</b>{' '}
+            (images, videos, and files) are stored on our servers and protected by access
+            controls, but are <b>not</b> yet end-to-end encrypted. If you lose access to
+            your device and have not saved a passphrase backup of your key, your encrypted
+            message history may be unrecoverable.
           </p>
           <p className="mt-2">
             Group chats and channels, and any chat where end-to-end encryption has not

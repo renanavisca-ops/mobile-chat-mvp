@@ -666,7 +666,9 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
   }
   function senderName(m: MessageRow) {
     if (!m.sender_id) return '';
-    return usernameById.get(m.sender_id) || shortId(m.sender_id);
+    // A sender with no profile among the chat members is a deleted account —
+    // their messages stay for everyone else but are shown as anonymous.
+    return usernameById.get(m.sender_id) || t('chat.deletedUser');
   }
 
   // Reset the "landed at bottom" flag when switching chats (the component

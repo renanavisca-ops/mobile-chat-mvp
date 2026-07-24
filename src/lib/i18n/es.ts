@@ -160,6 +160,7 @@ const es: Dictionary = {
     previewVideo: 'Vista previa de video:',
     typingSuffix: 'escribiendo…',
     someone: 'Alguien',
+    deletedUser: 'Usuario eliminado',
     editingMessage: '✏️ Editando mensaje',
     replyingTo: 'Respondiendo a:',
     blockedNotice: 'Has bloqueado a este usuario. Desbloquéalo (menú ⋯ arriba) para enviar mensajes.',

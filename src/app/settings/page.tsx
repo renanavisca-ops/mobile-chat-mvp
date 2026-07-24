@@ -212,6 +212,16 @@ export default function SettingsPage() {
         const body = await res.json().catch(() => ({}));
         throw new Error(body.error || 'Failed to delete account');
       }
+      // Clean this device: drop the push subscription/token, wipe the local
+      // identity + encryption keys (IndexedDB), clear the consent record, then
+      // sign out and return to the login screen.
+      await unsubscribeFromPush().catch(() => {});
+      clearLocalIdentity();
+      try {
+        localStorage.removeItem('toky_consent_v1');
+      } catch {
+        // ignore storage errors
+      }
       await supabase.auth.signOut();
       window.location.href = '/login';
     } catch (e: any) {
