@@ -24,7 +24,6 @@
     "@capacitor/ios": "^6.2.1",
     "@capacitor/splash-screen": "^6.0.4",
     "@capacitor/status-bar": "^6.0.3",
-    "@privacyresearch/libsignal-protocol-typescript": "0.0.16",
     "@supabase/supabase-js": "^2.49.1",
     "clsx": "^2.1.1",
     "next": "14.2.5",

@@ -93,6 +93,21 @@ export function isUnlocked(): boolean {
   return !!identityPrivate;
 }
 
+/**
+ * Make sure this account has an encryption identity so chats can be end-to-end
+ * encrypted by default. Safe to call on every sign-in:
+ *  - already unlocked on this device → nothing to do
+ *  - brand-new account (never published a key) → enroll one now
+ *  - account published a key elsewhere but this device has no local copy →
+ *    leave it; the user restores from their passphrase backup (recovery flow).
+ */
+export async function ensureIdentity(): Promise<void> {
+  await initKeystore();
+  if (identityPrivate) return;
+  const published = await hasPublishedIdentity();
+  if (!published) await enrollNewIdentity();
+}
+
 async function myUserId(): Promise<string | null> {
   const supabase = browserSupabase();
   const { data } = await supabase.auth.getUser();
@@ -236,6 +251,11 @@ export async function lockChat(
   if (!identityPrivate) throw new Error('Set up encryption on this device first.');
   const uid = await myUserId();
   if (!uid) throw new Error('Not signed in.');
+
+  // Idempotency guard: if this chat is already locked (I already hold its key),
+  // never regenerate — a new chat key would make earlier messages unreadable.
+  const existingKey = await getChatKey(chatId);
+  if (existingKey) return { ok: true, missing: [] };
 
   const members = Array.from(new Set([...memberIds, uid]));
   const pubs = new Map<string, Jwk>();

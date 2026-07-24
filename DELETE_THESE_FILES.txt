@@ -1,0 +1,8 @@
+After extracting this zip, DELETE these 4 dead-crypto files (extraction can't
+remove them), then reinstall deps:
+
+  git rm src/lib/crypto/device.ts src/lib/crypto/libsignal-adapter.ts \
+         src/lib/crypto/types.ts src/types/libsignal.d.ts
+  npm install   # drops @privacyresearch/libsignal-protocol-typescript
+
+Everything else in this zip is a normal overwrite.

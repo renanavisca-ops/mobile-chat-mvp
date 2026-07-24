@@ -9,6 +9,7 @@ import { StoriesBar } from '@/components/stories-bar';
 import { ChatConversation } from '@/components/chat-conversation';
 import { PlusIcon, SearchIcon, UsersIcon, UserPlusIcon, HashIcon } from '@/components/icons';
 import { useRequireAuth } from '@/lib/auth/use-require-auth';
+import { ensureIdentity } from '@/lib/crypto/keystore';
 import { browserSupabase } from '@/lib/supabase/client';
 import { listChats } from '@/lib/db/chats';
 import { useIsOnline } from '@/components/presence-provider';
@@ -66,6 +67,12 @@ export default function ChatsPage() {
   useEffect(() => {
     audioRef.current = new Audio('/notification.mp3');
   }, []);
+
+  // Make sure this account has an encryption identity (covers users who signed
+  // up before encryption-by-default), so their new direct chats can lock.
+  useEffect(() => {
+    if (user) void ensureIdentity().catch(() => {});
+  }, [user]);
 
   // On wide screens, open a chat in the right pane; on phones, navigate to the
   // full-page conversation.

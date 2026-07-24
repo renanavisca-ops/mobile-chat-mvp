@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { PageShell } from '@/components/page-shell';
-import { createLocalDeviceBundle } from '@/lib/crypto/device';
+import { ensureIdentity, getMyIdentityPub } from '@/lib/crypto/keystore';
 import { browserSupabase } from '@/lib/supabase/client';
 import { useSession } from '@/lib/auth/use-session';
 import { useT, TransBold } from '@/lib/i18n/context';
@@ -97,8 +97,12 @@ export default function OnboardingPage() {
       }
 
       setStatus(t('onboarding.statusGeneratingKeys'));
-      const bundle = await createLocalDeviceBundle();
-      window.localStorage.setItem('device_bundle', JSON.stringify(bundle));
+      // Real end-to-end-encryption identity: creates the private key on this
+      // device and publishes the public key so others can encrypt to us. This
+      // is what lets direct chats be encrypted by default.
+      await ensureIdentity();
+      const identityPub = await getMyIdentityPub();
+      const registrationId = Math.floor(Math.random() * 16380) + 1;
       window.localStorage.setItem('username', uname);
 
       setStatus(t('onboarding.statusSavingProfile'));
@@ -133,11 +137,11 @@ export default function OnboardingPage() {
           .insert({
             user_id: userId,
             device_label: deviceLabel,
-            registration_id: bundle.registrationId,
-            identity_public_key: bundle.identityKey,
-            signed_prekey_id: bundle.signedPreKeyId,
-            signed_prekey_public: 'mvp',
-            signed_prekey_signature: 'mvp',
+            registration_id: registrationId,
+            identity_public_key: identityPub ? JSON.stringify(identityPub) : 'e2ee',
+            signed_prekey_id: 1,
+            signed_prekey_public: 'e2ee',
+            signed_prekey_signature: 'e2ee',
           })
           .select('id')
           .single();

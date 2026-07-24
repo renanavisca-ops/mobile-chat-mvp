@@ -210,7 +210,19 @@ export async function createDirectChatWith(userId: string): Promise<string> {
 
   if (error) throw error;
 
-  return data as string;
+  const chatId = data as string;
+
+  // Encrypt direct chats by default. This only locks when BOTH people have an
+  // encryption identity; if the other user hasn't enrolled yet it stays plain
+  // (and the guard in lockChat makes re-opening an existing chat a no-op, so a
+  // locked chat is never re-keyed).
+  try {
+    await ksLockChat(chatId, [userId]);
+  } catch {
+    // best effort — never block opening the chat on encryption setup
+  }
+
+  return chatId;
 }
 
 export async function createGroupChat(title: string, memberIds: string[]): Promise<string> {
