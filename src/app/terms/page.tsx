@@ -1,218 +1,125 @@
 import Link from 'next/link';
+import { LegalDoc } from '@/components/legal/legal-doc';
+import { LEGAL } from '@/lib/legal';
 
 export const metadata = { title: 'Terms of Service — Toky Chat' };
 
-export default function TermsPage() {
-  return (
-    <main className="mx-auto max-w-3xl px-5 py-10 text-slate-200">
-      <Link href="/" className="text-sm text-blue-400 hover:text-blue-300">← Back to app</Link>
-      <h1 className="mt-3 text-3xl font-bold tracking-tight">Terms of Service</h1>
-      <p className="mt-1 text-xs text-slate-500">
-        Effective date: July 24, 2026 · Last updated: July 24, 2026
-      </p>
+const H2 = 'mb-3 text-lg font-semibold text-slate-100';
+const UL = 'list-disc space-y-1 pl-5';
+const mail = LEGAL.supportEmail;
 
+function En() {
+  return (
+    <>
+      <h1 className="text-3xl font-bold tracking-tight">Terms of Service</h1>
+      <p className="mt-1 text-xs text-slate-500">Effective date: {LEGAL.effectiveDate} · Last updated: {LEGAL.effectiveDate}</p>
       <div className="mt-8 space-y-9 text-sm leading-relaxed text-slate-300">
         <section>
-          <p>
-            These Terms of Service (&quot;Terms&quot;) are a binding agreement between you
-            and <b>Toky Chat</b> (&quot;Toky Chat&quot;, &quot;we&quot;,
-            &quot;us&quot;) governing your access to and use of the Toky Chat application
-            and related services (the &quot;Service&quot;). By creating an account,
-            clicking to accept, or using the Service, you agree to these Terms and to our{' '}
-            <Link href="/privacy" className="text-blue-400 hover:text-blue-300">Privacy Policy</Link>.
-            If you do not agree, do not use the Service.
-          </p>
+          <p>These Terms are a binding agreement between you and {LEGAL.operator}, an independent app operated by its individual creators based in {LEGAL.country} (&quot;we&quot;, &quot;us&quot;). By using the Service you agree to these Terms and our{' '}
+            <Link href="/privacy" className="text-blue-400 hover:text-blue-300">Privacy Policy</Link>. If you do not agree, do not use the Service.</p>
         </section>
-
         <section>
-          <h2 className="mb-3 text-lg font-semibold text-slate-100">1. Eligibility &amp; age</h2>
-          <p>
-            You must be at least <b>13</b>{' '}
-            years old (or the minimum age of digital consent in your country) to use the
-            Service. If you are under the age of majority, you represent that a parent or
-            legal guardian has reviewed and agreed to these Terms. You must have the legal
-            capacity to enter into this agreement, and you must not be barred from using
-            the Service under applicable law.
-          </p>
+          <h2 className={H2}>1. Eligibility &amp; age</h2>
+          <p>You must be at least <b>{LEGAL.minAge}</b> years old (or the minimum age of digital consent in your country) to use the Service. If you are under the age of majority, a parent or guardian must agree to these Terms.</p>
         </section>
-
         <section>
-          <h2 className="mb-3 text-lg font-semibold text-slate-100">2. The Service</h2>
-          <p>
-            Toky Chat is a messaging service that lets you send text, images, video, and
-            voice messages, make voice and video calls, create one-to-one and group
-            chats, and manage a profile. We may add, change, or remove features at any
-            time. Direct chats are end-to-end encrypted by default; group chats and
-            channels may not be. See our Privacy Policy for details on how content is
-            handled.
-          </p>
+          <h2 className={H2}>2. The Service</h2>
+          <p>Toky Chat lets you send messages and media, make voice and video calls, and create one-to-one and group chats. We may add, change, or remove features at any time. Direct chats are end-to-end encrypted by default; group chats and channels may not be. See the Privacy Policy for details.</p>
         </section>
-
         <section>
-          <h2 className="mb-3 text-lg font-semibold text-slate-100">3. Your account</h2>
-          <ul className="list-disc space-y-1 pl-5">
-            <li>You must provide accurate information and keep it up to date.</li>
-            <li>You are responsible for all activity that occurs under your account.</li>
-            <li>Keep your credentials confidential and notify us immediately of any unauthorized use at renanavisca@gmail.com.</li>
-            <li>You may not share, sell, or transfer your account, or use another person&apos;s account without permission.</li>
+          <h2 className={H2}>3. Your account</h2>
+          <ul className={UL}>
+            <li>Provide accurate information and keep your credentials confidential.</li>
+            <li>You are responsible for activity under your account; notify us of any unauthorized use at {mail}.</li>
+            <li>Do not share, sell, or transfer your account.</li>
           </ul>
         </section>
-
         <section>
-          <h2 className="mb-3 text-lg font-semibold text-slate-100">4. Acceptable use</h2>
-          <p>You agree that you will not, and will not help or permit others to:</p>
-          <ul className="mt-2 list-disc space-y-1 pl-5">
-            <li>violate any law or regulation, or infringe the intellectual property, privacy, or other rights of others;</li>
-            <li>harass, bully, threaten, defame, or abuse any person;</li>
-            <li>post or share content that is hateful, violent, or that sexually exploits or endangers minors (which we report to authorities as required by law);</li>
-            <li>share sexual content involving anyone without consent, or otherwise unlawful or non-consensual intimate imagery;</li>
-            <li>send spam, chain messages, or unsolicited bulk communications;</li>
-            <li>distribute malware, or attempt to gain unauthorized access to the Service, other accounts, or our systems;</li>
-            <li>scrape, crawl, or harvest data, or use bots or automated means except as we expressly permit;</li>
-            <li>interfere with, disrupt, or overload the Service, or circumvent security or rate limits;</li>
-            <li>impersonate any person or entity, or misrepresent your affiliation;</li>
-            <li>reverse engineer or attempt to extract source code except to the extent permitted by law.</li>
-          </ul>
+          <h2 className={H2}>4. Acceptable use</h2>
+          <p>You agree not to, and not to help others: violate the law or others&apos; rights; harass, threaten, or abuse anyone; post content that is hateful, violent, or that sexually exploits or endangers minors; share non-consensual intimate imagery; send spam; distribute malware or attempt unauthorized access; impersonate others; or interfere with or overload the Service. See our{' '}
+            <Link href="/guidelines" className="text-blue-400 hover:text-blue-300">Community Guidelines</Link>.</p>
         </section>
-
         <section>
-          <h2 className="mb-3 text-lg font-semibold text-slate-100">5. Your content &amp; license</h2>
-          <p>
-            You retain ownership of the content you create and share (&quot;User
-            Content&quot;). You grant us a worldwide, non-exclusive, royalty-free license
-            to host, store, reproduce, and transmit your User Content solely to operate,
-            provide, and secure the Service (for example, to deliver a message to its
-            recipients and display it to them). This license ends when your User Content
-            is deleted, except for content already shared with others or retained in
-            backups for a limited period, and except as needed to comply with law.
-          </p>
-          <p className="mt-2">
-            You represent that you have the necessary rights to your User Content and that
-            it does not violate these Terms or any law. You are solely responsible for
-            your User Content.
-          </p>
+          <h2 className={H2}>5. Your content &amp; license</h2>
+          <p>You own the content you share. You grant us a worldwide, non-exclusive, royalty-free license to host, store, and transmit it solely to operate and secure the Service (for example, to deliver a message to its recipients). This license ends when your content is deleted, except for content already shared with others or retained briefly in backups. You are responsible for your content and represent that you have the rights to it.</p>
         </section>
-
         <section>
-          <h2 className="mb-3 text-lg font-semibold text-slate-100">6. Reporting, moderation &amp; enforcement</h2>
-          <p>
-            You can report content or users and block other users within the Service. We
-            may, but are not obligated to, review reported content. We may remove content,
-            limit visibility, and warn, suspend, or terminate accounts that violate these
-            Terms or that we reasonably believe create legal or safety risk. We may
-            preserve and disclose information where required by law or to protect users.
-          </p>
+          <h2 className={H2}>6. Reporting, moderation &amp; enforcement</h2>
+          <p>You can report content or users and block others within the Service. We may remove content and warn, suspend, or terminate accounts that violate these Terms or create legal or safety risk, and we may preserve and disclose information where required by law.</p>
         </section>
-
         <section>
-          <h2 className="mb-3 text-lg font-semibold text-slate-100">7. Our intellectual property</h2>
-          <p>
-            The Service, including its software, design, trademarks, and content we
-            provide, is owned by Toky Chat or its licensors and is protected by
-            law. We grant you a limited, revocable, non-exclusive, non-transferable license
-            to use the Service for your personal, non-commercial use in accordance with
-            these Terms. All rights not expressly granted are reserved.
-          </p>
+          <h2 className={H2}>7. Third-party services &amp; IP</h2>
+          <p>The Service relies on third-party providers and may link to third-party content, which is governed by their own terms. The Service, its software and trademarks are owned by {LEGAL.operator} or its licensors; you receive a limited, revocable, non-transferable license to use it for personal, non-commercial use.</p>
         </section>
-
         <section>
-          <h2 className="mb-3 text-lg font-semibold text-slate-100">8. Third-party services</h2>
-          <p>
-            The Service relies on third-party providers (such as hosting and
-            infrastructure) and may link to third-party sites or content. We are not
-            responsible for third-party services, and your use of them may be subject to
-            their own terms.
-          </p>
+          <h2 className={H2}>8. Termination &amp; disclaimers</h2>
+          <p>You may stop using the Service and delete your account at any time. We may suspend or terminate access for violations or to protect the Service. The Service is provided &quot;as is&quot; without warranties of any kind, to the maximum extent permitted by law. To the extent permitted by law, our liability is limited; nothing here excludes liability that cannot legally be excluded.</p>
         </section>
-
         <section>
-          <h2 className="mb-3 text-lg font-semibold text-slate-100">9. Termination</h2>
-          <p>
-            You may stop using the Service and delete your account at any time. We may
-            suspend or terminate your access, with or without notice, if you violate these
-            Terms, if required by law, or to protect the Service or its users. Upon
-            termination, your right to use the Service ends. Sections that by their nature
-            should survive termination (including content license limitations,
-            disclaimers, limitation of liability, and indemnification) will survive.
-          </p>
-        </section>
-
-        <section>
-          <h2 className="mb-3 text-lg font-semibold text-slate-100">10. Disclaimers</h2>
-          <p>
-            THE SERVICE IS PROVIDED &quot;AS IS&quot; AND &quot;AS AVAILABLE&quot; WITHOUT
-            WARRANTIES OF ANY KIND, WHETHER EXPRESS, IMPLIED, OR STATUTORY, INCLUDING
-            WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE, AND
-            NON-INFRINGEMENT. WE DO NOT WARRANT THAT THE SERVICE WILL BE UNINTERRUPTED,
-            SECURE, OR ERROR-FREE. [Some jurisdictions do not allow certain disclaimers, so
-            these may not fully apply to you.]
-          </p>
-        </section>
-
-        <section>
-          <h2 className="mb-3 text-lg font-semibold text-slate-100">11. Limitation of liability</h2>
-          <p>
-            TO THE MAXIMUM EXTENT PERMITTED BY LAW, Toky Chat AND ITS AFFILIATES
-            WILL NOT BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR
-            PUNITIVE DAMAGES, OR ANY LOSS OF DATA, PROFITS, OR GOODWILL, ARISING FROM OR
-            RELATING TO YOUR USE OF THE SERVICE. OUR TOTAL LIABILITY FOR ANY CLAIM WILL NOT
-            EXCEED USD 100.
-            Nothing in these Terms limits liability that cannot be limited under
-            applicable law.
-          </p>
-        </section>
-
-        <section>
-          <h2 className="mb-3 text-lg font-semibold text-slate-100">12. Indemnification</h2>
-          <p>
-            You agree to indemnify and hold harmless Toky Chat and its
-            affiliates from any claims, damages, liabilities, and expenses (including
-            reasonable legal fees) arising from your User Content, your use of the Service,
-            or your violation of these Terms or of any law or third-party right.
-          </p>
-        </section>
-
-        <section>
-          <h2 className="mb-3 text-lg font-semibold text-slate-100">13. Governing law &amp; disputes</h2>
-          <p>
-            These Terms are governed by the laws of your country of residence, and any
-            dispute will be subject to the competent courts of that country. Nothing in
-            these Terms removes mandatory consumer-protection rights you have under the
-            laws of the country where you live.
-          </p>
-        </section>
-
-        <section>
-          <h2 className="mb-3 text-lg font-semibold text-slate-100">14. Changes to these Terms</h2>
-          <p>
-            We may modify these Terms from time to time. If changes are material, we will
-            provide reasonable notice (for example, in-app or by email). Your continued use
-            of the Service after changes take effect means you accept the revised Terms.
-          </p>
-        </section>
-
-        <section>
-          <h2 className="mb-3 text-lg font-semibold text-slate-100">15. General</h2>
-          <ul className="list-disc space-y-1 pl-5">
-            <li><b>Entire agreement:</b> these Terms and the Privacy Policy are the entire agreement between you and us regarding the Service.</li>
-            <li><b>Severability:</b> if any provision is unenforceable, the rest remain in effect.</li>
-            <li><b>No waiver:</b> our failure to enforce a provision is not a waiver.</li>
-            <li><b>Assignment:</b> you may not assign these Terms; we may assign them in connection with a merger, acquisition, or sale of assets.</li>
-            <li><b>Force majeure:</b> we are not liable for delays or failures caused by events beyond our reasonable control.</li>
-          </ul>
-        </section>
-
-        <section>
-          <h2 className="mb-3 text-lg font-semibold text-slate-100">16. Contact</h2>
-          <p>
-            Questions about these Terms? Contact Toky Chat at renanavisca@gmail.com.
-          </p>
+          <h2 className={H2}>9. Governing law &amp; contact</h2>
+          <p>These Terms are governed by the laws of {LEGAL.country}, and disputes will be subject to its competent courts — without removing mandatory consumer-protection rights you have under the laws of the country where you live. We may update these Terms; material changes will be notified in the Service and continued use means acceptance. Contact: <a className="text-blue-400 hover:text-blue-300" href={`mailto:${mail}`}>{mail}</a>.</p>
         </section>
       </div>
-
-      <p className="mt-10 text-xs text-slate-500">
-        See also our <Link href="/privacy" className="text-blue-400 hover:text-blue-300">Privacy Policy</Link>.
-      </p>
-    </main>
+    </>
   );
+}
+
+function Es() {
+  return (
+    <>
+      <h1 className="text-3xl font-bold tracking-tight">Términos del servicio</h1>
+      <p className="mt-1 text-xs text-slate-500">Fecha de vigencia: {LEGAL.effectiveDate} · Última actualización: {LEGAL.effectiveDate}</p>
+      <div className="mt-8 space-y-9 text-sm leading-relaxed text-slate-300">
+        <section>
+          <p>Estos Términos son un acuerdo vinculante entre tú y {LEGAL.operator}, una app independiente operada por sus creadores, con base en {LEGAL.country} (&quot;nosotros&quot;). Al usar el Servicio aceptas estos Términos y nuestra{' '}
+            <Link href="/privacy" className="text-blue-400 hover:text-blue-300">Política de privacidad</Link>. Si no estás de acuerdo, no uses el Servicio.</p>
+        </section>
+        <section>
+          <h2 className={H2}>1. Elegibilidad y edad</h2>
+          <p>Debes tener al menos <b>{LEGAL.minAge}</b> años (o la edad mínima de consentimiento digital en tu país) para usar el Servicio. Si eres menor de edad, un padre, madre o tutor debe aceptar estos Términos.</p>
+        </section>
+        <section>
+          <h2 className={H2}>2. El Servicio</h2>
+          <p>Toky Chat te permite enviar mensajes y multimedia, hacer llamadas de voz y video, y crear chats individuales y de grupo. Podemos agregar, cambiar o quitar funciones en cualquier momento. Los chats directos están cifrados de extremo a extremo de forma predeterminada; los chats de grupo y canales pueden no estarlo. Consulta la Política de privacidad.</p>
+        </section>
+        <section>
+          <h2 className={H2}>3. Tu cuenta</h2>
+          <ul className={UL}>
+            <li>Proporciona información veraz y mantén tus credenciales en secreto.</li>
+            <li>Eres responsable de la actividad de tu cuenta; avísanos de cualquier uso no autorizado a {mail}.</li>
+            <li>No compartas, vendas ni transfieras tu cuenta.</li>
+          </ul>
+        </section>
+        <section>
+          <h2 className={H2}>4. Uso aceptable</h2>
+          <p>Aceptas no hacer, ni ayudar a otros a: violar la ley o los derechos de terceros; acosar, amenazar o abusar de nadie; publicar contenido de odio, violento o que explote sexualmente o ponga en peligro a menores; compartir imágenes íntimas sin consentimiento; enviar spam; distribuir software malicioso o intentar accesos no autorizados; hacerte pasar por otros; o interferir con el Servicio o sobrecargarlo. Consulta nuestras{' '}
+            <Link href="/guidelines" className="text-blue-400 hover:text-blue-300">Normas de la comunidad</Link>.</p>
+        </section>
+        <section>
+          <h2 className={H2}>5. Tu contenido y licencia</h2>
+          <p>Eres dueño del contenido que compartes. Nos concedes una licencia mundial, no exclusiva y gratuita para alojarlo, almacenarlo y transmitirlo únicamente para operar y proteger el Servicio (por ejemplo, para entregar un mensaje a sus destinatarios). Esta licencia termina cuando eliminas tu contenido, salvo el ya compartido con otros o retenido brevemente en respaldos. Eres responsable de tu contenido y declaras tener los derechos sobre él.</p>
+        </section>
+        <section>
+          <h2 className={H2}>6. Denuncias, moderación y aplicación</h2>
+          <p>Puedes denunciar contenido o usuarios y bloquear a otros dentro del Servicio. Podemos eliminar contenido y advertir, suspender o cerrar cuentas que incumplan estos Términos o generen riesgo legal o de seguridad, y podemos conservar y divulgar información cuando la ley lo exija.</p>
+        </section>
+        <section>
+          <h2 className={H2}>7. Servicios de terceros y propiedad intelectual</h2>
+          <p>El Servicio depende de proveedores externos y puede enlazar a contenido de terceros, regido por sus propios términos. El Servicio, su software y marcas pertenecen a {LEGAL.operator} o sus licenciantes; recibes una licencia limitada, revocable e intransferible para uso personal y no comercial.</p>
+        </section>
+        <section>
+          <h2 className={H2}>8. Terminación y renuncias</h2>
+          <p>Puedes dejar de usar el Servicio y eliminar tu cuenta cuando quieras. Podemos suspender o cancelar el acceso por incumplimientos o para proteger el Servicio. El Servicio se ofrece &quot;tal cual&quot;, sin garantías de ningún tipo, en la máxima medida permitida por la ley. En la medida permitida por la ley, nuestra responsabilidad es limitada; nada de esto excluye responsabilidades que legalmente no puedan excluirse.</p>
+        </section>
+        <section>
+          <h2 className={H2}>9. Ley aplicable y contacto</h2>
+          <p>Estos Términos se rigen por las leyes de {LEGAL.country}, y las disputas se someterán a sus tribunales competentes — sin eliminar los derechos obligatorios de protección al consumidor que tengas según las leyes del país donde vives. Podemos actualizar estos Términos; los cambios importantes se notificarán en el Servicio y el uso continuado implica aceptación. Contacto: <a className="text-blue-400 hover:text-blue-300" href={`mailto:${mail}`}>{mail}</a>.</p>
+        </section>
+      </div>
+    </>
+  );
+}
+
+export default function TermsPage() {
+  return <LegalDoc en={<En />} es={<Es />} />;
 }

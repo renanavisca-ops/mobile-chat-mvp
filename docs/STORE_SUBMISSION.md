@@ -26,9 +26,14 @@ messaging product work.
 | Block / report records | `blocks`, `reports` | Safety / moderation | Yes |
 
 **Processors** (infrastructure, not sold/shared for ads): Supabase (database,
-auth, storage), Google Firebase (push delivery), Vercel (hosting).
-**In transit:** all traffic is HTTPS/TLS. **Deletion:** in-app account deletion
-removes the account and cascades profile, devices, contacts, memberships, blocks.
+auth, storage), Google Firebase (push delivery), Vercel (hosting), Cloudflare
+(STUN/TURN for calls).
+**In transit:** all traffic is HTTPS/TLS. **End-to-end encryption:** direct-chat
+message text is E2E-encrypted; media attachments are not yet (disclose messages
+as collected either way). **Deletion:** in-app account deletion removes the
+account and its data, purges the user's Storage files, and cascades profile,
+devices, tokens, contacts, blocks, memberships, and encryption keys; residual
+backup copies purged within 90 days.
 
 ---
 

@@ -6,9 +6,11 @@
 export const LEGAL = {
   /** Display name of the operator (an individual, not a company). */
   operator: 'Toky Chat',
-  /** Contact addresses. Replace with official addresses when available. */
-  privacyEmail: 'renanavisca@gmail.com',
-  supportEmail: 'renanavisca@gmail.com',
+  /** Country where the operator is based (for legal identification). */
+  country: 'Guatemala',
+  /** Contact addresses. */
+  privacyEmail: 'curiosidades2526@gmail.com',
+  supportEmail: 'curiosidades2526@gmail.com',
   /** Minimum age to use the Service — kept consistent everywhere. */
   minAge: 13,
   /** Document versions (date-based). Bump on material change. */
