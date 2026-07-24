@@ -127,11 +127,19 @@ export default function PrivacyPage() {
             database level).
           </p>
           <p className="mt-2">
-            <b>Please note:</b> messages are stored on our servers and are <b>not</b>{' '}
-            end-to-end encrypted. This means that, in principle, they could be accessed
-            by us or by parties with lawful or administrative access to our systems. Do
-            not use the Service to share information you need to be end-to-end encrypted.
-            No method of transmission or storage is completely secure.
+            <b>End-to-end encryption.</b> Direct (one-to-one) chats are end-to-end
+            encrypted by default. The encryption keys are generated on your device; we
+            store only public keys and encrypted ciphertext, so we cannot read the
+            contents of those messages. If you lose access to your device and have not
+            saved a passphrase backup of your key, your encrypted message history may be
+            unrecoverable.
+          </p>
+          <p className="mt-2">
+            Group chats and channels, and any chat where end-to-end encryption has not
+            been enabled, are stored on our servers protected by the access controls
+            above but are <b>not</b> end-to-end encrypted — in principle they could be
+            accessed by us or by parties with lawful or administrative access to our
+            systems. No method of transmission or storage is completely secure.
           </p>
         </section>
 

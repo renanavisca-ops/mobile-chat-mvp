@@ -46,10 +46,11 @@ export default function TermsPage() {
           <h2 className="mb-3 text-lg font-semibold text-slate-100">2. The Service</h2>
           <p>
             Toky Chat is a messaging service that lets you send text, images, video, and
-            voice messages, create one-to-one and group chats, and manage a profile. We
-            may add, change, or remove features at any time. Messages are stored on our
-            servers and are <b>not</b> end-to-end encrypted; see our Privacy Policy for
-            details on how content is handled.
+            voice messages, make voice and video calls, create one-to-one and group
+            chats, and manage a profile. We may add, change, or remove features at any
+            time. Direct chats are end-to-end encrypted by default; group chats and
+            channels may not be. See our Privacy Policy for details on how content is
+            handled.
           </p>
         </section>
 
