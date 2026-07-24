@@ -12,6 +12,7 @@ import {
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { browserSupabase } from '@/lib/supabase/client';
 import { logCallStart, logCallAnswered, logCallEnded } from '@/lib/db/calls';
+import { isBlockedWith } from '@/lib/db/safety';
 import { startRingtone, stopRingtone } from '@/lib/call/ringtone';
 import { useT } from '@/lib/i18n/context';
 import {
@@ -661,13 +662,15 @@ export function CallProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!myId) return;
     const ch = supabase.channel(`call-user:${myId}`, { config: { broadcast: { self: false } } });
-    ch.on('broadcast', { event: 'invite' }, ({ payload }) => {
+    ch.on('broadcast', { event: 'invite' }, async ({ payload }) => {
       const inv = payload as Invite;
       if (phaseRef.current !== 'idle') {
         // Busy — auto-decline.
         sendToUser(inv.from, 'declined', { callId: inv.callId, from: myIdRef.current });
         return;
       }
+      // Silently ignore calls from a blocked party (either direction).
+      if (inv.from && (await isBlockedWith(inv.from).catch(() => false))) return;
       setIncoming(inv);
       setPhaseBoth('ringing');
     });

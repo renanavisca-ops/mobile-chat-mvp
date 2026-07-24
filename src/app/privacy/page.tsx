@@ -80,7 +80,7 @@ export default function PrivacyPage() {
           <h2 className="mb-3 text-lg font-semibold text-slate-100">4. How we share information</h2>
           <ul className="list-disc space-y-1 pl-5">
             <li><b>With other users:</b> your profile (username, display name, avatar, presence) and the content you send are visible to the participants of your chats and groups.</li>
-            <li><b>With service providers (processors):</b> we use Supabase (database, authentication, file storage, realtime) and Vercel (application hosting) to run the Service. They process data on our behalf under contractual and security obligations. We also use Google Firebase Cloud Messaging to deliver push notifications.</li>
+            <li><b>With service providers (processors):</b> we use Supabase (database, authentication, file storage, realtime) and Vercel (application hosting) to run the Service. They process data on our behalf under contractual and security obligations. We also use Google Firebase Cloud Messaging to deliver push notifications, and Cloudflare for the STUN/TURN servers that help establish voice and video calls.</li>
             <li><b>For legal reasons &amp; safety:</b> to comply with law, respond to lawful requests, enforce our Terms, or protect the rights, property, and safety of our users and the public.</li>
             <li><b>Business transfers:</b> in connection with a merger, acquisition, or sale of assets, subject to this Policy.</li>
           </ul>

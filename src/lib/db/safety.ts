@@ -41,6 +41,20 @@ export async function isBlockedByMe(userId: string): Promise<boolean> {
   return !!data;
 }
 
+/**
+ * True if there is a block in EITHER direction between me and the other user
+ * (I blocked them, or they blocked me). Used to suppress calls from a blocked
+ * party — messages are already blocked by a database RLS policy.
+ */
+export async function isBlockedWith(userId: string): Promise<boolean> {
+  const supabase = browserSupabase();
+  const { data: me } = await supabase.auth.getUser();
+  if (!me.user) return false;
+  const { data, error } = await supabase.rpc('is_blocked', { p_a: me.user.id, p_b: userId });
+  if (error) return false;
+  return !!data;
+}
+
 export type ReportInput = {
   reportedUserId?: string | null;
   chatId?: string | null;

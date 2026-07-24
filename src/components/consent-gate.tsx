@@ -2,30 +2,77 @@
 
 import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
-import { useT } from '@/lib/i18n/context';
+import { useT, useLanguage } from '@/lib/i18n/context';
+import { browserSupabase } from '@/lib/supabase/client';
+import { LEGAL } from '@/lib/legal';
+import { hasAcceptedCurrentLegal, recordLegalAcceptance } from '@/lib/db/legal';
 
+// Device-side record of which document versions were accepted, so the gate also
+// works before sign-in and re-appears when a version changes.
 const KEY = 'toky_consent_v1';
-const MIN_AGE = '13'; // adjust to your jurisdiction (e.g. 16 in parts of the EU)
+const CURRENT = `${LEGAL.termsVersion}|${LEGAL.privacyVersion}`;
+const MIN_AGE = String(LEGAL.minAge);
+
+function deviceAccepted(): boolean {
+  try {
+    return localStorage.getItem(KEY) === CURRENT;
+  } catch {
+    return false;
+  }
+}
 
 /**
- * First-run age + terms gate. Blocks the app until the user confirms they meet
- * the minimum age and accepts the Terms and Privacy Policy. Stored per-device.
- * This is a baseline gate; enforce age at sign-up server-side for real assurance.
+ * Age + Terms/Privacy gate. Blocks the app until the user confirms they meet the
+ * minimum age and accept the current Terms and Privacy Policy. Acceptance is
+ * stored per-device AND, once signed in, in Supabase (public.legal_acceptances)
+ * with the document versions — so bumping a version in LEGAL re-prompts the user
+ * and records a fresh acceptance.
  */
 export function ConsentGate() {
   const t = useT();
+  const { lang } = useLanguage();
   const [ready, setReady] = useState(false);
   const [accepted, setAccepted] = useState(true); // assume accepted until we check
   const pathname = usePathname();
 
   useEffect(() => {
-    try {
-      setAccepted(localStorage.getItem(KEY) === 'true');
-    } catch {
-      setAccepted(true);
+    const supabase = browserSupabase();
+    let cancelled = false;
+
+    async function evaluate() {
+      const { data } = await supabase.auth.getUser();
+      const user = data.user;
+      if (!user) {
+        // Pre-login: rely on the device record only.
+        if (!cancelled) {
+          setAccepted(deviceAccepted());
+          setReady(true);
+        }
+        return;
+      }
+      // Signed in: the server ledger is the source of truth.
+      const inDb = await hasAcceptedCurrentLegal(user.id);
+      if (inDb) {
+        if (!cancelled) { setAccepted(true); setReady(true); }
+        return;
+      }
+      // Accepted on this device but not yet recorded (e.g. right after sign-up)
+      // — record it silently instead of prompting again.
+      if (deviceAccepted()) {
+        await recordLegalAcceptance(user.id, lang).catch(() => {});
+        if (!cancelled) { setAccepted(true); setReady(true); }
+        return;
+      }
+      if (!cancelled) { setAccepted(false); setReady(true); }
     }
-    setReady(true);
-  }, []);
+
+    void evaluate();
+    const { data: sub } = supabase.auth.onAuthStateChange(() => void evaluate());
+    return () => {
+      cancelled = true;
+      sub.subscription.unsubscribe();
+    };
+  }, [lang]);
 
   // Never gate the policy pages themselves (the user needs to read them here).
   const isPolicyPage = ['/privacy', '/terms', '/guidelines', '/support', '/delete-account'].includes(
@@ -34,11 +81,17 @@ export function ConsentGate() {
 
   if (!ready || accepted || isPolicyPage) return null;
 
-  function accept() {
+  async function accept() {
     try {
-      localStorage.setItem(KEY, 'true');
+      localStorage.setItem(KEY, CURRENT);
     } catch {
       // ignore
+    }
+    try {
+      const { data } = await browserSupabase().auth.getUser();
+      if (data.user) await recordLegalAcceptance(data.user.id, lang);
+    } catch {
+      // best effort — device record still blocks re-prompting
     }
     setAccepted(true);
   }

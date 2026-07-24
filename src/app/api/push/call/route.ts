@@ -27,11 +27,27 @@ export async function POST(req: Request) {
     if (webPushEnabled) webpush.setVapidDetails(vapidSubject, vapidPublic!, vapidPrivate!);
 
     const body = await req.json().catch(() => ({}));
-    const calleeIds: string[] = Array.isArray(body.calleeIds) ? body.calleeIds.slice(0, 50) : [];
+    let calleeIds: string[] = Array.isArray(body.calleeIds) ? body.calleeIds.slice(0, 50) : [];
     const callerName = String(body.callerName ?? 'Someone').slice(0, 80);
     const video = !!body.video;
     const chatId = body.chatId ? String(body.chatId) : null;
     if (calleeIds.length === 0) return NextResponse.json({ ok: true, skipped: 'no_callees' });
+
+    // Never notify a callee who has blocked the caller (or whom the caller
+    // blocked). Messages are already blocked by RLS; calls are enforced here.
+    const { data: blocks } = await supabaseAdmin
+      .from('blocks')
+      .select('blocker_id, blocked_id')
+      .or(
+        `and(blocker_id.eq.${user.id},blocked_id.in.(${calleeIds.join(',')})),` +
+          `and(blocked_id.eq.${user.id},blocker_id.in.(${calleeIds.join(',')}))`
+      );
+    if (blocks && blocks.length > 0) {
+      const blocked = new Set<string>();
+      for (const b of blocks) blocked.add(b.blocker_id === user.id ? b.blocked_id : b.blocker_id);
+      calleeIds = calleeIds.filter((id) => !blocked.has(id));
+    }
+    if (calleeIds.length === 0) return NextResponse.json({ ok: true, skipped: 'all_blocked' });
 
     const [{ data: subs }, { data: deviceTokens }] = await Promise.all([
       supabaseAdmin
