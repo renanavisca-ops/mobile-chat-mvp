@@ -1,5 +1,9 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
+import { rateLimit, rateLimitHeaders } from '@/lib/rate-limit';
+
+// Per-user throttle for the AI proxy so one client can't run up Anthropic cost.
+const AI_RATE_LIMIT = Number(process.env.AI_RATE_LIMIT_PER_MIN || 30);
 
 /**
  * AI helper endpoint — smart replies + translation via the Claude API.
@@ -77,6 +81,15 @@ export async function POST(req: Request) {
     error: authError,
   } = await supabaseAdmin.auth.getUser(token);
   if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  // Throttle per authenticated user (see src/lib/rate-limit.ts).
+  const rl = rateLimit(`ai:${user.id}`, AI_RATE_LIMIT, 60_000);
+  if (!rl.ok) {
+    return NextResponse.json(
+      { error: 'Too many requests', code: 'rate_limited', retryAfter: rl.retryAfter },
+      { status: 429, headers: rateLimitHeaders(rl) },
+    );
+  }
 
   if (!process.env.ANTHROPIC_API_KEY) {
     return NextResponse.json({ error: 'AI not configured', code: 'not_configured' }, { status: 501 });
