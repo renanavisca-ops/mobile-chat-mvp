@@ -1,6 +1,25 @@
 import './globals.css';
 import type { Metadata, Viewport } from 'next';
+import { Bricolage_Grotesque, Plus_Jakarta_Sans } from 'next/font/google';
 import { PresenceProvider } from '@/components/presence-provider';
+
+// Distinctive display face for the wordmark, headers and section titles; a
+// warm, highly legible grotesque for body/UI text. Both are self-hosted by
+// next/font at build time, so they ship inside the app bundle and render even
+// when the Capacitor webview is offline. Exposed as CSS variables consumed in
+// globals.css (--font-display / --font-body).
+const display = Bricolage_Grotesque({
+  subsets: ['latin'],
+  weight: ['500', '600', '700', '800'],
+  variable: '--font-display',
+  display: 'swap',
+});
+const body = Plus_Jakarta_Sans({
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700'],
+  variable: '--font-body',
+  display: 'swap',
+});
 import { ConsentGate } from '@/components/consent-gate';
 import { LanguageProvider } from '@/lib/i18n/context';
 import { ThemeProvider } from '@/lib/theme';
@@ -35,7 +54,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="es">
+    <html lang="es" className={`${display.variable} ${body.variable}`}>
       <body className="min-h-screen">
         <ThemeProvider>
           <LanguageProvider>

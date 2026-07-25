@@ -14,6 +14,21 @@ html {
 
 body {
   @apply bg-slate-950 text-slate-100;
+  font-family: var(--font-body), ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  /* Atmospheric depth: two soft brand-hued light sources bleeding in from the
+     corners over the slate base, instead of a flat fill. Fixed so it stays put
+     while content scrolls. Very low alpha keeps text contrast intact. */
+  background-image:
+    radial-gradient(60rem 60rem at 12% -8%, rgba(99, 102, 241, 0.14), transparent 60%),
+    radial-gradient(50rem 50rem at 100% 0%, rgba(56, 189, 248, 0.10), transparent 55%);
+  background-attachment: fixed;
+  background-repeat: no-repeat;
+}
+
+/* Distinctive display face for headings, the wordmark and section titles. */
+.font-display {
+  font-family: var(--font-display), var(--font-body), ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: -0.02em;
 }
 
 /* Respect iOS/Android safe areas (notches, home indicator). */
@@ -22,6 +37,74 @@ body {
 }
 .pt-safe {
   padding-top: env(safe-area-inset-top);
+}
+
+/* =========================================================================
+   Toky design system — brand gradient, elevation, glass and motion.
+   Utilities layered on top of the existing slate palette so the theming
+   attribute-overrides below keep working untouched.
+   ========================================================================= */
+
+:root {
+  /* Signature Toky gradient — indigo → sky. Used on primary CTAs, the send
+     button, the active nav pill, story rings and the wordmark. */
+  --toky-brand-a: #6366f1;
+  --toky-brand-b: #22d3ee;
+  --toky-grad: linear-gradient(135deg, #6366f1 0%, #4f46e5 45%, #22d3ee 120%);
+  --toky-shadow-sm: 0 1px 2px rgba(2, 6, 23, 0.35);
+  --toky-shadow-md: 0 8px 24px -8px rgba(2, 6, 23, 0.55);
+  --toky-shadow-brand: 0 8px 22px -8px rgba(79, 70, 229, 0.6);
+}
+
+/* Brand gradient fill + its text-clip variant. */
+.toky-grad { background-image: var(--toky-grad); }
+.toky-grad-text {
+  background-image: var(--toky-grad);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.toky-ring-brand { box-shadow: var(--toky-shadow-brand); }
+.toky-elev { box-shadow: var(--toky-shadow-md); }
+
+/* Frosted-glass surface for sticky headers, the bottom nav and menus. */
+.toky-glass {
+  background-color: rgba(2, 6, 23, 0.72);
+  -webkit-backdrop-filter: saturate(160%) blur(16px);
+  backdrop-filter: saturate(160%) blur(16px);
+}
+html[data-theme='light'] .toky-glass {
+  background-color: rgba(255, 255, 255, 0.78);
+}
+
+/* Give the whole app calm, consistent easing on interactive state changes. */
+button, a, input, textarea, select, [role='button'] {
+  transition-property: background-color, border-color, color, box-shadow, transform, opacity;
+  transition-duration: 160ms;
+  transition-timing-function: cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+/* Tactile press feedback on tappable controls (respects reduced-motion). */
+@media (prefers-reduced-motion: no-preference) {
+  button:active, a[role='button']:active, [role='button']:active {
+    transform: scale(0.97);
+  }
+}
+
+/* Staggered entrance used for list rows and cards. */
+@keyframes tokyRise {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .toky-rise { animation: tokyRise 0.32s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+}
+
+/* Lighter atmospheric wash for light theme (the dark radial hues would muddy
+   a near-white background). */
+html[data-theme='light'] body {
+  background-image:
+    radial-gradient(60rem 60rem at 12% -8%, rgba(99, 102, 241, 0.10), transparent 60%),
+    radial-gradient(50rem 50rem at 100% 0%, rgba(56, 189, 248, 0.10), transparent 55%);
 }
 
 /* Story progress bar fill (used by the full-screen story viewer). */

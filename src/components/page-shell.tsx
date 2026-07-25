@@ -24,8 +24,8 @@ export function BottomNav() {
   const pathname = usePathname();
   const t = useT();
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-800 bg-slate-950/95 pb-safe backdrop-blur">
-      <ul className="mx-auto flex max-w-2xl items-stretch justify-around">
+    <nav className="toky-glass fixed inset-x-0 bottom-0 z-40 border-t border-slate-800/80 pb-safe">
+      <ul className="mx-auto flex max-w-2xl items-stretch justify-around px-1">
         {NAV_ITEMS.map(({ href, key, Icon }) => {
           const active = pathname === href || pathname?.startsWith(href + '/');
           return (
@@ -34,11 +34,18 @@ export function BottomNav() {
                 href={href}
                 aria-current={active ? 'page' : undefined}
                 className={[
-                  'flex flex-col items-center gap-1 py-2 text-[11px] font-medium transition-colors',
-                  active ? 'text-blue-500' : 'text-slate-400 hover:text-slate-200',
+                  'group flex flex-col items-center gap-1 pb-1.5 pt-2 text-[11px] font-medium',
+                  active ? 'text-white' : 'text-slate-400 hover:text-slate-200',
                 ].join(' ')}
               >
-                <Icon className="h-6 w-6" size={24} />
+                <span
+                  className={[
+                    'grid h-9 w-14 place-items-center rounded-full',
+                    active ? 'toky-grad toky-ring-brand' : 'bg-transparent group-hover:bg-slate-800/60',
+                  ].join(' ')}
+                >
+                  <Icon className="h-6 w-6" size={24} />
+                </span>
                 <span className="leading-none">{t(key)}</span>
               </Link>
             </li>
@@ -60,9 +67,9 @@ export function PageShell({
 }) {
   return (
     <main className="min-h-screen bg-slate-950 text-slate-50">
-      <header className="sticky top-0 z-30 border-b border-slate-900 bg-slate-950/90 pt-safe backdrop-blur">
+      <header className="toky-glass sticky top-0 z-30 border-b border-slate-800/70 pt-safe">
         <div className="mx-auto flex max-w-2xl items-center justify-between gap-3 px-4 py-3">
-          <h1 className="truncate text-lg font-semibold">{title}</h1>
+          <h1 className="font-display truncate text-xl font-bold">{title}</h1>
           {right ? <div className="shrink-0">{right}</div> : null}
         </div>
       </header>

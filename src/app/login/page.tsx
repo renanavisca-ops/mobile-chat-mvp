@@ -123,26 +123,28 @@ export default function LoginPage() {
 
   return (
     <main className="flex min-h-[100dvh] flex-col items-center justify-center bg-slate-950 px-5 py-10 text-slate-50 pt-safe pb-safe">
-      <div className="w-full max-w-md space-y-6">
+      <div className="w-full max-w-md space-y-6 toky-rise">
         <div className="flex flex-col items-center text-center">
-          <div className="grid h-16 w-16 place-items-center rounded-2xl bg-gradient-to-br from-blue-600 to-emerald-500 text-3xl font-extrabold text-white shadow-lg shadow-blue-600/30">
+          <div className="toky-grad toky-ring-brand grid h-20 w-20 place-items-center rounded-[1.4rem] font-display text-4xl font-extrabold text-white">
             T
           </div>
-          <h1 className="mt-4 text-2xl font-bold">{t('auth.welcomeTitle')}</h1>
-          <p className="mt-1 text-sm text-slate-400">{t('auth.welcomeSubtitle')}</p>
+          <h1 className="mt-5 font-display text-3xl font-extrabold tracking-tight">
+            {t('auth.welcomeTitle')}
+          </h1>
+          <p className="mt-1.5 text-sm text-slate-400">{t('auth.welcomeSubtitle')}</p>
         </div>
 
         {mode !== 'forgot' && (
-          <div className="flex gap-2">
+          <div className="flex gap-1 rounded-2xl border border-slate-800 bg-slate-900/50 p-1">
             <button
-              className={`rounded-lg px-4 py-2 text-sm font-medium transition-all ${mode === 'signin' ? 'bg-slate-800 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}
+              className={`flex-1 rounded-xl px-4 py-2 text-sm font-semibold ${mode === 'signin' ? 'toky-grad toky-ring-brand text-white' : 'text-slate-400 hover:text-slate-200'}`}
               onClick={() => setMode('signin')}
               disabled={busy}
             >
               {t('auth.signIn')}
             </button>
             <button
-              className={`rounded-lg px-4 py-2 text-sm font-medium transition-all ${mode === 'signup' ? 'bg-slate-800 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}
+              className={`flex-1 rounded-xl px-4 py-2 text-sm font-semibold ${mode === 'signup' ? 'toky-grad toky-ring-brand text-white' : 'text-slate-400 hover:text-slate-200'}`}
               onClick={() => setMode('signup')}
               disabled={busy}
             >
@@ -151,11 +153,11 @@ export default function LoginPage() {
           </div>
         )}
 
-        <div className="space-y-4 rounded-xl border border-slate-900 bg-slate-950/50 p-6 shadow-xl">
+        <div className="toky-glass toky-elev space-y-4 rounded-3xl border border-slate-800 p-6">
           <div className="space-y-2">
             <label className="block text-sm font-medium text-slate-300 ml-1">{t('auth.email')}</label>
             <input
-              className="w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all placeholder:text-slate-600"
+              className="w-full rounded-xl border border-slate-800 bg-slate-900 px-3.5 py-2.5 text-slate-100 focus:outline-none focus:border-blue-500/60 focus:ring-2 focus:ring-blue-500/20 transition-all placeholder:text-slate-600"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               autoComplete="email"
@@ -180,7 +182,7 @@ export default function LoginPage() {
                 )}
               </div>
               <input
-                className="w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all placeholder:text-slate-600"
+                className="w-full rounded-xl border border-slate-800 bg-slate-900 px-3.5 py-2.5 text-slate-100 focus:outline-none focus:border-blue-500/60 focus:ring-2 focus:ring-blue-500/20 transition-all placeholder:text-slate-600"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
@@ -193,7 +195,7 @@ export default function LoginPage() {
           {mode === 'forgot' ? (
             <div className="space-y-3">
               <button
-                className="w-full rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 active:scale-[0.98] transition-all disabled:opacity-50"
+                className="toky-grad toky-ring-brand w-full rounded-xl px-4 py-2.5 text-sm font-semibold text-white active:scale-[0.98] disabled:opacity-50"
                 onClick={handleForgotPassword}
                 disabled={busy}
               >
@@ -212,7 +214,7 @@ export default function LoginPage() {
             </div>
           ) : (
             <button
-              className="w-full rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 active:scale-[0.98] transition-all disabled:opacity-50"
+              className="toky-grad toky-ring-brand w-full rounded-xl px-4 py-2.5 text-sm font-semibold text-white active:scale-[0.98] disabled:opacity-50"
               onClick={submit}
               disabled={busy}
             >
