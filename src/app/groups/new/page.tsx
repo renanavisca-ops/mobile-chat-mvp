@@ -153,7 +153,7 @@ export default function NewGroupPage() {
 
         {/* Button */}
         <button
-          className="rounded bg-blue-600 px-4 py-2 text-sm hover:bg-blue-500 disabled:opacity-60"
+          className="rounded toky-grad toky-ring-brand px-4 py-2 text-sm disabled:opacity-60"
           onClick={onCreate}
           disabled={busy}
         >

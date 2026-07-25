@@ -104,7 +104,7 @@ export function EmojiPicker(props: {
     <div
       ref={boxRef}
       className={[
-        'absolute bottom-14 z-[70] w-80 rounded-2xl border border-slate-900 bg-slate-950 shadow-xl',
+        'absolute bottom-14 z-[70] w-80 rounded-3xl border border-slate-800 toky-glass toky-elev',
         anchor === 'right' ? 'right-0' : 'left-0',
       ].join(' ')}
     >

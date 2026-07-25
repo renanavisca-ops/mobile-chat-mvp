@@ -44,8 +44,8 @@ export function ForwardModal(props: {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-      <div className="w-full max-w-lg rounded-2xl border border-slate-900 bg-slate-950 shadow-xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+      <div className="w-full max-w-lg rounded-3xl border border-slate-800 toky-glass toky-elev">
         <div className="flex items-center justify-between border-b border-slate-900 p-4">
           <div>
             <div className="text-base font-semibold text-slate-100">{t('forward.title')}</div>
@@ -112,7 +112,7 @@ export function ForwardModal(props: {
             </div>
 
             <button
-              className="rounded bg-blue-600 px-4 py-2 text-sm hover:bg-blue-500 disabled:opacity-60"
+              className="toky-grad toky-ring-brand rounded-xl px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
               disabled={busy || selectedIds.length === 0}
               onClick={async () => {
                 setErr('');

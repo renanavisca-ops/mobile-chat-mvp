@@ -54,12 +54,12 @@ export function GifPicker({
 
   return (
     <div
-      className="fixed inset-0 z-[75] flex items-end justify-center bg-black/60 p-2 sm:items-center"
+      className="fixed inset-0 z-[75] flex items-end justify-center bg-black/60 backdrop-blur-sm p-2 sm:items-center"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="flex h-[70vh] w-full max-w-md flex-col overflow-hidden rounded-2xl border border-slate-900 bg-slate-950 shadow-xl">
+      <div className="flex h-[70vh] w-full max-w-md flex-col overflow-hidden rounded-3xl border border-slate-800 toky-glass toky-elev">
         <div className="flex items-center gap-2 border-b border-slate-900 p-3">
           <input
             autoFocus

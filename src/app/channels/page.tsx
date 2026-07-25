@@ -84,7 +84,7 @@ export default function ChannelsPage() {
           <button
             type="button"
             onClick={() => setCreateOpen(true)}
-            className="rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-500"
+            className="toky-grad toky-ring-brand rounded-xl px-3 py-2 text-sm font-semibold text-white"
           >
             {t('channels.create')}
           </button>
@@ -127,7 +127,7 @@ export default function ChannelsPage() {
                     type="button"
                     onClick={() => onJoin(c)}
                     disabled={busyId === c.id}
-                    className="shrink-0 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-500 disabled:opacity-50"
+                    className="shrink-0 toky-grad toky-ring-brand rounded-xl px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
                   >
                     {busyId === c.id ? t('channels.joining') : t('channels.join')}
                   </button>

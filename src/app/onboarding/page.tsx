@@ -194,7 +194,7 @@ export default function OnboardingPage() {
         </div>
 
         <button
-          className="w-fit rounded bg-blue-600 px-4 py-2 disabled:opacity-60"
+          className="w-fit rounded toky-grad toky-ring-brand px-4 py-2 disabled:opacity-60"
           onClick={runOnboarding}
           disabled={busy || avail === 'taken' || avail === 'invalid'}
         >

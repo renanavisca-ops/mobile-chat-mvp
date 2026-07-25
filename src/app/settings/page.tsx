@@ -530,7 +530,7 @@ export default function SettingsPage() {
                 type="button"
                 onClick={saveProfile}
                 disabled={savingProfile}
-                className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50"
+                className="toky-grad toky-ring-brand rounded-xl px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
               >
                 {savingProfile ? t('settings.savingProfile') : t('settings.saveProfile')}
               </button>

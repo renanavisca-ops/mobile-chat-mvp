@@ -60,7 +60,7 @@ export function PollComposer({
 
   return (
     <div
-      className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 p-4"
+      className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget && !busy) {
           reset();
@@ -68,7 +68,7 @@ export function PollComposer({
         }
       }}
     >
-      <div className="w-full max-w-sm rounded-2xl border border-slate-900 bg-slate-950 p-4 shadow-xl">
+      <div className="w-full max-w-sm rounded-3xl border border-slate-800 toky-glass toky-elev p-4">
         <div className="text-base font-semibold text-slate-100">{t('poll.createTitle')}</div>
 
         <input
@@ -131,7 +131,7 @@ export function PollComposer({
             type="button"
             onClick={submit}
             disabled={busy}
-            className="flex-1 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50"
+            className="flex-1 toky-grad toky-ring-brand rounded-xl px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
           >
             {busy ? t('poll.creating') : t('poll.create')}
           </button>

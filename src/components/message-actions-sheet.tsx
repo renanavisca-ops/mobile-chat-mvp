@@ -46,8 +46,8 @@ export function MessageActionsSheet(props: {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/60 p-2 sm:items-center">
-      <div className="w-full max-w-md rounded-2xl border border-slate-900 bg-slate-950 shadow-xl">
+    <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/60 backdrop-blur-sm p-2 sm:items-center">
+      <div className="w-full max-w-md rounded-3xl border border-slate-800 toky-glass toky-elev">
         <div className="flex items-center justify-between border-b border-slate-900 p-4">
           <div className="min-w-0">
             <div className="text-sm font-semibold text-slate-100">{header.title}</div>
@@ -142,7 +142,7 @@ export function MessageActionsSheet(props: {
 
         <button
           type="button"
-          className="w-full rounded-b-2xl border-t border-slate-900 bg-slate-950 py-3 text-sm text-slate-300 hover:bg-slate-900"
+          className="w-full rounded-b-3xl border-t border-slate-800/70 py-3 text-sm text-slate-300 hover:bg-slate-800/40"
           onClick={onClose}
         >
           {t('messageActions.cancel')}

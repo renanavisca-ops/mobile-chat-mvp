@@ -1223,7 +1223,7 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
 
   return (
     <div className={`flex ${embedded ? 'h-full w-full' : 'h-[100dvh]'} flex-col overflow-hidden bg-slate-950 text-slate-50`}>
-      <header className={`flex items-center gap-1.5 border-b border-slate-900 bg-slate-950/90 px-2 py-2 backdrop-blur ${embedded ? '' : 'pt-safe'}`}>
+      <header className={`toky-glass flex items-center gap-1.5 border-b border-slate-800/70 px-2 py-2 ${embedded ? '' : 'pt-safe'}`}>
         {!embedded && (
           <Link
             href="/chats"
@@ -1680,7 +1680,7 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
                 {chat.status === 'open' ? t('common.statusOpen') : chat.status === 'in_progress' ? t('common.statusInProgress') : t('common.statusClosed')}
               </span>
               {chat.status === 'open' && (
-                <button onClick={() => updateStatus('in_progress')} className="rounded bg-blue-600 px-2 py-1 text-white hover:bg-blue-500">
+                <button onClick={() => updateStatus('in_progress')} className="toky-grad rounded-lg px-2.5 py-1 text-white">
                   {t('chat.take')}
                 </button>
               )}
@@ -1756,10 +1756,10 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
                     <li
                       key={m.id}
                       id={`msg-${m.id}`}
-                      className={`flex flex-col mb-2 px-3 py-2 rounded-2xl w-fit max-w-[80%] shadow-sm transition-shadow ${
-                        m.sender_type === 'system' ? 'mx-auto bg-slate-800 text-center text-xs text-slate-400' :
-                        isMine(m) ? 'ml-auto rounded-br-md bg-blue-600 text-white' :
-                        'mr-auto rounded-bl-md bg-slate-800 text-slate-100'
+                      className={`flex flex-col mb-1.5 px-3.5 py-2 rounded-[1.25rem] w-fit max-w-[80%] transition-shadow ${
+                        m.sender_type === 'system' ? 'mx-auto bg-slate-800/80 text-center text-xs text-slate-400' :
+                        isMine(m) ? 'ml-auto rounded-br-md toky-grad text-white shadow-[0_4px_14px_-6px_rgba(79,70,229,0.7)]' :
+                        'mr-auto rounded-bl-md bg-slate-800 text-slate-100 shadow-sm'
                       }`}
                       onContextMenu={(e) => {
                         e.preventDefault();
@@ -2100,7 +2100,7 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
           )}
 
           {canPost ? (
-          <div ref={composerRef} className="relative -mx-3 flex items-end gap-2 border-t border-slate-900 bg-slate-950/80 px-2 py-2">
+          <div ref={composerRef} className="toky-glass relative -mx-3 flex items-end gap-2 border-t border-slate-800/70 px-2 py-2">
             {/* Rounded input pill: emoji · text · AI · attach */}
             <div className="flex min-w-0 flex-1 items-center gap-0.5 rounded-3xl border border-slate-800 bg-slate-900 px-1.5">
               <div className="relative shrink-0">
@@ -2174,7 +2174,7 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
             {/* Circular send (when typing/editing) or mic button */}
             {text.trim() || editingId ? (
               <button
-                className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-blue-600 text-white hover:bg-blue-500 disabled:opacity-60"
+                className="toky-grad toky-ring-brand grid h-11 w-11 shrink-0 place-items-center rounded-full text-white disabled:opacity-60"
                 onClick={onSend}
                 disabled={busy || isRecording || blocked}
                 title={editingId ? t('chat.saveEdit') : t('chat.send')}
@@ -2184,7 +2184,7 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
               </button>
             ) : (
               <button
-                className={`grid h-11 w-11 shrink-0 place-items-center rounded-full text-white disabled:opacity-60 ${isRecording ? 'animate-pulse bg-red-600' : 'bg-blue-600 hover:bg-blue-500'}`}
+                className={`grid h-11 w-11 shrink-0 place-items-center rounded-full text-white disabled:opacity-60 ${isRecording ? 'animate-pulse bg-red-600' : 'toky-grad toky-ring-brand'}`}
                 onClick={isRecording ? stopRecording : startRecording}
                 disabled={busy}
                 title={isRecording ? t('chat.stopAndSend') : t('chat.recordAudio')}

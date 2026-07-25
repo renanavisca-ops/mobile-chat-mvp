@@ -109,12 +109,12 @@ export function AvatarCreator({
 
   return (
     <div
-      className="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 p-4"
+      className="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget && !busy) onClose();
       }}
     >
-      <div className="w-full max-w-sm rounded-2xl border border-slate-900 bg-slate-950 p-4 shadow-xl">
+      <div className="w-full max-w-sm rounded-3xl border border-slate-800 toky-glass toky-elev p-4">
         <div className="flex items-center justify-between">
           <div className="text-base font-semibold text-slate-100">{t('avatarCreator.title')}</div>
           <button type="button" onClick={onClose} className="rounded bg-slate-800 px-3 py-1.5 text-xs hover:bg-slate-700">
@@ -172,7 +172,7 @@ export function AvatarCreator({
           type="button"
           onClick={save}
           disabled={busy}
-          className="mt-5 w-full rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50"
+          className="mt-5 w-full toky-grad toky-ring-brand rounded-xl px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
         >
           {busy ? t('avatarCreator.saving') : t('avatarCreator.save')}
         </button>

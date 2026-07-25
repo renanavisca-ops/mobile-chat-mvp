@@ -194,12 +194,12 @@ export function GroupInfoModal({
 
   return (
     <div
-      className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 p-4"
+      className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="max-h-[90vh] w-full max-w-sm overflow-auto rounded-2xl border border-slate-900 bg-slate-950 p-4 shadow-xl">
+      <div className="max-h-[90vh] w-full max-w-sm overflow-auto rounded-3xl border border-slate-800 toky-glass toky-elev p-4">
         <div className="flex items-center justify-between">
           <div className="text-base font-semibold text-slate-100">{t('groupInfo.title')}</div>
           <button type="button" onClick={onClose} className="rounded bg-slate-800 px-3 py-1.5 text-xs hover:bg-slate-700">
@@ -262,7 +262,7 @@ export function GroupInfoModal({
             type="button"
             onClick={saveInfo}
             disabled={savingInfo || !name.trim() || !infoChanged}
-            className="mt-2 w-full rounded-lg bg-indigo-600 px-3 py-2 text-sm text-white hover:bg-indigo-500 disabled:opacity-50"
+            className="mt-2 w-full toky-grad toky-ring-brand rounded-xl px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
           >
             {savingInfo ? t('groupInfo.saving') : t('groupInfo.save')}
           </button>

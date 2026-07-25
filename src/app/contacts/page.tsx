@@ -109,7 +109,7 @@ export default function ContactsPage() {
       title={t('contacts.title')}
       right={
         <button
-          className="rounded-full bg-blue-600 px-4 py-2 text-sm hover:bg-blue-500"
+          className="rounded-full toky-grad toky-ring-brand px-4 py-2 text-sm"
           onClick={openModal}
         >
           {t('contacts.addContact')}
@@ -129,7 +129,7 @@ export default function ContactsPage() {
               <li key={c.id} className="flex items-center justify-between gap-3 p-2">
                 <div className="text-sm">{c.username ?? c.id}</div>
                 <button
-                  className="rounded bg-blue-600 px-3 py-1.5 text-sm hover:bg-blue-500"
+                  className="rounded toky-grad toky-ring-brand px-3 py-1.5 text-sm"
                   onClick={() => onChat(c.id)}
                 >
                   {t('contacts.chat')}
@@ -186,7 +186,7 @@ export default function ContactsPage() {
                           {t('contacts.add')}
                         </button>
                         <button
-                          className="rounded bg-blue-600 px-3 py-1.5 text-sm hover:bg-blue-500"
+                          className="rounded toky-grad toky-ring-brand px-3 py-1.5 text-sm"
                           onClick={() => onChat(r.id)}
                         >
                           {t('contacts.chat')}

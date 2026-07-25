@@ -61,7 +61,7 @@ export function ReportModal({
 
   return (
     <div
-      className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 p-4"
+      className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) {
           reset();
@@ -69,7 +69,7 @@ export function ReportModal({
         }
       }}
     >
-      <div className="w-full max-w-sm rounded-2xl border border-slate-900 bg-slate-950 p-4 shadow-xl">
+      <div className="w-full max-w-sm rounded-3xl border border-slate-800 toky-glass toky-elev p-4">
         <div className="text-base font-semibold text-slate-100">{t('reportModal.title')}</div>
 
         {done ? (
