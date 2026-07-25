@@ -1784,9 +1784,16 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
                           {m.edited_at && <span className="ml-1 italic">{t('chat.edited')}</span>}
                         </span>
                         {isMine(m) ? (
-                          <span className={m.read ? 'text-sky-200 ml-2' : 'text-blue-200/60 ml-2'}>
-                            {m.read ? '✓✓' : '✓'}
-                          </span>
+                          m.read ? (
+                            // Read — double bright cyan tick.
+                            <span className="ml-2 text-sky-200" title={t('chat.receiptRead')}>✓✓</span>
+                          ) : m.delivery_status === 'delivered' || m.delivery_status === 'read' ? (
+                            // Delivered to their device — double faint tick.
+                            <span className="ml-2 text-white/60" title={t('chat.receiptDelivered')}>✓✓</span>
+                          ) : (
+                            // Sent to the server — single faint tick.
+                            <span className="ml-2 text-white/45" title={t('chat.receiptSent')}>✓</span>
+                          )
                         ) : null}
                       </div>
 

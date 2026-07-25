@@ -662,8 +662,31 @@ export async function searchMessages(chatId: string, query: string, limit = 30):
 }
 
 /**
- * Mark the OTHER participants' unread messages as read.
- * Never marks your own messages (that's what makes ✓ vs ✓✓ meaningful).
+ * Mark every incoming (not-mine) message across all my chats as "delivered".
+ * Row-level security scopes the UPDATE to chats I'm a member of, so a single
+ * statement safely fans out. Only bumps messages still at 'sent' — 'read' and
+ * 'delivered' are left untouched. This is what lets a sender see ✓✓ (delivered)
+ * even while the recipient hasn't opened the specific conversation.
+ */
+export async function markIncomingDelivered() {
+  const supabase = browserSupabase();
+  const { data: me } = await supabase.auth.getUser();
+  if (!me.user) return;
+
+  const { error } = await supabase
+    .from('messages')
+    .update({ delivery_status: 'delivered' })
+    .eq('delivery_status', 'sent')
+    .neq('sender_id', me.user.id);
+
+  if (error) console.error(error);
+}
+
+/**
+ * Mark the OTHER participants' messages in a chat as read — unless this user has
+ * turned read receipts OFF, in which case we only advance them to "delivered"
+ * so the sender never learns whether they were actually read.
+ * Never touches your own messages (that's what makes ✓ vs ✓✓ meaningful).
  */
 export async function markMessagesAsRead(chatId: string) {
   const supabase = browserSupabase();
@@ -671,9 +694,29 @@ export async function markMessagesAsRead(chatId: string) {
   const { data: me } = await supabase.auth.getUser();
   if (!me.user) return;
 
+  // Respect the viewer's read-receipts privacy preference.
+  const { data: prof } = await supabase
+    .from('profiles')
+    .select('read_receipts')
+    .eq('id', me.user.id)
+    .maybeSingle();
+  const sendReadReceipts = (prof as { read_receipts?: boolean } | null)?.read_receipts !== false;
+
+  if (!sendReadReceipts) {
+    // Privacy on: acknowledge delivery but never "read".
+    const { error } = await supabase
+      .from('messages')
+      .update({ delivery_status: 'delivered' })
+      .eq('chat_id', chatId)
+      .eq('delivery_status', 'sent')
+      .neq('sender_id', me.user.id);
+    if (error) console.error(error);
+    return;
+  }
+
   const { error } = await supabase
     .from('messages')
-    .update({ read: true })
+    .update({ read: true, delivery_status: 'read' })
     .eq('chat_id', chatId)
     .eq('read', false)
     .neq('sender_id', me.user.id);

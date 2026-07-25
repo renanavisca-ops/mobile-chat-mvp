@@ -11,7 +11,7 @@ import { PlusIcon, SearchIcon, UsersIcon, UserPlusIcon, HashIcon, ChatBubbleIcon
 import { useRequireAuth } from '@/lib/auth/use-require-auth';
 import { ensureIdentity } from '@/lib/crypto/keystore';
 import { browserSupabase } from '@/lib/supabase/client';
-import { listChats } from '@/lib/db/chats';
+import { listChats, markIncomingDelivered } from '@/lib/db/chats';
 import { useIsOnline } from '@/components/presence-provider';
 import { useLanguage } from '@/lib/i18n/context';
 
@@ -142,6 +142,9 @@ export default function ChatsPage() {
       listChats()
         .then(setChats)
         .catch((e) => setErr(e?.message ?? String(e)));
+      // Acknowledge delivery of any incoming messages while the app is open,
+      // even for chats the user hasn't opened yet (RLS scopes this to my chats).
+      void markIncomingDelivered().catch(() => {});
     };
     load();
 

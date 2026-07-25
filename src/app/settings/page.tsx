@@ -46,6 +46,7 @@ export default function SettingsPage() {
   const [status, setStatus] = useState<string>('');
   const [activeDeviceId, setActiveDeviceId] = useState<string | null>(null);
   const [showOnline, setShowOnline] = useState<boolean>(true);
+  const [readReceipts, setReadReceipts] = useState<boolean>(true);
   const [savingPrivacy, setSavingPrivacy] = useState(false);
 
   // Password change state
@@ -340,6 +341,7 @@ export default function SettingsPage() {
           };
           setProfile(prof);
           setShowOnline((prof as any)?.show_online ?? true);
+          setReadReceipts((prof as any)?.read_receipts ?? true);
           setDisplayName((prof as any)?.display_name ?? '');
           setAvatarUrl((prof as any)?.avatar_url ?? null);
         }
@@ -393,6 +395,25 @@ export default function SettingsPage() {
       setTimeout(() => window.location.reload(), 250);
     } catch (e: any) {
       setShowOnline(!next); // revert on failure
+      setStatus(`❌ ${e?.message ?? String(e)}`);
+    } finally {
+      setSavingPrivacy(false);
+    }
+  }
+
+  async function toggleReadReceipts() {
+    if (!user) return;
+    const next = !readReceipts;
+    setReadReceipts(next);
+    setSavingPrivacy(true);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ read_receipts: next } as any)
+        .eq('id', user.id);
+      if (error) throw error;
+    } catch (e: any) {
+      setReadReceipts(!next); // revert on failure
       setStatus(`❌ ${e?.message ?? String(e)}`);
     } finally {
       setSavingPrivacy(false);
@@ -735,6 +756,29 @@ export default function SettingsPage() {
                 <span
                   className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
                     showOnline ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
+            <div className="rounded-xl border border-slate-900 bg-slate-950/50 p-4 shadow-sm flex items-center justify-between gap-3">
+              <div>
+                <div className="text-sm font-medium text-slate-200">{t('settings.readReceipts')}</div>
+                <div className="text-xs text-slate-400 mt-1">
+                  {t('settings.readReceiptsDesc')}
+                </div>
+              </div>
+              <button
+                onClick={toggleReadReceipts}
+                disabled={savingPrivacy}
+                role="switch"
+                aria-checked={readReceipts}
+                className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors disabled:opacity-50 ${
+                  readReceipts ? 'bg-emerald-600' : 'bg-slate-700'
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    readReceipts ? 'translate-x-6' : 'translate-x-1'
                   }`}
                 />
               </button>

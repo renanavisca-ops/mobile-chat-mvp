@@ -554,6 +554,7 @@ export type Database = {
           display_name: string | null
           id: string
           last_seen: string | null
+          read_receipts: boolean
           role: string | null
           show_online: boolean
           store_id: string | null
@@ -565,6 +566,7 @@ export type Database = {
           display_name?: string | null
           id: string
           last_seen?: string | null
+          read_receipts?: boolean
           role?: string | null
           show_online?: boolean
           store_id?: string | null
@@ -576,6 +578,7 @@ export type Database = {
           display_name?: string | null
           id?: string
           last_seen?: string | null
+          read_receipts?: boolean
           role?: string | null
           show_online?: boolean
           store_id?: string | null
