@@ -73,7 +73,7 @@ export async function listChats(): Promise<ChatSummary[]> {
 
   // Members (for direct-chat titles) + last messages, in parallel
   const [membersRes, msgsRes] = await Promise.all([
-    supabase.from('chat_members').select('chat_id, user_id').in('chat_id', chatIds),
+    supabase.from('chat_members').select('chat_id, user_id, archived').in('chat_id', chatIds),
     supabase
       .from('messages')
       .select('id, chat_id, content, ciphertext, created_at')
@@ -81,14 +81,23 @@ export async function listChats(): Promise<ChatSummary[]> {
       .order('created_at', { ascending: false })
       .limit(300),
   ]);
+  // Graceful fallback if the archive migration hasn't been applied yet: refetch
+  // without the `archived` column so the chat list still loads (all unarchived).
+  let members: { chat_id: string; user_id: string; archived?: boolean }[] = membersRes.data ?? [];
+  if (membersRes.error) {
+    const fb = await supabase.from('chat_members').select('chat_id, user_id').in('chat_id', chatIds);
+    members = fb.data ?? [];
+  }
 
   // Map chat -> other user ids, and track which chats *I* belong to.
   const otherIdsByChat = new Map<string, string[]>();
   const allOtherIds = new Set<string>();
   const myMemberChatIds = new Set<string>();
-  for (const row of membersRes.data ?? []) {
+  const archivedByChat = new Map<string, boolean>();
+  for (const row of members) {
     if (row.user_id === user.id) {
       myMemberChatIds.add(row.chat_id);
+      archivedByChat.set(row.chat_id, !!row.archived);
       continue;
     }
     const arr = otherIdsByChat.get(row.chat_id) ?? [];
@@ -184,6 +193,7 @@ export async function listChats(): Promise<ChatSummary[]> {
       other_user_id: c.kind === 'direct' ? otherIds[0] ?? null : null,
       other_user_avatar: c.kind === 'direct' ? avatarById.get(otherIds[0]) ?? null : null,
       member_ids: otherIds,
+      archived: archivedByChat.get(c.id) ?? false,
     };
   });
 
@@ -516,6 +526,13 @@ export async function getChatMuted(chatId: string): Promise<boolean> {
     .maybeSingle();
   if (error) throw error;
   return data?.muted ?? false;
+}
+
+/** Archive/unarchive a chat for yourself (hides it from the main list). */
+export async function setChatArchived(chatId: string, archived: boolean) {
+  const supabase = browserSupabase();
+  const { error } = await supabase.rpc('set_chat_archived', { p_chat_id: chatId, p_archived: archived });
+  if (error) throw error;
 }
 
 /** Add members to a group. Only the group's creator may do this (enforced by RLS). */

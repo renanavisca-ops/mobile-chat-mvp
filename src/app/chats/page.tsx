@@ -12,7 +12,8 @@ import { ChatListSkeleton } from '@/components/skeleton';
 import { useRequireAuth } from '@/lib/auth/use-require-auth';
 import { ensureIdentity } from '@/lib/crypto/keystore';
 import { browserSupabase } from '@/lib/supabase/client';
-import { listChats, markIncomingDelivered } from '@/lib/db/chats';
+import { listChats, markIncomingDelivered, setChatArchived } from '@/lib/db/chats';
+import { tap, impact } from '@/lib/haptics';
 import { useIsOnline } from '@/components/presence-provider';
 import { useLanguage } from '@/lib/i18n/context';
 
@@ -91,6 +92,14 @@ function TimerGlyph() {
     </svg>
   );
 }
+function ArchiveGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="4" width="18" height="4" rx="1" />
+      <path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8M10 12h4" />
+    </svg>
+  );
+}
 
 // Reads live presence for a direct chat's counterpart and renders the avatar
 // with an online indicator.
@@ -119,6 +128,40 @@ export default function ChatsPage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [, setUnreadCount] = useState(0);
+  const [showArchived, setShowArchived] = useState(false);
+  const [rowMenuChat, setRowMenuChat] = useState<ChatSummary | null>(null);
+  const rowPressTimer = useRef<number | null>(null);
+  const justLongPressed = useRef(false);
+
+  const reloadChats = () => {
+    listChats().then(setChats).catch((e) => setErr(e?.message ?? String(e)));
+  };
+
+  function startRowPress(c: ChatSummary) {
+    if (rowPressTimer.current) window.clearTimeout(rowPressTimer.current);
+    rowPressTimer.current = window.setTimeout(() => {
+      impact();
+      justLongPressed.current = true;
+      setRowMenuChat(c);
+      rowPressTimer.current = null;
+    }, 450);
+  }
+  function cancelRowPress() {
+    if (rowPressTimer.current) {
+      window.clearTimeout(rowPressTimer.current);
+      rowPressTimer.current = null;
+    }
+  }
+  async function toggleArchive(c: ChatSummary) {
+    setRowMenuChat(null);
+    tap();
+    try {
+      await setChatArchived(c.id, !c.archived);
+      reloadChats();
+    } catch (e: any) {
+      setErr(e?.message ?? String(e));
+    }
+  }
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
@@ -305,16 +348,51 @@ export default function ChatsPage() {
               </div>
             ) : chats.filter((c) => (c.title || '').toLowerCase().includes(search.trim().toLowerCase())).length === 0 ? (
               <p className="p-3 text-sm text-slate-400">{t('emoji.noMatches')}</p>
-            ) : (
+            ) : (() => {
+              const searched = chats.filter((c) => (c.title || '').toLowerCase().includes(search.trim().toLowerCase()));
+              const archivedList = searched.filter((c) => c.archived);
+              const visible = showArchived ? archivedList : searched.filter((c) => !c.archived);
+              return (
               <ul className="space-y-0.5">
-                {chats
-                  .filter((c) => (c.title || '').toLowerCase().includes(search.trim().toLowerCase()))
-                  .map((c, i) => {
+                {showArchived ? (
+                  <li>
+                    <button
+                      onClick={() => setShowArchived(false)}
+                      className="flex w-full items-center gap-2 rounded-2xl p-2.5 text-left text-sm font-semibold text-blue-300 hover:bg-slate-900/70"
+                    >
+                      <span className="text-lg leading-none">‹</span> {t('chatsList.backToChats')}
+                    </button>
+                  </li>
+                ) : archivedList.length > 0 ? (
+                  <li>
+                    <button
+                      onClick={() => setShowArchived(true)}
+                      className="flex w-full items-center justify-between gap-3 rounded-2xl p-2.5 text-left hover:bg-slate-900/70"
+                    >
+                      <span className="flex items-center gap-3 text-sm font-medium text-slate-300">
+                        <span className="grid h-9 w-9 place-items-center rounded-xl bg-slate-800 text-slate-400">
+                          <ArchiveGlyph />
+                        </span>
+                        {t('chatsList.archived')}
+                      </span>
+                      <span className="shrink-0 text-xs font-semibold text-slate-500">{archivedList.length}</span>
+                    </button>
+                  </li>
+                ) : null}
+                {visible.map((c, i) => {
                   const active = c.id === selectedId;
                   return (
                     <li key={c.id} className="toky-rise" style={{ animationDelay: `${Math.min(i, 12) * 28}ms` }}>
                       <button
-                        onClick={() => openChat(c.id)}
+                        onClick={() => {
+                          if (justLongPressed.current) { justLongPressed.current = false; return; }
+                          openChat(c.id);
+                        }}
+                        onPointerDown={() => startRowPress(c)}
+                        onPointerUp={cancelRowPress}
+                        onPointerLeave={cancelRowPress}
+                        onPointerCancel={cancelRowPress}
+                        onContextMenu={(e) => { e.preventDefault(); setRowMenuChat(c); }}
                         className={`flex w-full items-center gap-3 rounded-2xl p-2.5 text-left ${
                           active ? 'bg-slate-800/80 shadow-sm' : 'hover:bg-slate-900/70 active:bg-slate-900'
                         }`}
@@ -351,7 +429,8 @@ export default function ChatsPage() {
                   );
                 })}
               </ul>
-            )}
+              );
+            })()}
           </div>
         </aside>
 
@@ -366,6 +445,34 @@ export default function ChatsPage() {
           )}
         </section>
       </div>
+
+      {rowMenuChat && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-0 backdrop-blur-sm sm:items-center sm:p-4" onClick={() => setRowMenuChat(null)}>
+          <div
+            className="toky-glass toky-elev w-full max-w-md rounded-t-3xl border border-slate-800 p-2 pb-safe sm:rounded-3xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-3 pb-2 pt-3 text-sm font-semibold text-slate-300 truncate">
+              {rowMenuChat.title || t('chatsList.directChat')}
+            </div>
+            <button
+              type="button"
+              onClick={() => toggleArchive(rowMenuChat)}
+              className="flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left text-sm text-slate-200 hover:bg-slate-800/60"
+            >
+              <ArchiveGlyph />
+              {rowMenuChat.archived ? t('chatsList.unarchive') : t('chatsList.archive')}
+            </button>
+            <button
+              type="button"
+              onClick={() => setRowMenuChat(null)}
+              className="mt-1 flex w-full items-center justify-center rounded-2xl px-3 py-2.5 text-sm text-slate-400 hover:bg-slate-800/40"
+            >
+              {t('common.cancel')}
+            </button>
+          </div>
+        </div>
+      )}
 
       <BottomNav />
     </div>

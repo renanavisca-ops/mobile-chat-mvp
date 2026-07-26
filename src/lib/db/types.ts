@@ -24,6 +24,8 @@ export type ChatSummary = {
   disappearing_seconds?: number | null;
   /** Whether this chat is end-to-end encrypted (opt-in). */
   encrypted?: boolean | null;
+  /** Whether the current user has archived this chat. */
+  archived?: boolean;
 };
 
 export type ProfileLite = {

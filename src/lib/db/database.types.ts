@@ -34,18 +34,21 @@ export type Database = {
       }
       chat_members: {
         Row: {
+          archived: boolean
           chat_id: string
           joined_at: string
           muted: boolean
           user_id: string
         }
         Insert: {
+          archived?: boolean
           chat_id: string
           joined_at?: string
           muted?: boolean
           user_id: string
         }
         Update: {
+          archived?: boolean
           chat_id?: string
           joined_at?: string
           muted?: boolean
@@ -316,6 +319,42 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      message_stars: {
+        Row: {
+          chat_id: string
+          created_at: string
+          message_id: string
+          user_id: string
+        }
+        Insert: {
+          chat_id: string
+          created_at?: string
+          message_id: string
+          user_id: string
+        }
+        Update: {
+          chat_id?: string
+          created_at?: string
+          message_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "message_stars_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "message_stars_chat_id_fkey"
+            columns: ["chat_id"]
+            isOneToOne: false
+            referencedRelation: "chats"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       hidden_messages: {
         Row: {
@@ -871,6 +910,10 @@ export type Database = {
       }
       rename_group_chat: {
         Args: { p_chat_id: string; p_title: string }
+        Returns: undefined
+      }
+      set_chat_archived: {
+        Args: { p_chat_id: string; p_archived: boolean }
         Returns: undefined
       }
       set_chat_muted: {

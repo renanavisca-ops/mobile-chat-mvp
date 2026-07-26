@@ -2,7 +2,7 @@
 
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { ChevronLeftIcon, SearchIcon, InfoIcon, MoreVerticalIcon } from '@/components/icons';
+import { ChevronLeftIcon, SearchIcon, InfoIcon, MoreVerticalIcon, XIcon } from '@/components/icons';
 import { ForwardModal } from '@/components/forward-modal';
 import { MessageActionsSheet } from '@/components/message-actions-sheet';
 import { AttachSheet } from '@/components/attach-sheet';
@@ -27,6 +27,7 @@ import { ImageLightbox } from '@/components/image-lightbox';
 import { tap, impact } from '@/lib/haptics';
 import { LinkPreview, firstUrl } from '@/components/link-preview';
 import { SafetyNumberModal } from '@/components/safety-number-modal';
+import { starMessage, unstarMessage, getStarredIdsForChat } from '@/lib/db/stars';
 import { ImageEditor } from '@/components/image-editor';
 import { MessageEffects, detectEffect } from '@/components/message-effects';
 import { GifPicker } from '@/components/gif-picker';
@@ -360,6 +361,10 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
 
   // Forward state
   const [safetyOpen, setSafetyOpen] = useState(false);
+  const [starredIds, setStarredIds] = useState<Set<string>>(new Set());
+  const [starredOpen, setStarredOpen] = useState(false);
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [forwardOpen, setForwardOpen] = useState(false);
   const [forwardBody, setForwardBody] = useState<ForwardPayload | null>(null);
   const [chats, setChats] = useState<ChatSummary[]>([]);
@@ -698,6 +703,43 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
     return (!!myId && m.sender_id === myId) || m.sender_device_id === 'local';
   }
 
+  // Load which messages in this chat I've starred (for the indicator + viewer).
+  useEffect(() => {
+    let alive = true;
+    getStarredIdsForChat(chatId)
+      .then((ids) => alive && setStarredIds(new Set(ids)))
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [chatId]);
+
+  async function toggleStar(messageId: string) {
+    const starred = starredIds.has(messageId);
+    // Optimistic update, reverting on failure.
+    setStarredIds((prev) => {
+      const n = new Set(prev);
+      if (starred) n.delete(messageId);
+      else n.add(messageId);
+      return n;
+    });
+    try {
+      if (starred) await unstarMessage(messageId);
+      else {
+        await starMessage(messageId, chatId);
+        tap();
+      }
+    } catch (e: any) {
+      setErr(e?.message ?? String(e));
+      setStarredIds((prev) => {
+        const n = new Set(prev);
+        if (starred) n.add(messageId);
+        else n.delete(messageId);
+        return n;
+      });
+    }
+  }
+
   // Persist the newest message time as "read" while the chat is open.
   useEffect(() => {
     if (typeof window === 'undefined' || messages.length === 0) return;
@@ -895,8 +937,45 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
     };
   }, [items, signedUrls]);
 
+  // -------- Multi-select
+  function enterSelect(id: string) {
+    setSelectMode(true);
+    setSelectedIds(new Set([id]));
+  }
+  function exitSelect() {
+    setSelectMode(false);
+    setSelectedIds(new Set());
+  }
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) => {
+      const n = new Set(prev);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      if (n.size === 0) setSelectMode(false);
+      return n;
+    });
+  }
+  async function bulkDelete() {
+    const ids = Array.from(selectedIds);
+    exitSelect();
+    setBusy(true);
+    try {
+      for (const id of ids) await hideMessageForMe(id, chatId);
+    } catch (e: any) {
+      setErr(e?.message ?? String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   // -------- Forward
   async function confirmForward(destChatIds: string[]) {
+    if (selectMode && selectedIds.size) {
+      const msgs = items.filter((m) => selectedIds.has(m.id) && !m.body.is_deleted);
+      for (const m of msgs) await forwardMessageToChats(destChatIds, toForwardPayload(m.body));
+      exitSelect();
+      return;
+    }
     if (!forwardBody) return;
     await forwardMessageToChats(destChatIds, forwardBody);
   }
@@ -926,7 +1005,7 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
   // ----- Swipe-to-reply (drag a bubble right to quote it) -----
   const SWIPE_TRIGGER = 56; // px pull that commits to a reply
   function onMsgPointerDown(e: React.PointerEvent, m: MessageRow & { body: Payload }) {
-    if (m.body.is_deleted || m.sender_type === 'system') return;
+    if (selectMode || m.body.is_deleted || m.sender_type === 'system') return;
     swipeStart.current = { x: e.clientX, y: e.clientY, id: m.id, decided: 'none' };
     startLongPress(m.id, m.body);
   }
@@ -1324,7 +1403,40 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
   const loading = authLoading || msgLoading;
 
   return (
-    <div className={`flex ${embedded ? 'h-full w-full' : 'h-[100dvh]'} flex-col overflow-hidden bg-slate-950 text-slate-50`}>
+    <div className={`relative flex ${embedded ? 'h-full w-full' : 'h-[100dvh]'} flex-col overflow-hidden bg-slate-950 text-slate-50`}>
+      {selectMode && (
+        <div className={`toky-glass absolute inset-x-0 top-0 z-40 flex items-center gap-2 border-b border-slate-800/70 px-2 py-2 ${embedded ? '' : 'pt-safe'}`}>
+          <button
+            type="button"
+            onClick={exitSelect}
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-slate-300 hover:bg-slate-900 hover:text-white"
+            aria-label={t('common.cancel')}
+          >
+            <XIcon size={20} />
+          </button>
+          <span className="flex-1 text-sm font-semibold">{selectedIds.size} {t('chat.selected')}</span>
+          <button
+            type="button"
+            onClick={() => setForwardOpen(true)}
+            disabled={selectedIds.size === 0}
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-slate-300 hover:bg-slate-900 hover:text-white disabled:opacity-40"
+            aria-label={t('chat.actionForward')}
+            title={t('chat.actionForward')}
+          >
+            <ForwardIcon size={20} />
+          </button>
+          <button
+            type="button"
+            onClick={bulkDelete}
+            disabled={selectedIds.size === 0 || busy}
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-rose-300 hover:bg-rose-950/40 disabled:opacity-40"
+            aria-label={t('chat.actionDeleteForMe')}
+            title={t('chat.actionDeleteForMe')}
+          >
+            <TrashIcon size={20} />
+          </button>
+        </div>
+      )}
       <header className={`toky-glass flex items-center gap-1.5 border-b border-slate-800/70 px-2 py-2 ${embedded ? '' : 'pt-safe'}`}>
         {!embedded && (
           <Link
@@ -1436,6 +1548,15 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
           title={t('chat.searchInChat')}
         >
           <SearchIcon size={20} />
+        </button>
+        <button
+          type="button"
+          onClick={() => setStarredOpen(true)}
+          className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-slate-300 hover:bg-slate-900 hover:text-white"
+          aria-label={t('chat.starredTitle')}
+          title={t('chat.starredTitle')}
+        >
+          <StarGlyph size={19} />
         </button>
         {isGroup && (
           <button
@@ -1591,6 +1712,26 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
               if (!actionsMsg) return;
               await doCopy(actionsMsg.body);
               toast(t('chat.copied'));
+            },
+          },
+          {
+            key: 'star',
+            label: starredIds.has(actionsMsg?.id ?? '') ? t('chat.actionUnstar') : t('chat.actionStar'),
+            icon: <StarGlyph filled={starredIds.has(actionsMsg?.id ?? '')} />,
+            onClick: () => {
+              if (!actionsMsg) return;
+              setActionsOpen(false);
+              void toggleStar(actionsMsg.id);
+            },
+          },
+          {
+            key: 'select',
+            label: t('chat.actionSelect'),
+            icon: <CheckIcon size={18} />,
+            onClick: () => {
+              if (!actionsMsg) return;
+              setActionsOpen(false);
+              enterSelect(actionsMsg.id);
             },
           },
           { key: 'save', label: t('chat.actionSave'), icon: <DownloadIcon size={18} />, onClick: () => toast(t('chat.savePending')) },
@@ -1902,6 +2043,8 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
                     <li
                       id={`msg-${m.id}`}
                       className={`relative flex flex-col mb-1.5 px-3.5 py-2 rounded-[1.25rem] w-fit max-w-[80%] transition-shadow ${grouped ? '-mt-1' : ''} ${
+                        selectMode && selectedIds.has(m.id) ? 'ring-2 ring-blue-400 ring-offset-2 ring-offset-slate-950' : ''
+                      } ${
                         m.sender_type === 'system' ? 'mx-auto bg-slate-800/80 text-center text-xs text-slate-400' :
                         isMine(m) ? `ml-auto toky-grad text-white shadow-[0_4px_14px_-6px_rgba(79,70,229,0.7)] ${grouped ? 'rounded-tr-md rounded-br-md' : 'rounded-br-md'}` :
                         `mr-auto bg-slate-800 text-slate-100 shadow-sm ${grouped ? 'rounded-tl-md rounded-bl-md' : 'rounded-bl-md'}`
@@ -1911,16 +2054,24 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
                         : { transition: 'transform .18s ease-out' }}
                       onContextMenu={(e) => {
                         e.preventDefault();
-                        if (!m.body.is_deleted) openActions(m.id, m.body);
+                        if (!selectMode && !m.body.is_deleted) openActions(m.id, m.body);
+                      }}
+                      onClick={() => {
+                        if (selectMode && m.sender_type !== 'system') toggleSelect(m.id);
                       }}
                       onPointerDown={(e) => onMsgPointerDown(e, m)}
                       onPointerMove={(e) => onMsgPointerMove(e, m)}
                       onPointerUp={(e) => onMsgPointerUp(e, m)}
                       onPointerCancel={onMsgPointerCancel}
                       onDoubleClick={() => {
-                        if (!m.body.is_deleted) openActions(m.id, m.body);
+                        if (!selectMode && !m.body.is_deleted) openActions(m.id, m.body);
                       }}
                     >
+                      {selectMode && m.sender_type !== 'system' && (
+                        <span className={`pointer-events-none absolute -top-1.5 ${isMine(m) ? '-left-1.5' : '-right-1.5'} grid h-5 w-5 place-items-center rounded-full text-white ${selectedIds.has(m.id) ? 'toky-grad' : 'bg-slate-700 ring-1 ring-slate-500'}`}>
+                          {selectedIds.has(m.id) && <CheckIcon size={12} />}
+                        </span>
+                      )}
                       {swipe?.id === m.id && m.sender_type !== 'system' && (
                         <span
                           className="pointer-events-none absolute top-1/2 -left-9 -translate-y-1/2 grid h-7 w-7 place-items-center rounded-full bg-slate-800 text-blue-300"
@@ -1933,9 +2084,10 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
                         <div className="text-[10px] font-semibold text-blue-300 mb-0.5">{senderName(m)}</div>
                       )}
                       <div className={`text-[10px] flex items-center justify-between mb-1 ${isMine(m) ? 'text-blue-100/70' : 'text-slate-500'}`}>
-                        <span>
+                        <span className="flex items-center gap-1">
                           {new Date(m.created_at).toLocaleTimeString(lang, { hour: '2-digit', minute: '2-digit' })}
                           {m.edited_at && <span className="ml-1 italic">{t('chat.edited')}</span>}
+                          {starredIds.has(m.id) && <StarGlyph filled size={11} />}
                         </span>
                         {isMine(m) ? (
                           m.read ? (
@@ -2028,7 +2180,10 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
                                 key={path}
                                 src={url}
                                 alt="chat image"
-                                onClick={() => setLightboxUrl(url)}
+                                onClick={() => {
+                                  if (selectMode) toggleSelect(m.id);
+                                  else setLightboxUrl(url);
+                                }}
                                 className="max-h-80 w-auto cursor-zoom-in rounded-lg border border-slate-900 transition-opacity hover:opacity-90"
                               />
                             ) : (
@@ -2407,6 +2562,72 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
         peerName={headerName}
         peerUserId={otherUserId}
       />
+
+      {starredOpen && (
+        <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/60 p-0 backdrop-blur-sm sm:items-center sm:p-4" onClick={() => setStarredOpen(false)}>
+          <div
+            className="toky-glass toky-elev flex max-h-[80vh] w-full max-w-md flex-col rounded-t-3xl border border-slate-800 sm:rounded-3xl"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+          >
+            <div className="flex items-center gap-2 border-b border-slate-800/70 px-4 py-3">
+              <StarGlyph filled size={18} />
+              <h2 className="font-display text-base font-bold">{t('chat.starredTitle')}</h2>
+            </div>
+            {(() => {
+              const starred = items.filter((m) => starredIds.has(m.id));
+              if (starred.length === 0) {
+                return <p className="px-4 py-8 text-center text-sm text-slate-400">{t('chat.noStarred')}</p>;
+              }
+              return (
+                <ul className="min-h-0 flex-1 overflow-y-auto p-2">
+                  {starred.map((m) => (
+                    <li key={m.id}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setStarredOpen(false);
+                          scrollToMessage(m.id);
+                        }}
+                        className="flex w-full items-start gap-3 rounded-xl px-3 py-2.5 text-left hover:bg-slate-800/50"
+                      >
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-[11px] font-semibold text-blue-300">
+                            {isMine(m) ? t('chat.you') : senderName(m) || t('chatsList.directChat')}
+                          </span>
+                          <span className="mt-0.5 block truncate text-sm text-slate-200">
+                            {m.body.is_deleted ? t('chat.deletedMessage') : m.body.text || t('chatsList.photo')}
+                          </span>
+                        </span>
+                        <span className="shrink-0 text-[10px] text-slate-500">
+                          {new Date(m.created_at).toLocaleDateString(lang, { month: 'short', day: 'numeric' })}
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              );
+            })()}
+            <button
+              type="button"
+              onClick={() => setStarredOpen(false)}
+              className="border-t border-slate-800/70 px-4 py-3 text-sm text-slate-300 hover:bg-slate-800/40 pb-safe"
+            >
+              {t('common.close')}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
+  );
+}
+
+function StarGlyph({ filled, size = 18 }: { filled?: boolean; size?: number }) {
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} aria-hidden
+      fill={filled ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 2.5l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.9 6.1 20.5l1.2-6.5L2.5 9.4l6.6-.9z" />
+    </svg>
   );
 }
