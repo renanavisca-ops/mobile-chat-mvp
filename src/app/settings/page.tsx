@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { PageShell } from '@/components/page-shell';
 import { browserSupabase } from '@/lib/supabase/client';
 import { clearLocalIdentity } from '@/lib/auth/local-identity';
+import { validatePassword } from '@/lib/password';
 import { WALLPAPERS, CUSTOM_WALLPAPER_ID, getWallpaperId, setWallpaperId as saveWallpaperId, uploadCustomWallpaper, getCustomWallpaperUrl } from '@/lib/wallpaper';
 import { uploadAvatar } from '@/lib/db/avatar';
 import { useNotifications } from '@/lib/hooks/useNotifications';
@@ -436,8 +437,15 @@ export default function SettingsPage() {
     e.preventDefault();
     setPasswordStatus({ type: null, message: '' });
 
-    if (newPassword.length < 6) {
-      setPasswordStatus({ type: 'error', message: t('settings.passwordTooShort') });
+    const pwCheck = validatePassword(newPassword);
+    if (!pwCheck.ok) {
+      setPasswordStatus({
+        type: 'error',
+        message:
+          pwCheck.code === 'common' ? t('settings.passwordCommon')
+          : pwCheck.code === 'weak' ? t('settings.passwordWeak')
+          : t('settings.passwordTooShort'),
+      });
       return;
     }
 

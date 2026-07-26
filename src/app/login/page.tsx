@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { browserSupabase } from '@/lib/supabase/client';
 import { reconcileLocalIdentity } from '@/lib/auth/local-identity';
+import { validatePassword, passwordStrength } from '@/lib/password';
 import { useT } from '@/lib/i18n/context';
 
 type Mode = 'signin' | 'signup' | 'forgot';
@@ -20,8 +21,6 @@ export default function LoginPage() {
   const [status, setStatus] = useState('');
   // True once we know this email exists but hasn't confirmed — surfaces a resend.
   const [needsConfirm, setNeedsConfirm] = useState(false);
-
-  const MIN_PASSWORD = 8;
 
   async function resendConfirmation() {
     const e = email.trim().toLowerCase();
@@ -86,7 +85,14 @@ export default function LoginPage() {
       if (!e.includes('@')) throw new Error(t('auth.errorInvalidEmailShort'));
 
       if (mode === 'signup') {
-        if (password.length < MIN_PASSWORD) throw new Error(t('auth.errorPasswordMin'));
+        const pwCheck = validatePassword(password);
+        if (!pwCheck.ok) {
+          throw new Error(
+            pwCheck.code === 'common' ? t('auth.errorPasswordCommon')
+            : pwCheck.code === 'weak' ? t('auth.errorPasswordWeak')
+            : t('auth.errorPasswordMin'),
+          );
+        }
 
         const emailRedirectTo =
           typeof window !== 'undefined'
@@ -225,6 +231,23 @@ export default function LoginPage() {
                 placeholder="••••••••"
                 type="password"
               />
+              {mode === 'signup' && password.length > 0 && (
+                <div className="flex items-center gap-2 px-1">
+                  <div className="flex h-1 flex-1 gap-1">
+                    {[0, 1, 2, 3].map((i) => {
+                      const s = passwordStrength(password);
+                      const color = s <= 1 ? 'bg-rose-500' : s === 2 ? 'bg-amber-500' : s === 3 ? 'bg-lime-500' : 'bg-emerald-500';
+                      return <div key={i} className={`flex-1 rounded-full ${i < s ? color : 'bg-slate-800'}`} />;
+                    })}
+                  </div>
+                  <span className="text-[10px] text-slate-500">
+                    {(() => {
+                      const s = passwordStrength(password);
+                      return s <= 1 ? t('auth.pwWeak') : s === 2 ? t('auth.pwFair') : s === 3 ? t('auth.pwGood') : t('auth.pwStrong');
+                    })()}
+                  </span>
+                </div>
+              )}
             </div>
           )}
 
