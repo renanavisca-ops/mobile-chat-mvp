@@ -182,6 +182,7 @@ const en = {
     edited: '(edited)',
     today: 'Today',
     yesterday: 'Yesterday',
+    scrollToBottom: 'Jump to latest',
     receiptSent: 'Sent',
     receiptDelivered: 'Delivered',
     receiptRead: 'Read',

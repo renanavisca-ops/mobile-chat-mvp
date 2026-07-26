@@ -23,6 +23,7 @@ import { useOnlineUsers } from '@/components/presence-provider';
 import { useLanguage } from '@/lib/i18n/context';
 import { PollComposer } from '@/components/poll-composer';
 import { MessagesSkeleton } from '@/components/skeleton';
+import { ImageLightbox } from '@/components/image-lightbox';
 import { ImageEditor } from '@/components/image-editor';
 import { MessageEffects, detectEffect } from '@/components/message-effects';
 import { GifPicker } from '@/components/gif-picker';
@@ -338,6 +339,8 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
 
   // Signed URL cache (path -> url)
   const [signedUrls, setSignedUrls] = useState<Record<string, string>>({});
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  const [showScrollDown, setShowScrollDown] = useState(false);
 
   // Video play error -> only shows the "Open video" link
   const [videoPlayError, setVideoPlayError] = useState<Record<string, boolean>>({});
@@ -732,7 +735,14 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
     if (el.scrollTop === 0 && hasMore && !loadingMore) {
       loadMore();
     }
+    // Show the jump-to-latest button once the user scrolls a screenful up.
+    setShowScrollDown(el.scrollHeight - el.scrollTop - el.clientHeight > 400);
   };
+
+  function scrollToBottom() {
+    const el = scrollRef.current;
+    if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+  }
 
   // Typing detection
   useEffect(() => {
@@ -1684,7 +1694,7 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
       {loading ? (
         <MessagesSkeleton />
       ) : (
-        <div className="flex min-h-0 flex-1 flex-col gap-2 px-3 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+        <div className="relative flex min-h-0 flex-1 flex-col gap-2 px-3 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
           {/* Support-console status controls only apply to store chats. */}
           {chat && chat.store_id && (
             <div className="flex items-center gap-2 px-1 text-xs">
@@ -1775,6 +1785,18 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
                     !prev ||
                     new Date(m.created_at).toDateString() !== new Date(prev.created_at).toDateString();
 
+                  // Group consecutive messages from the same sender (same side,
+                  // within 5 min, no day break between): tighten the spacing and
+                  // drop the repeated sender name.
+                  const grouped =
+                    !!prev &&
+                    !showDay &&
+                    m.sender_type !== 'system' &&
+                    prev.sender_type !== 'system' &&
+                    prev.sender_id === m.sender_id &&
+                    isMine(prev) === isMine(m) &&
+                    new Date(m.created_at).getTime() - new Date(prev.created_at).getTime() < 5 * 60 * 1000;
+
                   return (
                     <Fragment key={m.id}>
                     {showDay && (
@@ -1784,10 +1806,10 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
                     )}
                     <li
                       id={`msg-${m.id}`}
-                      className={`flex flex-col mb-1.5 px-3.5 py-2 rounded-[1.25rem] w-fit max-w-[80%] transition-shadow ${
+                      className={`flex flex-col mb-1.5 px-3.5 py-2 rounded-[1.25rem] w-fit max-w-[80%] transition-shadow ${grouped ? '-mt-1' : ''} ${
                         m.sender_type === 'system' ? 'mx-auto bg-slate-800/80 text-center text-xs text-slate-400' :
-                        isMine(m) ? 'ml-auto rounded-br-md toky-grad text-white shadow-[0_4px_14px_-6px_rgba(79,70,229,0.7)]' :
-                        'mr-auto rounded-bl-md bg-slate-800 text-slate-100 shadow-sm'
+                        isMine(m) ? `ml-auto toky-grad text-white shadow-[0_4px_14px_-6px_rgba(79,70,229,0.7)] ${grouped ? 'rounded-tr-md rounded-br-md' : 'rounded-br-md'}` :
+                        `mr-auto bg-slate-800 text-slate-100 shadow-sm ${grouped ? 'rounded-tl-md rounded-bl-md' : 'rounded-bl-md'}`
                       }`}
                       onContextMenu={(e) => {
                         e.preventDefault();
@@ -1803,7 +1825,7 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
                         if (!m.body.is_deleted) openActions(m.id, m.body);
                       }}
                     >
-                      {isGroup && !isMine(m) && m.sender_type !== 'system' && (
+                      {isGroup && !isMine(m) && m.sender_type !== 'system' && !grouped && (
                         <div className="text-[10px] font-semibold text-blue-300 mb-0.5">{senderName(m)}</div>
                       )}
                       <div className={`text-[10px] flex items-center justify-between mb-1 ${isMine(m) ? 'text-blue-100/70' : 'text-slate-500'}`}>
@@ -1894,7 +1916,13 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
                             const url = signedUrls[path] || '';
                             return url ? (
                               // eslint-disable-next-line @next/next/no-img-element
-                              <img key={path} src={url} alt="chat image" className="max-h-80 w-auto rounded-lg border border-slate-900" />
+                              <img
+                                key={path}
+                                src={url}
+                                alt="chat image"
+                                onClick={() => setLightboxUrl(url)}
+                                className="max-h-80 w-auto cursor-zoom-in rounded-lg border border-slate-900 transition-opacity hover:opacity-90"
+                              />
                             ) : (
                               <div key={path} className="h-28 w-full animate-pulse rounded-lg border border-slate-900 bg-slate-800" />
                             );
@@ -2014,6 +2042,21 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
               </ul>
             )}
           </div>
+
+          {/* Jump to latest */}
+          {showScrollDown && (
+            <button
+              type="button"
+              onClick={scrollToBottom}
+              aria-label={t('chat.scrollToBottom')}
+              title={t('chat.scrollToBottom')}
+              className="toky-glass absolute bottom-24 right-4 z-10 grid h-10 w-10 place-items-center rounded-full border border-slate-700 text-slate-100 shadow-lg"
+            >
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 5v14M19 12l-7 7-7-7" />
+              </svg>
+            </button>
+          )}
 
           {/* Preview images */}
           {previewImages.length ? (
@@ -2243,6 +2286,10 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
             </p>
           )}
         </div>
+      )}
+
+      {lightboxUrl && (
+        <ImageLightbox url={lightboxUrl} alt={t('chatsList.photo')} onClose={() => setLightboxUrl(null)} />
       )}
     </div>
   );

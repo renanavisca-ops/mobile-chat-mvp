@@ -184,6 +184,7 @@ const es: Dictionary = {
     edited: '(editado)',
     today: 'Hoy',
     yesterday: 'Ayer',
+    scrollToBottom: 'Ir al último',
     receiptSent: 'Enviado',
     receiptDelivered: 'Entregado',
     receiptRead: 'Leído',

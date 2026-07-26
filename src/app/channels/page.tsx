@@ -5,6 +5,7 @@ import { PageShell } from '@/components/page-shell';
 import { useRequireAuth } from '@/lib/auth/use-require-auth';
 import { listPublicChannels, createChannel, joinChannel, type ChannelSummary } from '@/lib/db/chats';
 import { EmptyState } from '@/components/empty-state';
+import { ChatListSkeleton } from '@/components/skeleton';
 import { HashIcon, PlusIcon } from '@/components/icons';
 import { useT } from '@/lib/i18n/context';
 
@@ -93,7 +94,7 @@ export default function ChannelsPage() {
         </div>
 
         {loading ? (
-          <p className="text-sm text-slate-400">{t('common.loading')}</p>
+          <ChatListSkeleton rows={6} />
         ) : channels.length === 0 ? (
           <EmptyState
             icon={<HashIcon size={28} />}

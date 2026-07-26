@@ -170,6 +170,12 @@ export default function OnboardingPage() {
   return (
     <PageShell title={t('onboarding.title')}>
       <div className="mx-auto max-w-xl space-y-4">
+        <div className="flex flex-col items-center pt-2 text-center">
+          <div className="toky-grad toky-ring-brand font-display grid h-16 w-16 place-items-center rounded-3xl text-3xl font-extrabold text-white">
+            T
+          </div>
+          <h2 className="mt-3 font-display text-xl font-bold">{t('onboarding.title')}</h2>
+        </div>
         <p className="text-sm text-slate-300">
           <TransBold text={t('onboarding.intro')} />
         </p>
