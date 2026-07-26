@@ -346,6 +346,7 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const [showScrollDown, setShowScrollDown] = useState(false);
   // Swipe-to-reply: track the gesture start and the live horizontal pull.
+  const optionsMenuRef = useRef<HTMLDivElement>(null);
   const swipeStart = useRef<{ x: number; y: number; id: string; decided: 'none' | 'h' | 'v' } | null>(null);
   const [swipe, setSwipe] = useState<{ id: string; dx: number } | null>(null);
   // Unread divider: freeze the last-read timestamp at mount so the "new
@@ -702,6 +703,22 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
   function isMine(m: MessageRow) {
     return (!!myId && m.sender_id === myId) || m.sender_device_id === 'local';
   }
+
+  // Close the header options (⋮) menu on any tap/click outside it. A document
+  // listener is used instead of a fixed-position backdrop because the glass
+  // header has `backdrop-filter`, which would contain a `position: fixed`
+  // catcher to the header strip rather than the whole viewport.
+  useEffect(() => {
+    if (!safetyMenuOpen) return;
+    const onDown = (e: PointerEvent) => {
+      if (!optionsMenuRef.current?.contains(e.target as Node)) {
+        setSafetyMenuOpen(false);
+        setDisappearingMenuOpen(false);
+      }
+    };
+    document.addEventListener('pointerdown', onDown);
+    return () => document.removeEventListener('pointerdown', onDown);
+  }, [safetyMenuOpen]);
 
   // Load which messages in this chat I've starred (for the indicator + viewer).
   useEffect(() => {
@@ -1528,7 +1545,7 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
             </button>
           </>
         )}
-        <div className="relative">
+        <div className="relative" ref={optionsMenuRef}>
             <button
               type="button"
               onClick={() => setSafetyMenuOpen((v) => !v)}
@@ -1539,10 +1556,8 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
             </button>
             {safetyMenuOpen && (
               <>
-              {/* Tap-away catcher so the menu closes on mobile (no mouseleave). */}
-              <div className="fixed inset-0 z-20" onClick={() => { setSafetyMenuOpen(false); setDisappearingMenuOpen(false); }} />
               <div
-                className="absolute right-0 top-11 z-30 w-56 overflow-hidden rounded-lg border border-slate-800 bg-slate-950 text-sm shadow-xl"
+                className="absolute right-0 top-11 z-30 w-56 overflow-hidden rounded-xl border border-slate-700 bg-slate-900 text-sm shadow-2xl ring-1 ring-black/50"
                 onMouseLeave={() => {
                   setSafetyMenuOpen(false);
                   setDisappearingMenuOpen(false);

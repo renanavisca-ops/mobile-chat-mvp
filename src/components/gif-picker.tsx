@@ -55,7 +55,7 @@ export function GifPicker({
   return (
     <div
       className="fixed inset-0 z-[75] flex items-end justify-center bg-black/60 backdrop-blur-sm p-2 sm:items-center"
-      onMouseDown={(e) => {
+      onPointerDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >

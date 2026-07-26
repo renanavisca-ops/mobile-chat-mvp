@@ -132,6 +132,19 @@ export default function ChatsPage() {
   const [rowMenuChat, setRowMenuChat] = useState<ChatSummary | null>(null);
   const rowPressTimer = useRef<number | null>(null);
   const justLongPressed = useRef(false);
+  const newMenuRef = useRef<HTMLDivElement>(null);
+
+  // Close the "new chat" (+) menu on any tap outside it. A document listener
+  // (not a fixed backdrop) is required because the glass header's backdrop-filter
+  // would contain a fixed catcher to the header strip only.
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onDown = (e: PointerEvent) => {
+      if (!newMenuRef.current?.contains(e.target as Node)) setMenuOpen(false);
+    };
+    document.addEventListener('pointerdown', onDown);
+    return () => document.removeEventListener('pointerdown', onDown);
+  }, [menuOpen]);
 
   const reloadChats = () => {
     listChats().then(setChats).catch((e) => setErr(e?.message ?? String(e)));
@@ -284,7 +297,7 @@ export default function ChatsPage() {
               <h1 className="font-display text-2xl font-extrabold tracking-tight">
                 <span className="toky-grad-text">{t('chatsList.title')}</span>
               </h1>
-              <div className="relative">
+              <div className="relative" ref={newMenuRef}>
                 <button
                   type="button"
                   onClick={() => setMenuOpen((v) => !v)}
@@ -295,8 +308,7 @@ export default function ChatsPage() {
                 </button>
                 {menuOpen && (
                   <>
-                    <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
-                    <div className="toky-glass toky-elev absolute right-0 top-12 z-20 w-56 overflow-hidden rounded-2xl border border-slate-800 py-1.5">
+                    <div className="absolute right-0 top-12 z-20 w-56 overflow-hidden rounded-2xl border border-slate-700 bg-slate-900 shadow-2xl ring-1 ring-black/50 py-1.5">
                       <Link href="/contacts" onClick={() => setMenuOpen(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-200 hover:bg-slate-900">
                         <UsersIcon size={18} /> {t('nav.contacts')}
                       </Link>

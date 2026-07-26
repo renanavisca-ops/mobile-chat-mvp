@@ -47,8 +47,14 @@ export function AttachSheet(props: {
   );
 
   return (
-    <div className="fixed inset-0 z-[55] flex items-end justify-center bg-black/60 backdrop-blur-sm p-2 sm:items-center">
-      <div className="w-full max-w-md rounded-3xl border border-slate-800 toky-glass toky-elev">
+    <div
+      className="fixed inset-0 z-[55] flex items-end justify-center bg-black/60 backdrop-blur-sm p-2 sm:items-center"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-md rounded-3xl border border-slate-800 toky-glass toky-elev"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="flex items-center justify-between border-b border-slate-900 p-4">
           <div>
             <div className="text-sm font-semibold text-slate-100">{t('attach.title')}</div>

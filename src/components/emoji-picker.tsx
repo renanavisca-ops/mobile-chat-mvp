@@ -59,14 +59,15 @@ export function EmojiPicker(props: {
       if (e.key === 'Escape') onClose();
     };
     window.addEventListener('keydown', onKey);
-    const onClickOutside = (e: MouseEvent) => {
+    const onClickOutside = (e: Event) => {
       const el = boxRef.current;
       if (el && !el.contains(e.target as Node)) onClose();
     };
-    window.addEventListener('mousedown', onClickOutside);
+    // pointerdown fires reliably on touch (mousedown can be flaky in WebViews).
+    window.addEventListener('pointerdown', onClickOutside);
     return () => {
       window.removeEventListener('keydown', onKey);
-      window.removeEventListener('mousedown', onClickOutside);
+      window.removeEventListener('pointerdown', onClickOutside);
     };
   }, [open, onClose]);
 
