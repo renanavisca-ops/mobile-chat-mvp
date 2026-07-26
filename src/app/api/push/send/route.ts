@@ -105,6 +105,19 @@ export async function POST(req: Request) {
       }
     }
 
+    // A push reaching at least one recipient device is our "delivered" signal:
+    // the recipient's app is usually backgrounded (just showing the notification)
+    // and never runs the client-side delivered-marking, so do it here. Only bump
+    // 'sent' -> 'delivered' so we never clobber a 'read' that raced ahead.
+    const totalSent = webSent + nativeSent;
+    if (totalSent > 0) {
+      await supabaseAdmin
+        .from('messages')
+        .update({ delivery_status: 'delivered' })
+        .eq('id', message.id)
+        .eq('delivery_status', 'sent');
+    }
+
     return NextResponse.json({ ok: true, sent: webSent + nativeSent, web: webSent, native: nativeSent });
   } catch (error: any) {
     console.error('Error sending push:', error);
