@@ -1,6 +1,16 @@
 import type { Dictionary } from './en';
 
 const es: Dictionary = {
+  safety: {
+    title: 'Verificar cifrado',
+    subtitle: 'Cifrado de extremo a extremo',
+    yourKey: 'Tu número de seguridad',
+    theirKey: 'Número de seguridad de {name}',
+    hint: 'Compara estos números con tu contacto en persona o por otro canal de confianza. Si coinciden, tu chat es privado y nadie lo está interceptando.',
+    markVerified: 'Marcar como verificado',
+    verified: 'Verificado',
+    unavailable: 'Este contacto aún no ha publicado una clave de cifrado, así que no hay número de seguridad disponible.',
+  },
   common: {
     save: 'Guardar',
     saving: 'Guardando…',
@@ -185,6 +195,7 @@ const es: Dictionary = {
     today: 'Hoy',
     yesterday: 'Ayer',
     scrollToBottom: 'Ir al último',
+    newMessages: 'mensajes nuevos',
     receiptSent: 'Enviado',
     receiptDelivered: 'Entregado',
     receiptRead: 'Leído',

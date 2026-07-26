@@ -146,6 +146,12 @@ export async function myFingerprint(): Promise<string | null> {
   return pub ? e2ee.fingerprint(pub) : null;
 }
 
+/** Safety-number fingerprint of another user's published identity key. */
+export async function peerFingerprint(userId: string): Promise<string | null> {
+  const pub = await fetchMemberPub(userId);
+  return pub ? e2ee.fingerprint(pub) : null;
+}
+
 /** Whether a server-side (passphrase) backup exists for this account. */
 export async function hasServerBackup(): Promise<boolean> {
   const uid = await myUserId();

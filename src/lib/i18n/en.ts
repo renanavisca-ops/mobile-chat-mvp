@@ -1,4 +1,14 @@
 const en = {
+  safety: {
+    title: 'Verify encryption',
+    subtitle: 'End-to-end encrypted',
+    yourKey: 'Your safety number',
+    theirKey: "{name}'s safety number",
+    hint: 'Compare these numbers with your contact in person or over another trusted channel. If they match, your chat is private and no one is intercepting it.',
+    markVerified: 'Mark as verified',
+    verified: 'Verified',
+    unavailable: 'This contact has not published an encryption key yet, so a safety number is not available.',
+  },
   common: {
     save: 'Save',
     saving: 'Saving…',
@@ -183,6 +193,7 @@ const en = {
     today: 'Today',
     yesterday: 'Yesterday',
     scrollToBottom: 'Jump to latest',
+    newMessages: 'new messages',
     receiptSent: 'Sent',
     receiptDelivered: 'Delivered',
     receiptRead: 'Read',

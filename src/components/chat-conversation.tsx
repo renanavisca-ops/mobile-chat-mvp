@@ -24,6 +24,9 @@ import { useLanguage } from '@/lib/i18n/context';
 import { PollComposer } from '@/components/poll-composer';
 import { MessagesSkeleton } from '@/components/skeleton';
 import { ImageLightbox } from '@/components/image-lightbox';
+import { tap, impact } from '@/lib/haptics';
+import { LinkPreview, firstUrl } from '@/components/link-preview';
+import { SafetyNumberModal } from '@/components/safety-number-modal';
 import { ImageEditor } from '@/components/image-editor';
 import { MessageEffects, detectEffect } from '@/components/message-effects';
 import { GifPicker } from '@/components/gif-picker';
@@ -341,11 +344,22 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
   const [signedUrls, setSignedUrls] = useState<Record<string, string>>({});
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const [showScrollDown, setShowScrollDown] = useState(false);
+  // Swipe-to-reply: track the gesture start and the live horizontal pull.
+  const swipeStart = useRef<{ x: number; y: number; id: string; decided: 'none' | 'h' | 'v' } | null>(null);
+  const [swipe, setSwipe] = useState<{ id: string; dx: number } | null>(null);
+  // Unread divider: freeze the last-read timestamp at mount so the "new
+  // messages" line stays put while the chat is open; advance the stored marker
+  // as messages arrive (the chat being open counts as reading them).
+  const [initialLastRead] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null;
+    try { return window.localStorage.getItem(`toky:lastread:${chatId}`); } catch { return null; }
+  });
 
   // Video play error -> only shows the "Open video" link
   const [videoPlayError, setVideoPlayError] = useState<Record<string, boolean>>({});
 
   // Forward state
+  const [safetyOpen, setSafetyOpen] = useState(false);
   const [forwardOpen, setForwardOpen] = useState(false);
   const [forwardBody, setForwardBody] = useState<ForwardPayload | null>(null);
   const [chats, setChats] = useState<ChatSummary[]>([]);
@@ -683,6 +697,27 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
   function isMine(m: MessageRow) {
     return (!!myId && m.sender_id === myId) || m.sender_device_id === 'local';
   }
+
+  // Persist the newest message time as "read" while the chat is open.
+  useEffect(() => {
+    if (typeof window === 'undefined' || messages.length === 0) return;
+    const newest = messages[messages.length - 1].created_at;
+    try { window.localStorage.setItem(`toky:lastread:${chatId}`, newest); } catch { /* ignore */ }
+  }, [messages, chatId]);
+
+  // First incoming message newer than the frozen last-read marker → divider row.
+  const firstUnreadIdx = initialLastRead
+    ? items.findIndex(
+        (mm) =>
+          mm.sender_type !== 'system' &&
+          !isMine(mm) &&
+          new Date(mm.created_at).getTime() > new Date(initialLastRead).getTime(),
+      )
+    : -1;
+  const unreadCount =
+    firstUnreadIdx >= 0
+      ? items.slice(firstUnreadIdx).filter((mm) => mm.sender_type !== 'system' && !isMine(mm)).length
+      : 0;
   function senderName(m: MessageRow) {
     if (!m.sender_id) return '';
     // A sender with no profile among the chat members is a deleted account —
@@ -868,6 +903,7 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
 
   // -------- Actions Sheet
   function openActions(messageId: string, body: Payload) {
+    impact();
     setActionsMsg({ id: messageId, body });
     setActionsOpen(true);
   }
@@ -885,6 +921,45 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
       openActions(messageId, body);
       clearLongPress();
     }, 450);
+  }
+
+  // ----- Swipe-to-reply (drag a bubble right to quote it) -----
+  const SWIPE_TRIGGER = 56; // px pull that commits to a reply
+  function onMsgPointerDown(e: React.PointerEvent, m: MessageRow & { body: Payload }) {
+    if (m.body.is_deleted || m.sender_type === 'system') return;
+    swipeStart.current = { x: e.clientX, y: e.clientY, id: m.id, decided: 'none' };
+    startLongPress(m.id, m.body);
+  }
+  function onMsgPointerMove(e: React.PointerEvent, m: MessageRow & { body: Payload }) {
+    const s = swipeStart.current;
+    if (!s || s.id !== m.id) return;
+    const dx = e.clientX - s.x;
+    const dy = e.clientY - s.y;
+    if (s.decided === 'none') {
+      if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+      s.decided = Math.abs(dx) > Math.abs(dy) ? 'h' : 'v';
+    }
+    if (s.decided !== 'h') {
+      clearLongPress(); // vertical → let the list scroll, no reply
+      return;
+    }
+    clearLongPress();
+    setSwipe({ id: m.id, dx: Math.max(0, Math.min(80, dx)) }); // rightward pull only
+  }
+  function onMsgPointerUp(e: React.PointerEvent, m: MessageRow & { body: Payload }) {
+    const s = swipeStart.current;
+    clearLongPress();
+    if (s && s.id === m.id && s.decided === 'h' && e.clientX - s.x >= SWIPE_TRIGGER) {
+      setReplyingTo(m);
+      tap();
+    }
+    swipeStart.current = null;
+    setSwipe(null);
+  }
+  function onMsgPointerCancel() {
+    clearLongPress();
+    swipeStart.current = null;
+    setSwipe(null);
   }
 
   async function doCopy(body: Payload) {
@@ -1127,6 +1202,7 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
   async function onSend() {
     setErr('');
     const t2 = text.trim();
+    if (t2) tap();
 
     if (editingId) {
       if (!t2) return;
@@ -1313,6 +1389,18 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
               title={t('call.startVideo')}
             >
               <VideoIcon size={20} />
+            </button>
+            <button
+              type="button"
+              onClick={() => setSafetyOpen(true)}
+              className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-slate-300 hover:bg-slate-900 hover:text-white"
+              aria-label={t('safety.title')}
+              title={t('safety.title')}
+            >
+              <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                <path d="m9 12 2 2 4-4" />
+              </svg>
             </button>
           </>
         )}
@@ -1799,6 +1887,13 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
 
                   return (
                     <Fragment key={m.id}>
+                    {idx === firstUnreadIdx && unreadCount > 0 && (
+                      <li className="my-2 flex items-center gap-3 px-1 text-[11px] font-semibold uppercase tracking-wide text-blue-300">
+                        <span className="h-px flex-1 bg-blue-400/30" />
+                        {unreadCount} {t('chat.newMessages')}
+                        <span className="h-px flex-1 bg-blue-400/30" />
+                      </li>
+                    )}
                     {showDay && (
                       <li className="mx-auto my-1 rounded-full bg-slate-800/70 px-3 py-1 text-[11px] font-medium text-slate-400">
                         {dayLabel(m.created_at)}
@@ -1806,25 +1901,34 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
                     )}
                     <li
                       id={`msg-${m.id}`}
-                      className={`flex flex-col mb-1.5 px-3.5 py-2 rounded-[1.25rem] w-fit max-w-[80%] transition-shadow ${grouped ? '-mt-1' : ''} ${
+                      className={`relative flex flex-col mb-1.5 px-3.5 py-2 rounded-[1.25rem] w-fit max-w-[80%] transition-shadow ${grouped ? '-mt-1' : ''} ${
                         m.sender_type === 'system' ? 'mx-auto bg-slate-800/80 text-center text-xs text-slate-400' :
                         isMine(m) ? `ml-auto toky-grad text-white shadow-[0_4px_14px_-6px_rgba(79,70,229,0.7)] ${grouped ? 'rounded-tr-md rounded-br-md' : 'rounded-br-md'}` :
                         `mr-auto bg-slate-800 text-slate-100 shadow-sm ${grouped ? 'rounded-tl-md rounded-bl-md' : 'rounded-bl-md'}`
                       }`}
+                      style={swipe?.id === m.id
+                        ? { transform: `translateX(${swipe.dx}px)`, transition: 'none' }
+                        : { transition: 'transform .18s ease-out' }}
                       onContextMenu={(e) => {
                         e.preventDefault();
                         if (!m.body.is_deleted) openActions(m.id, m.body);
                       }}
-                      onPointerDown={() => {
-                        if (!m.body.is_deleted) startLongPress(m.id, m.body);
-                      }}
-                      onPointerUp={clearLongPress}
-                      onPointerCancel={clearLongPress}
-                      onPointerMove={clearLongPress}
+                      onPointerDown={(e) => onMsgPointerDown(e, m)}
+                      onPointerMove={(e) => onMsgPointerMove(e, m)}
+                      onPointerUp={(e) => onMsgPointerUp(e, m)}
+                      onPointerCancel={onMsgPointerCancel}
                       onDoubleClick={() => {
                         if (!m.body.is_deleted) openActions(m.id, m.body);
                       }}
                     >
+                      {swipe?.id === m.id && m.sender_type !== 'system' && (
+                        <span
+                          className="pointer-events-none absolute top-1/2 -left-9 -translate-y-1/2 grid h-7 w-7 place-items-center rounded-full bg-slate-800 text-blue-300"
+                          style={{ opacity: Math.min(1, swipe.dx / SWIPE_TRIGGER), transform: `translateY(-50%) scale(${Math.min(1, 0.5 + swipe.dx / SWIPE_TRIGGER / 2)})` }}
+                        >
+                          <ReplyIcon size={15} />
+                        </span>
+                      )}
                       {isGroup && !isMine(m) && m.sender_type !== 'system' && !grouped && (
                         <div className="text-[10px] font-semibold text-blue-300 mb-0.5">{senderName(m)}</div>
                       )}
@@ -1863,6 +1967,10 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
                             </div>
                           )}
                           {m.body.text ? <div className="text-sm mt-1">{m.body.text}</div> : null}
+                          {(() => {
+                            const link = m.body.text ? firstUrl(m.body.text) : null;
+                            return link ? <LinkPreview url={link} mine={isMine(m)} /> : null;
+                          })()}
 
                       {translatingId === m.id && !translations[m.id] ? (
                         <div className="mt-1 text-xs italic text-slate-500">{t('ai.translating')}</div>
@@ -2291,6 +2399,14 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
       {lightboxUrl && (
         <ImageLightbox url={lightboxUrl} alt={t('chatsList.photo')} onClose={() => setLightboxUrl(null)} />
       )}
+
+      <SafetyNumberModal
+        open={safetyOpen}
+        onClose={() => setSafetyOpen(false)}
+        chatId={chatId}
+        peerName={headerName}
+        peerUserId={otherUserId}
+      />
     </div>
   );
 }
