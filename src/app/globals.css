@@ -14,12 +14,16 @@ html {
 
 /* Never let a stray-wide child (negative margins, fixed pixel widths, long
    unbroken strings) push the page wider than the device and trigger the
-   browser's zoom-to-fit / horizontal scroll on mobile web. */
+   browser's zoom-to-fit / horizontal scroll on mobile web.
+
+   IMPORTANT: use `overflow-x: clip`, NOT `hidden`. `hidden` turns html/body
+   into scroll containers, which breaks vertical page scrolling in the Android
+   WebView (Settings/Calls froze). `clip` contains the same horizontal overflow
+   without establishing a scroll container, so document scrolling keeps working. */
 html,
 body {
   max-width: 100%;
-  overflow-x: hidden;
-  overscroll-behavior-y: none;
+  overflow-x: clip;
 }
 
 body {

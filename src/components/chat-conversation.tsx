@@ -1502,18 +1502,6 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
             >
               <VideoIcon size={20} />
             </button>
-            <button
-              type="button"
-              onClick={() => setSafetyOpen(true)}
-              className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-slate-300 hover:bg-slate-900 hover:text-white"
-              aria-label={t('safety.title')}
-              title={t('safety.title')}
-            >
-              <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                <path d="m9 12 2 2 4-4" />
-              </svg>
-            </button>
           </>
         )}
         {isGroup && otherMemberIds.length > 0 && (
@@ -1540,37 +1528,7 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
             </button>
           </>
         )}
-        <button
-          type="button"
-          onClick={() => setSearchOpen((v) => !v)}
-          className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-slate-300 hover:bg-slate-900 hover:text-white"
-          aria-label={t('chat.searchInChat')}
-          title={t('chat.searchInChat')}
-        >
-          <SearchIcon size={20} />
-        </button>
-        <button
-          type="button"
-          onClick={() => setStarredOpen(true)}
-          className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-slate-300 hover:bg-slate-900 hover:text-white"
-          aria-label={t('chat.starredTitle')}
-          title={t('chat.starredTitle')}
-        >
-          <StarGlyph size={19} />
-        </button>
-        {isGroup && (
-          <button
-            type="button"
-            onClick={() => setGroupInfoOpen(true)}
-            className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-slate-300 hover:bg-slate-900 hover:text-white"
-            aria-label={t('chat.groupInfo')}
-            title={t('chat.groupInfo')}
-          >
-            <InfoIcon size={20} />
-          </button>
-        )}
-        {otherUserId && (
-          <div className="relative">
+        <div className="relative">
             <button
               type="button"
               onClick={() => setSafetyMenuOpen((v) => !v)}
@@ -1580,13 +1538,55 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
               <MoreVerticalIcon size={20} />
             </button>
             {safetyMenuOpen && (
+              <>
+              {/* Tap-away catcher so the menu closes on mobile (no mouseleave). */}
+              <div className="fixed inset-0 z-20" onClick={() => { setSafetyMenuOpen(false); setDisappearingMenuOpen(false); }} />
               <div
-                className="absolute right-0 top-11 z-30 w-52 overflow-hidden rounded-lg border border-slate-800 bg-slate-950 text-sm shadow-xl"
+                className="absolute right-0 top-11 z-30 w-56 overflow-hidden rounded-lg border border-slate-800 bg-slate-950 text-sm shadow-xl"
                 onMouseLeave={() => {
                   setSafetyMenuOpen(false);
                   setDisappearingMenuOpen(false);
                 }}
               >
+                {/* Moved out of the header to keep the title readable */}
+                <button
+                  type="button"
+                  onClick={() => { setSafetyMenuOpen(false); setSearchOpen(true); }}
+                  className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-slate-200 hover:bg-slate-900"
+                >
+                  <SearchIcon size={16} /> {t('chat.searchInChat')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setSafetyMenuOpen(false); setStarredOpen(true); }}
+                  className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-slate-200 hover:bg-slate-900"
+                >
+                  <StarGlyph size={16} /> {t('chat.starredTitle')}
+                </button>
+                {isGroup && (
+                  <button
+                    type="button"
+                    onClick={() => { setSafetyMenuOpen(false); setGroupInfoOpen(true); }}
+                    className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-slate-200 hover:bg-slate-900"
+                  >
+                    <InfoIcon size={16} /> {t('chat.groupInfo')}
+                  </button>
+                )}
+                {otherUserId && (
+                  <button
+                    type="button"
+                    onClick={() => { setSafetyMenuOpen(false); setSafetyOpen(true); }}
+                    className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-slate-200 hover:bg-slate-900"
+                  >
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                      <path d="m9 12 2 2 4-4" />
+                    </svg>
+                    {t('safety.title')}
+                  </button>
+                )}
+                {otherUserId && <div className="my-1 border-t border-slate-800/70" />}
+                {otherUserId && (
                 <button
                   type="button"
                   onClick={toggleMute}
@@ -1595,6 +1595,8 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
                 >
                   {muted ? t('common.unmute') : t('common.mute')}
                 </button>
+                )}
+                {otherUserId && (<>
                 <button
                   type="button"
                   onClick={() => setDisappearingMenuOpen((v) => !v)}
@@ -1654,10 +1656,11 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
                 >
                   {t('common.report')}
                 </button>
+                </>)}
               </div>
+              </>
             )}
           </div>
-        )}
       </header>
 
       <MessageEffects trigger={effectTrigger} onDone={() => setEffectTrigger(null)} />
@@ -1994,7 +1997,7 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
             </button>
           )}
 
-          <div ref={scrollRef} onScroll={handleScroll} style={wallpaperStyle} className="-mx-3 min-h-0 flex-1 overflow-auto border-y border-slate-900 bg-slate-950/40 px-3 py-3">
+          <div ref={scrollRef} onScroll={handleScroll} style={wallpaperStyle} className="-mx-3 min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain border-y border-slate-900 bg-slate-950/40 px-3 py-3">
             {loadingMore && <div className="text-center text-xs text-slate-500 my-2">{t('chat.loadingOlder')}</div>}
             {items.length === 0 ? (
               <p className="text-sm text-slate-400">{t('chat.noMessagesYet')}</p>
@@ -2118,7 +2121,7 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
                               {t('chat.replyToMessage')}
                             </div>
                           )}
-                          {m.body.text ? <div className="text-sm mt-1">{m.body.text}</div> : null}
+                          {m.body.text ? <div className="text-sm mt-1 whitespace-pre-wrap break-words">{m.body.text}</div> : null}
                           {(() => {
                             const link = m.body.text ? firstUrl(m.body.text) : null;
                             return link ? <LinkPreview url={link} mine={isMine(m)} /> : null;
