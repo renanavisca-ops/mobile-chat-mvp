@@ -11,6 +11,7 @@
  */
 
 import { useEffect } from 'react';
+import * as Sentry from '@sentry/nextjs';
 
 export default function Error({
   error,
@@ -20,8 +21,9 @@ export default function Error({
   reset: () => void;
 }) {
   useEffect(() => {
-    // Surface for logs / future error reporting.
+    // Surface for logs and report to Sentry (no-op if Sentry is unconfigured).
     console.error('App error boundary caught:', error);
+    Sentry.captureException(error);
   }, [error]);
 
   return (

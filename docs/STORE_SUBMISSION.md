@@ -8,9 +8,11 @@ they match what the app really does.
 
 ## 1. What the app collects (source of truth)
 
-No analytics or advertising SDKs are present, and the app requests **no location
-and no device address-book access**. Everything below exists to make the
-messaging product work.
+**No advertising SDKs** are present, and the app requests **no location and no
+device address-book access**. There are **no third-party analytics SDKs**; the
+only optional diagnostics is crash reporting (Sentry — see below), which is off
+unless a DSN is configured. Everything below exists to make the messaging product
+work.
 
 | Data | Where | Purpose | Linked to user |
 |---|---|---|---|
@@ -21,13 +23,17 @@ messaging product work.
 | In-app contacts (other Toky users you add) | `contacts` | Your contact list | Yes |
 | Call metadata (time, participants, missed/answered) — **no recording** | `calls` | Call history | Yes |
 | Reactions, polls, stories, story views | various | App features | Yes |
+| Starred messages (private pointers to messages you saved) | `message_stars` | Saved-messages feature | Yes |
 | Push token / device id | `device_tokens`, `push_subscriptions`, `devices` | Notifications | Yes |
 | Encryption public keys + encrypted key backup (server can't read) | `user_keys`, `key_backups`, `chat_keys` | End-to-end encryption | Yes |
+| 2FA recovery-code hashes (SHA-256; never the codes themselves) | `mfa_recovery_codes` | Two-factor account recovery | Yes |
+| Terms/privacy acceptance records (timestamp + version) | `legal_acceptances` | Legal compliance | Yes |
 | Block / report records | `blocks`, `reports` | Safety / moderation | Yes |
+| **Crash & error diagnostics (optional)** — stack traces, app/OS version, non-PII breadcrumbs; **no message content, no Session Replay** | Sentry (only if `NEXT_PUBLIC_SENTRY_DSN` set) | Stability / debugging | **No** (PII disabled) |
 
 **Processors** (infrastructure, not sold/shared for ads): Supabase (database,
 auth, storage), Google Firebase (push delivery), Vercel (hosting), Cloudflare
-(STUN/TURN for calls).
+(STUN/TURN for calls), and — when enabled — Sentry (crash/error diagnostics).
 **In transit:** all traffic is HTTPS/TLS. **End-to-end encryption:** direct-chat
 message text is E2E-encrypted; media attachments are not yet (disclose messages
 as collected either way). **Deletion:** in-app account deletion removes the
@@ -47,13 +53,22 @@ Data linked to the user, all purpose **App Functionality** only:
 - **User Content →** Photos or Videos; Other User Content (messages); Customer Support (reports)
 - **Identifiers →** User ID; Device ID
 
+Data **not** linked to the user (only if you ship with a Sentry DSN — otherwise
+omit entirely):
+
+- **Diagnostics →** Crash Data; (optionally) Performance Data — purpose **App
+  Functionality**. Our Sentry config sets `sendDefaultPii: false` and disables
+  Session Replay, so these reports carry no identifiers and no message content,
+  which is why they are declared *not linked to the user*.
+
 > Payments are a **scaffold only** (no active checkout, no UI), so declare **no
 > purchases** and there's no In-App Purchase requirement today. If you later sell
 > digital goods, Apple requires In-App Purchase (not an external checkout) — wire
 > that before enabling it.
 
 Everything else (Location, Contacts, Health, Browsing History, Search History,
-Diagnostics, Usage Data): **Data Not Collected.**
+Usage Data): **Data Not Collected.** (If you do **not** configure Sentry,
+Diagnostics is **Data Not Collected** too.)
 
 ---
 
@@ -70,6 +85,14 @@ Data types to declare (Collected, Linked, purpose *App functionality*):
 - Messages: **In-app messages**
 - App activity: **App interactions** (calls/stories/reactions)
 - Device or other IDs: **Device or other IDs** (push token)
+
+Only if you ship with a Sentry DSN — add under *App info and performance*:
+
+- **Crash logs** — Collected, purpose *App functionality*, **not linked** to a
+  user (Sentry runs with PII disabled and no Session Replay). Optionally
+  **Diagnostics** if you keep performance sampling on.
+
+If Sentry is **not** configured, do not declare Crash logs or Diagnostics.
 
 Security section: "Data is encrypted in transit," "You can request that data be
 deleted," and (optionally) "Committed to Play Families / follows security best
