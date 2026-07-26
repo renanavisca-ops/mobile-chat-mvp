@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { browserSupabase } from '@/lib/supabase/client';
 import { reconcileLocalIdentity } from '@/lib/auth/local-identity';
 import { validatePassword, passwordStrength } from '@/lib/password';
+import { pendingMfa, verifyLoginCode } from '@/lib/auth/mfa';
 import { useT } from '@/lib/i18n/context';
 
 type Mode = 'signin' | 'signup' | 'forgot';
@@ -21,6 +22,9 @@ export default function LoginPage() {
   const [status, setStatus] = useState('');
   // True once we know this email exists but hasn't confirmed — surfaces a resend.
   const [needsConfirm, setNeedsConfirm] = useState(false);
+  // 2FA challenge state (only when the account has TOTP enabled).
+  const [mfaFactorId, setMfaFactorId] = useState('');
+  const [mfaCode, setMfaCode] = useState('');
 
   async function resendConfirmation() {
     const e = email.trim().toLowerCase();
@@ -149,6 +153,17 @@ export default function LoginPage() {
         throw new Error(t('auth.errorNotConfirmed'));
       }
 
+      // If the account has 2FA enabled, the password only got us to aal1 — pause
+      // for the authenticator code before granting access.
+      const mfa = await pendingMfa();
+      if (mfa.required && mfa.factorId) {
+        setMfaFactorId(mfa.factorId);
+        setMfaCode('');
+        setStatus('');
+        setBusy(false);
+        return;
+      }
+
       // Clear any previous account's local device/keys before continuing, so a
       // second user on this browser doesn't inherit the first user's identity.
       reconcileLocalIdentity(data.session.user.id);
@@ -161,6 +176,34 @@ export default function LoginPage() {
     } finally {
       setBusy(false);
     }
+  }
+
+  async function verifyMfa() {
+    setBusy(true);
+    setStatus('');
+    try {
+      await verifyLoginCode(mfaFactorId, mfaCode);
+      const supabase = browserSupabase();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) reconcileLocalIdentity(session.user.id);
+      router.replace('/chats');
+    } catch {
+      setStatus(`❌ ${t('auth.mfaInvalidCode')}`);
+      setBusy(false);
+    }
+  }
+
+  async function cancelMfa() {
+    setBusy(true);
+    try {
+      await browserSupabase().auth.signOut();
+    } catch {
+      /* ignore */
+    }
+    setMfaFactorId('');
+    setMfaCode('');
+    setStatus('');
+    setBusy(false);
   }
 
   return (
@@ -176,7 +219,7 @@ export default function LoginPage() {
           <p className="mt-1.5 text-sm text-slate-400">{t('auth.welcomeSubtitle')}</p>
         </div>
 
-        {mode !== 'forgot' && (
+        {mode !== 'forgot' && !mfaFactorId && (
           <div className="flex gap-1 rounded-2xl border border-slate-800 bg-slate-900/50 p-1">
             <button
               className={`flex-1 rounded-xl px-4 py-2 text-sm font-semibold ${mode === 'signin' ? 'toky-grad toky-ring-brand text-white' : 'text-slate-400 hover:text-slate-200'}`}
@@ -195,6 +238,42 @@ export default function LoginPage() {
           </div>
         )}
 
+        {mfaFactorId && (
+          <div className="toky-glass toky-elev space-y-4 rounded-3xl border border-slate-800 p-6">
+            <div className="text-center">
+              <div className="font-display text-lg font-bold">{t('auth.mfaTitle')}</div>
+              <p className="mt-1 text-sm text-slate-400">{t('auth.mfaPrompt')}</p>
+            </div>
+            <input
+              value={mfaCode}
+              onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              placeholder="123456"
+              className="w-full rounded-xl border border-slate-800 bg-slate-900 px-3.5 py-2.5 text-center text-lg tracking-[0.5em] text-slate-100 focus:outline-none focus:border-blue-500/60 focus:ring-2 focus:ring-blue-500/20"
+              onKeyDown={(e) => { if (e.key === 'Enter' && mfaCode.length === 6) verifyMfa(); }}
+            />
+            <button
+              className="toky-grad toky-ring-brand w-full rounded-xl px-4 py-2.5 text-sm font-semibold text-white active:scale-[0.98] disabled:opacity-50"
+              onClick={verifyMfa}
+              disabled={busy || mfaCode.length !== 6}
+            >
+              {busy ? t('auth.working') : t('auth.mfaVerify')}
+            </button>
+            <button
+              className="w-full text-center text-xs text-slate-400 hover:text-slate-200 py-1"
+              onClick={cancelMfa}
+              disabled={busy}
+            >
+              {t('auth.backToSignIn')}
+            </button>
+            {!!status && (
+              <div className="mt-1 rounded-lg border border-rose-500/20 bg-rose-500/10 p-3 text-xs text-rose-400">{status}</div>
+            )}
+          </div>
+        )}
+
+        {!mfaFactorId && (
         <div className="toky-glass toky-elev space-y-4 rounded-3xl border border-slate-800 p-6">
           <div className="space-y-2">
             <label className="block text-sm font-medium text-slate-300 ml-1">{t('auth.email')}</label>
@@ -301,6 +380,7 @@ export default function LoginPage() {
             </button>
           )}
         </div>
+        )}
       </div>
     </main>
   );
