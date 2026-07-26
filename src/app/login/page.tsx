@@ -18,6 +18,30 @@ export default function LoginPage() {
 
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState('');
+  // True once we know this email exists but hasn't confirmed — surfaces a resend.
+  const [needsConfirm, setNeedsConfirm] = useState(false);
+
+  const MIN_PASSWORD = 8;
+
+  async function resendConfirmation() {
+    const e = email.trim().toLowerCase();
+    if (!e.includes('@')) {
+      setStatus(`❌ ${t('auth.errorInvalidEmailShort')}`);
+      return;
+    }
+    setBusy(true);
+    try {
+      const supabase = browserSupabase();
+      const emailRedirectTo = typeof window !== 'undefined' ? `${window.location.origin}/auth/callback` : undefined;
+      const { error } = await supabase.auth.resend({ type: 'signup', email: e, options: { emailRedirectTo } });
+      if (error) throw error;
+      setStatus(`✅ ${t('auth.statusConfirmResent')}`);
+    } catch (err: any) {
+      setStatus(`❌ ${err?.message ?? String(err)}`);
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function handleForgotPassword() {
     if (!email.includes('@')) {
@@ -53,6 +77,7 @@ export default function LoginPage() {
   async function submit() {
     setBusy(true);
     setStatus('');
+    setNeedsConfirm(false);
 
     try {
       const supabase = browserSupabase();
@@ -61,7 +86,7 @@ export default function LoginPage() {
       if (!e.includes('@')) throw new Error(t('auth.errorInvalidEmailShort'));
 
       if (mode === 'signup') {
-        if (password.length < 6) throw new Error(t('auth.errorPasswordMin'));
+        if (password.length < MIN_PASSWORD) throw new Error(t('auth.errorPasswordMin'));
 
         const emailRedirectTo =
           typeof window !== 'undefined'
@@ -90,6 +115,8 @@ export default function LoginPage() {
           return;
         }
 
+        // Email confirmation required (dashboard toggle on): no session yet.
+        setNeedsConfirm(true);
         setStatus(`✅ ${t('auth.statusAccountCreatedConfirm')}`);
         return;
       }
@@ -98,6 +125,7 @@ export default function LoginPage() {
       const { data, error } = await supabase.auth.signInWithPassword({ email: e, password });
       if (error) {
         if (String(error.message || '').toLowerCase().includes('confirm')) {
+          setNeedsConfirm(true);
           throw new Error(t('auth.errorNotConfirmed'));
         }
         throw error;
@@ -105,6 +133,14 @@ export default function LoginPage() {
 
       if (!data.session) {
         throw new Error(t('auth.errorNoSession'));
+      }
+
+      // Belt-and-suspenders: if a session somehow comes back for an unconfirmed
+      // email, refuse it so an unverified address can't be used to sign in.
+      if (!data.session.user.email_confirmed_at && !(data.session.user as { confirmed_at?: string }).confirmed_at) {
+        await supabase.auth.signOut();
+        setNeedsConfirm(true);
+        throw new Error(t('auth.errorNotConfirmed'));
       }
 
       // Clear any previous account's local device/keys before continuing, so a
@@ -230,6 +266,16 @@ export default function LoginPage() {
             }`}>
               {status}
             </div>
+          )}
+
+          {needsConfirm && mode !== 'forgot' && (
+            <button
+              className="w-full text-center text-xs text-blue-400 hover:text-blue-300 py-1 disabled:opacity-50"
+              onClick={resendConfirmation}
+              disabled={busy}
+            >
+              {t('auth.resendConfirmation')}
+            </button>
           )}
         </div>
       </div>

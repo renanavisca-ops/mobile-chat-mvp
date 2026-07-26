@@ -197,6 +197,7 @@ export default function SettingsPage() {
 
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState('');
+  const [deletePassword, setDeletePassword] = useState('');
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [deleteErr, setDeleteErr] = useState('');
 
@@ -204,6 +205,17 @@ export default function SettingsPage() {
     setDeleteBusy(true);
     setDeleteErr('');
     try {
+      // Reauthenticate first: confirm the person actually knows the account
+      // password before a borrowed/unlocked phone can erase the account.
+      const { data: ures } = await supabase.auth.getUser();
+      const emailAddr = ures.user?.email;
+      if (!emailAddr) throw new Error(t('settings.deleteReauthError'));
+      const { error: reauthErr } = await supabase.auth.signInWithPassword({
+        email: emailAddr,
+        password: deletePassword,
+      });
+      if (reauthErr) throw new Error(t('settings.deleteWrongPassword'));
+
       const { data: { session } } = await supabase.auth.getSession();
       const res = await fetch('/api/account/delete', {
         method: 'POST',
@@ -1050,6 +1062,7 @@ export default function SettingsPage() {
             if (e.target === e.currentTarget && !deleteBusy) {
               setDeleteOpen(false);
               setDeleteConfirm('');
+              setDeletePassword('');
               setDeleteErr('');
             }
           }}
@@ -1065,6 +1078,14 @@ export default function SettingsPage() {
               placeholder={t('settings.deleteModalPlaceholder')}
               className="mt-3 w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-rose-500/50"
             />
+            <input
+              value={deletePassword}
+              onChange={(e) => setDeletePassword(e.target.value)}
+              type="password"
+              autoComplete="current-password"
+              placeholder={t('settings.deletePasswordPlaceholder')}
+              className="mt-2 w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-rose-500/50"
+            />
             {deleteErr && <p className="mt-2 text-xs text-red-400">{deleteErr}</p>}
             <div className="mt-4 flex gap-2">
               <button
@@ -1072,6 +1093,7 @@ export default function SettingsPage() {
                 onClick={() => {
                   setDeleteOpen(false);
                   setDeleteConfirm('');
+              setDeletePassword('');
                   setDeleteErr('');
                 }}
                 disabled={deleteBusy}
@@ -1082,7 +1104,7 @@ export default function SettingsPage() {
               <button
                 type="button"
                 onClick={deleteAccount}
-                disabled={deleteBusy || deleteConfirm !== 'DELETE'}
+                disabled={deleteBusy || deleteConfirm !== 'DELETE' || !deletePassword}
                 className="flex-1 rounded-lg bg-rose-700 px-4 py-2 text-sm font-medium text-white hover:bg-rose-600 disabled:opacity-50"
               >
                 {deleteBusy ? t('settings.deleting') : t('settings.deleteModalConfirm')}
