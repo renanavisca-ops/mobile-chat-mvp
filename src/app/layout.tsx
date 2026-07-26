@@ -46,6 +46,11 @@ export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   viewportFit: 'cover',
+  // Android Chrome keeps the layout viewport full-height when the on-screen
+  // keyboard opens, so `100dvh` panels get shoved around/behind it. Asking the
+  // browser to resize the content viewport makes `dvh`/`vh` shrink to the space
+  // above the keyboard, keeping the composer docked and the header in view.
+  interactiveWidget: 'resizes-content',
   themeColor: [
     { media: '(prefers-color-scheme: dark)', color: '#020617' },
     { media: '(prefers-color-scheme: light)', color: '#f8fafc' },

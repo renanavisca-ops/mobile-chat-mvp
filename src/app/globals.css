@@ -12,6 +12,16 @@ html {
   text-size-adjust: 100%;
 }
 
+/* Never let a stray-wide child (negative margins, fixed pixel widths, long
+   unbroken strings) push the page wider than the device and trigger the
+   browser's zoom-to-fit / horizontal scroll on mobile web. */
+html,
+body {
+  max-width: 100%;
+  overflow-x: hidden;
+  overscroll-behavior-y: none;
+}
+
 body {
   @apply bg-slate-950 text-slate-100;
   font-family: var(--font-body), ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
