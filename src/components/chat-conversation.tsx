@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { ChevronLeftIcon, SearchIcon, InfoIcon, MoreVerticalIcon } from '@/components/icons';
 import { ForwardModal } from '@/components/forward-modal';
@@ -22,6 +22,7 @@ import { browserSupabase } from '@/lib/supabase/client';
 import { useOnlineUsers } from '@/components/presence-provider';
 import { useLanguage } from '@/lib/i18n/context';
 import { PollComposer } from '@/components/poll-composer';
+import { MessagesSkeleton } from '@/components/skeleton';
 import { ImageEditor } from '@/components/image-editor';
 import { MessageEffects, detectEffect } from '@/components/message-effects';
 import { GifPicker } from '@/components/gif-picker';
@@ -476,6 +477,21 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
     () => messages.filter((m) => !hiddenIds.has(m.id)).map((m) => ({ ...m, body: getMessagePayload(m) })),
     [messages, hiddenIds]
   );
+
+  // Human-friendly date label for the day separators between messages.
+  function dayLabel(iso: string) {
+    const d = new Date(iso);
+    const now = new Date();
+    const yest = new Date();
+    yest.setDate(now.getDate() - 1);
+    if (d.toDateString() === now.toDateString()) return t('chat.today');
+    if (d.toDateString() === yest.toDateString()) return t('chat.yesterday');
+    return d.toLocaleDateString(lang, {
+      day: 'numeric',
+      month: 'short',
+      ...(d.getFullYear() !== now.getFullYear() ? { year: 'numeric' as const } : {}),
+    });
+  }
 
   const reactionsByMessage = useMemo(() => {
     const map = new Map<string, { emoji: string; count: number; mine: boolean }[]>();
@@ -1666,7 +1682,7 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
       <input ref={fileInputRef} type="file" hidden onChange={onFileChange} />
 
       {loading ? (
-        <div className="grid flex-1 place-items-center text-sm text-slate-300">{t('chat.loading')}</div>
+        <MessagesSkeleton />
       ) : (
         <div className="flex min-h-0 flex-1 flex-col gap-2 px-3 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
           {/* Support-console status controls only apply to store chats. */}
@@ -1745,16 +1761,28 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
               <p className="text-sm text-slate-400">{t('chat.noMessagesYet')}</p>
             ) : (
               <ul className="space-y-2">
-                {items.map((m) => {
+                {items.map((m, idx) => {
                   const imgPaths: string[] = [];
                   if (m.body.imagePath) imgPaths.push(m.body.imagePath);
                   if (Array.isArray(m.body.imagePaths)) imgPaths.push(...m.body.imagePaths.filter(Boolean));
                   const videoPath = m.body.videoPath;
                   const audioPath = m.body.audioPath;
 
+                  // Insert a centered day separator whenever the calendar day
+                  // changes from the previous message.
+                  const prev = idx > 0 ? items[idx - 1] : null;
+                  const showDay =
+                    !prev ||
+                    new Date(m.created_at).toDateString() !== new Date(prev.created_at).toDateString();
+
                   return (
+                    <Fragment key={m.id}>
+                    {showDay && (
+                      <li className="mx-auto my-1 rounded-full bg-slate-800/70 px-3 py-1 text-[11px] font-medium text-slate-400">
+                        {dayLabel(m.created_at)}
+                      </li>
+                    )}
                     <li
-                      key={m.id}
                       id={`msg-${m.id}`}
                       className={`flex flex-col mb-1.5 px-3.5 py-2 rounded-[1.25rem] w-fit max-w-[80%] transition-shadow ${
                         m.sender_type === 'system' ? 'mx-auto bg-slate-800/80 text-center text-xs text-slate-400' :
@@ -1980,6 +2008,7 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
                     </>
                   )}
                     </li>
+                    </Fragment>
                   );
                 })}
               </ul>
@@ -2039,8 +2068,15 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
           ) : null}
 
           {typingUsers.length > 0 && (
-            <div className="text-xs text-blue-400 animate-pulse ml-2">
-              {typingUsers.map((id) => usernameById.get(id) || t('chat.someone')).join(', ')} {t('chat.typingSuffix')}
+            <div className="ml-2 flex items-center gap-2">
+              <div className="flex items-center gap-1 rounded-2xl rounded-bl-md bg-slate-800 px-3 py-2.5">
+                <span className="toky-typing-dot" />
+                <span className="toky-typing-dot" />
+                <span className="toky-typing-dot" />
+              </div>
+              <span className="text-xs text-slate-400">
+                {typingUsers.map((id) => usernameById.get(id) || t('chat.someone')).join(', ')} {t('chat.typingSuffix')}
+              </span>
             </div>
           )}
 

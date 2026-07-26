@@ -7,6 +7,7 @@ import { useLanguage } from '@/lib/i18n/context';
 import { useCall } from '@/lib/call/call-provider';
 import { listCalls, type CallLog } from '@/lib/db/calls';
 import { PhoneIcon, VideoIcon } from '@/components/icons';
+import { EmptyState } from '@/components/empty-state';
 
 function Avatar({ url, name }: { url: string | null; name: string }) {
   const initial = (name || '?').trim().charAt(0).toUpperCase() || '?';
@@ -56,7 +57,7 @@ export default function CallsPage() {
       {loading ? (
         <p className="text-sm text-slate-300">{t('chatsList.loading')}</p>
       ) : calls.length === 0 ? (
-        <p className="p-3 text-sm text-slate-400">{t('calls.empty')}</p>
+        <EmptyState icon={<PhoneIcon size={28} />} title={t('calls.empty')} />
       ) : (
         <ul className="space-y-1">
           {calls.map((c) => {

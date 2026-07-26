@@ -8,6 +8,7 @@ import { BottomNav } from '@/components/page-shell';
 import { StoriesBar } from '@/components/stories-bar';
 import { ChatConversation } from '@/components/chat-conversation';
 import { PlusIcon, SearchIcon, UsersIcon, UserPlusIcon, HashIcon, ChatBubbleIcon } from '@/components/icons';
+import { ChatListSkeleton } from '@/components/skeleton';
 import { useRequireAuth } from '@/lib/auth/use-require-auth';
 import { ensureIdentity } from '@/lib/crypto/keystore';
 import { browserSupabase } from '@/lib/supabase/client';
@@ -288,7 +289,7 @@ export default function ChatsPage() {
             {err ? <p className="text-sm text-red-300">{err}</p> : null}
 
             {loading ? (
-              <p className="text-sm text-slate-300">{t('chatsList.loading')}</p>
+              <ChatListSkeleton rows={8} />
             ) : chats.length === 0 ? (
               <div className="mt-10 flex flex-col items-center px-6 text-center">
                 <div className="toky-grad toky-ring-brand grid h-16 w-16 place-items-center rounded-3xl text-white">

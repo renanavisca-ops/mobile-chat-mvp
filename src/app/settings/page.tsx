@@ -486,11 +486,23 @@ export default function SettingsPage() {
         </div>
       ) : (
         <div className="space-y-6">
-          <section className="space-y-3">
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500 ml-1">{t('settings.sectionAccount')}</h2>
-            <div className="rounded-xl border border-slate-900 bg-slate-950/50 p-4 shadow-sm">
-              <div className="text-sm font-medium text-slate-200">{t('settings.email')}</div>
-              <div className="text-xs text-slate-400 mt-1">{user?.email ?? user?.id ?? t('settings.emailNotAvailable')}</div>
+          {/* Profile hero — gradient cover with avatar, name and handle. */}
+          <section className="overflow-hidden rounded-3xl border border-slate-800 toky-elev">
+            <div className="toky-grad h-24" />
+            <div className="-mt-10 flex flex-col items-center px-4 pb-5 text-center">
+              {avatarUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={avatarUrl} alt="" className="h-20 w-20 rounded-3xl object-cover ring-4 ring-slate-950" />
+              ) : (
+                <span className="grid h-20 w-20 place-items-center rounded-3xl bg-slate-800 text-2xl font-bold text-white ring-4 ring-slate-950">
+                  {(displayName || profile?.username || '?').trim().charAt(0).toUpperCase()}
+                </span>
+              )}
+              <div className="mt-3 font-display text-xl font-bold">
+                {displayName || profile?.username || t('settings.noUsername')}
+              </div>
+              {profile?.username && <div className="text-sm text-slate-400">@{profile.username}</div>}
+              <div className="mt-1 text-xs text-slate-500">{user?.email ?? user?.id ?? ''}</div>
             </div>
           </section>
 

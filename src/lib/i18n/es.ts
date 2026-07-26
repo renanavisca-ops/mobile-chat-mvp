@@ -182,6 +182,8 @@ const es: Dictionary = {
     cantPlayInline: 'No se pudo reproducir inline.',
     openVideo: 'Abrir video',
     edited: '(editado)',
+    today: 'Hoy',
+    yesterday: 'Ayer',
     receiptSent: 'Enviado',
     receiptDelivered: 'Entregado',
     receiptRead: 'Leído',

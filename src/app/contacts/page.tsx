@@ -8,6 +8,8 @@ import { createDirectChatWith } from '@/lib/db/chats';
 import { addContact, listMyContacts, searchUsers } from '@/lib/db/contacts';
 import { blockUser } from '@/lib/db/safety';
 import { ReportModal } from '@/components/report-modal';
+import { EmptyState } from '@/components/empty-state';
+import { UsersIcon, UserPlusIcon } from '@/components/icons';
 import { useT, TransBold } from '@/lib/i18n/context';
 import type { ProfileLite } from '@/lib/db/types';
 
@@ -122,7 +124,11 @@ export default function ContactsPage() {
         <div className="text-sm text-slate-300">{t('contacts.myContacts')}</div>
 
         {contacts.length === 0 ? (
-          <p className="mt-2 text-sm text-slate-400">{t('contacts.noContactsYet')}</p>
+          <EmptyState
+            icon={<UsersIcon size={30} />}
+            title={t('contacts.noContactsYet')}
+            action={{ label: t('contacts.addContact'), onClick: () => setOpenAdd(true), icon: <UserPlusIcon size={18} /> }}
+          />
         ) : (
           <ul className="mt-2 divide-y divide-slate-900 rounded-lg border border-slate-900">
             {contacts.map((c) => (

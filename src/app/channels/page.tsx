@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import { PageShell } from '@/components/page-shell';
 import { useRequireAuth } from '@/lib/auth/use-require-auth';
 import { listPublicChannels, createChannel, joinChannel, type ChannelSummary } from '@/lib/db/chats';
+import { EmptyState } from '@/components/empty-state';
+import { HashIcon, PlusIcon } from '@/components/icons';
 import { useT } from '@/lib/i18n/context';
 
 export default function ChannelsPage() {
@@ -93,7 +95,11 @@ export default function ChannelsPage() {
         {loading ? (
           <p className="text-sm text-slate-400">{t('common.loading')}</p>
         ) : channels.length === 0 ? (
-          <p className="text-sm text-slate-400">{t('channels.empty')}</p>
+          <EmptyState
+            icon={<HashIcon size={28} />}
+            title={t('channels.empty')}
+            action={{ label: t('channels.create'), onClick: () => setCreateOpen(true), icon: <PlusIcon size={18} /> }}
+          />
         ) : (
           <ul className="space-y-2">
             {channels.map((c) => (

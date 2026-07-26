@@ -180,6 +180,8 @@ const en = {
     cantPlayInline: "Couldn't play inline.",
     openVideo: 'Open video',
     edited: '(edited)',
+    today: 'Today',
+    yesterday: 'Yesterday',
     receiptSent: 'Sent',
     receiptDelivered: 'Delivered',
     receiptRead: 'Read',
