@@ -735,13 +735,17 @@ export function CallProvider({ children }: { children: ReactNode }) {
 
       {/* Incoming */}
       {phase === 'ringing' && incoming && (
-        <div className="fixed inset-0 z-[95] flex items-center justify-center bg-black/80 p-4">
-          <div className="w-full max-w-xs rounded-2xl border border-slate-800 bg-slate-950 p-6 text-center shadow-xl">
-            <div className="mx-auto grid h-20 w-20 place-items-center rounded-full bg-slate-800 text-slate-200">
-              {incoming.video ? <VideoIcon size={32} /> : <PhoneIcon size={32} />}
+        <div className="fixed inset-0 z-[95] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
+          <div className="toky-glass toky-elev w-full max-w-xs rounded-3xl border border-slate-800 p-7 text-center">
+            <div className="relative mx-auto h-24 w-24">
+              <span className="toky-grad absolute inset-0 animate-ping rounded-3xl opacity-30" />
+              <div className="toky-grad toky-ring-brand relative grid h-24 w-24 place-items-center rounded-3xl text-3xl font-bold text-white">
+                {(incoming.label || incoming.fromName || '?').charAt(0).toUpperCase()}
+              </div>
             </div>
-            <div className="mt-3 text-lg font-semibold text-slate-100">{incoming.label || incoming.fromName}</div>
-            <div className="text-sm text-slate-400">
+            <div className="mt-4 font-display text-xl font-bold text-slate-100">{incoming.label || incoming.fromName}</div>
+            <div className="mt-0.5 flex items-center justify-center gap-1.5 text-sm text-slate-400">
+              {incoming.video ? <VideoIcon size={15} /> : <PhoneIcon size={15} />}
               {incoming.isGroup
                 ? t('call.incomingGroup', { name: incoming.fromName })
                 : incoming.video
@@ -772,18 +776,27 @@ export function CallProvider({ children }: { children: ReactNode }) {
 
       {/* Active call */}
       {phase === 'incall' && (
-        <div className="fixed inset-0 z-[95] flex flex-col bg-slate-950">
+        <div
+          className="fixed inset-0 z-[95] flex flex-col bg-slate-950"
+          style={{
+            backgroundImage:
+              'radial-gradient(40rem 40rem at 50% 12%, rgba(99,102,241,0.22), transparent 60%), radial-gradient(34rem 34rem at 80% 100%, rgba(56,189,248,0.14), transparent 55%)',
+          }}
+        >
           <div className="relative flex-1 overflow-hidden">
             {oneToOne ? (
               <>
                 {remoteList[0] ? (
                   <RemoteTile p={remoteList[0]} fill register={registerMediaEl} />
                 ) : (
-                  <div className="flex h-full w-full flex-col items-center justify-center gap-3">
-                    <div className="grid h-24 w-24 place-items-center rounded-full bg-slate-800 text-4xl text-slate-300">
-                      {(label || '?').charAt(0).toUpperCase()}
+                  <div className="flex h-full w-full flex-col items-center justify-center gap-4">
+                    <div className="relative">
+                      <span className="toky-grad absolute inset-0 animate-ping rounded-[2rem] opacity-20" />
+                      <div className="toky-grad toky-ring-brand relative grid h-28 w-28 place-items-center rounded-[2rem] text-5xl font-bold text-white">
+                        {(label || '?').charAt(0).toUpperCase()}
+                      </div>
                     </div>
-                    <div className="text-lg font-semibold text-slate-100">{label}</div>
+                    <div className="font-display text-xl font-bold text-slate-100">{label}</div>
                   </div>
                 )}
                 {localHasVideo && (
@@ -835,7 +848,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
           </div>
 
           {/* Controls */}
-          <div className="flex items-center justify-center gap-5 bg-slate-950 py-5">
+          <div className="toky-glass flex items-center justify-center gap-4 border-t border-white/10 py-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
             <button
               type="button"
               onClick={toggleMute}
@@ -893,9 +906,9 @@ export function CallProvider({ children }: { children: ReactNode }) {
               type="button"
               onClick={endCall}
               aria-label={t('call.hangUp')}
-              className="grid h-12 w-12 place-items-center rounded-full bg-rose-600 text-white hover:bg-rose-500"
+              className="grid h-14 w-14 place-items-center rounded-full bg-rose-600 text-white shadow-[0_8px_22px_-8px_rgba(225,29,72,0.8)] hover:bg-rose-500"
             >
-              <PhoneOffIcon size={22} />
+              <PhoneOffIcon size={24} />
             </button>
           </div>
         </div>
