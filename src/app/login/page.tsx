@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { browserSupabase } from '@/lib/supabase/client';
 import { reconcileLocalIdentity } from '@/lib/auth/local-identity';
 import { validatePassword, passwordStrength } from '@/lib/password';
-import { pendingMfa, verifyLoginCode } from '@/lib/auth/mfa';
+import { pendingMfa, verifyLoginCode, consumeRecoveryCode } from '@/lib/auth/mfa';
 import { useT } from '@/lib/i18n/context';
 
 type Mode = 'signin' | 'signup' | 'forgot';
@@ -25,6 +25,8 @@ export default function LoginPage() {
   // 2FA challenge state (only when the account has TOTP enabled).
   const [mfaFactorId, setMfaFactorId] = useState('');
   const [mfaCode, setMfaCode] = useState('');
+  const [recoveryMode, setRecoveryMode] = useState(false);
+  const [recoveryCode, setRecoveryCode] = useState('');
 
   async function resendConfirmation() {
     const e = email.trim().toLowerCase();
@@ -193,6 +195,21 @@ export default function LoginPage() {
     }
   }
 
+  async function submitRecovery() {
+    setBusy(true);
+    setStatus('');
+    try {
+      await consumeRecoveryCode(recoveryCode);
+      const supabase = browserSupabase();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) reconcileLocalIdentity(session.user.id);
+      router.replace('/chats');
+    } catch {
+      setStatus(`❌ ${t('auth.recoveryInvalid')}`);
+      setBusy(false);
+    }
+  }
+
   async function cancelMfa() {
     setBusy(true);
     try {
@@ -202,6 +219,8 @@ export default function LoginPage() {
     }
     setMfaFactorId('');
     setMfaCode('');
+    setRecoveryMode(false);
+    setRecoveryCode('');
     setStatus('');
     setBusy(false);
   }
@@ -242,24 +261,62 @@ export default function LoginPage() {
           <div className="toky-glass toky-elev space-y-4 rounded-3xl border border-slate-800 p-6">
             <div className="text-center">
               <div className="font-display text-lg font-bold">{t('auth.mfaTitle')}</div>
-              <p className="mt-1 text-sm text-slate-400">{t('auth.mfaPrompt')}</p>
+              <p className="mt-1 text-sm text-slate-400">{recoveryMode ? t('auth.recoveryPrompt') : t('auth.mfaPrompt')}</p>
             </div>
-            <input
-              value={mfaCode}
-              onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              placeholder="123456"
-              className="w-full rounded-xl border border-slate-800 bg-slate-900 px-3.5 py-2.5 text-center text-lg tracking-[0.5em] text-slate-100 focus:outline-none focus:border-blue-500/60 focus:ring-2 focus:ring-blue-500/20"
-              onKeyDown={(e) => { if (e.key === 'Enter' && mfaCode.length === 6) verifyMfa(); }}
-            />
-            <button
-              className="toky-grad toky-ring-brand w-full rounded-xl px-4 py-2.5 text-sm font-semibold text-white active:scale-[0.98] disabled:opacity-50"
-              onClick={verifyMfa}
-              disabled={busy || mfaCode.length !== 6}
-            >
-              {busy ? t('auth.working') : t('auth.mfaVerify')}
-            </button>
+
+            {recoveryMode ? (
+              <>
+                <input
+                  value={recoveryCode}
+                  onChange={(e) => setRecoveryCode(e.target.value)}
+                  autoComplete="one-time-code"
+                  placeholder="XXXXX-XXXXX"
+                  className="w-full rounded-xl border border-slate-800 bg-slate-900 px-3.5 py-2.5 text-center font-mono text-base tracking-widest text-slate-100 focus:outline-none focus:border-blue-500/60 focus:ring-2 focus:ring-blue-500/20"
+                  onKeyDown={(e) => { if (e.key === 'Enter' && recoveryCode.trim()) submitRecovery(); }}
+                />
+                <button
+                  className="toky-grad toky-ring-brand w-full rounded-xl px-4 py-2.5 text-sm font-semibold text-white active:scale-[0.98] disabled:opacity-50"
+                  onClick={submitRecovery}
+                  disabled={busy || !recoveryCode.trim()}
+                >
+                  {busy ? t('auth.working') : t('auth.recoveryUse')}
+                </button>
+                <button
+                  className="w-full text-center text-xs text-blue-400 hover:text-blue-300 py-1"
+                  onClick={() => { setRecoveryMode(false); setStatus(''); }}
+                  disabled={busy}
+                >
+                  {t('auth.recoveryBackToCode')}
+                </button>
+              </>
+            ) : (
+              <>
+                <input
+                  value={mfaCode}
+                  onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  placeholder="123456"
+                  className="w-full rounded-xl border border-slate-800 bg-slate-900 px-3.5 py-2.5 text-center text-lg tracking-[0.5em] text-slate-100 focus:outline-none focus:border-blue-500/60 focus:ring-2 focus:ring-blue-500/20"
+                  onKeyDown={(e) => { if (e.key === 'Enter' && mfaCode.length === 6) verifyMfa(); }}
+                />
+                <button
+                  className="toky-grad toky-ring-brand w-full rounded-xl px-4 py-2.5 text-sm font-semibold text-white active:scale-[0.98] disabled:opacity-50"
+                  onClick={verifyMfa}
+                  disabled={busy || mfaCode.length !== 6}
+                >
+                  {busy ? t('auth.working') : t('auth.mfaVerify')}
+                </button>
+                <button
+                  className="w-full text-center text-xs text-blue-400 hover:text-blue-300 py-1"
+                  onClick={() => { setRecoveryMode(true); setStatus(''); }}
+                  disabled={busy}
+                >
+                  {t('auth.recoveryUseCode')}
+                </button>
+              </>
+            )}
+
             <button
               className="w-full text-center text-xs text-slate-400 hover:text-slate-200 py-1"
               onClick={cancelMfa}

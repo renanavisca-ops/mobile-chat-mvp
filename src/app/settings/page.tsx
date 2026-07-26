@@ -6,7 +6,7 @@ import { PageShell } from '@/components/page-shell';
 import { browserSupabase } from '@/lib/supabase/client';
 import { clearLocalIdentity } from '@/lib/auth/local-identity';
 import { validatePassword } from '@/lib/password';
-import { isMfaEnabled, enrollTotp, verifyEnroll, disableTotp } from '@/lib/auth/mfa';
+import { isMfaEnabled, enrollTotp, verifyEnroll, disableTotp, generateRecoveryCodes } from '@/lib/auth/mfa';
 import { WALLPAPERS, CUSTOM_WALLPAPER_ID, getWallpaperId, setWallpaperId as saveWallpaperId, uploadCustomWallpaper, getCustomWallpaperUrl } from '@/lib/wallpaper';
 import { uploadAvatar } from '@/lib/db/avatar';
 import { useNotifications } from '@/lib/hooks/useNotifications';
@@ -203,6 +203,7 @@ export default function SettingsPage() {
   const [mfaMsg, setMfaMsg] = useState('');
   const [mfaEnroll, setMfaEnroll] = useState<{ factorId: string; qr: string; secret: string } | null>(null);
   const [mfaEnrollCode, setMfaEnrollCode] = useState('');
+  const [recoveryCodes, setRecoveryCodes] = useState<string[] | null>(null);
 
   useEffect(() => {
     isMfaEnabled().then(setMfaEnabled).catch(() => {});
@@ -232,8 +233,26 @@ export default function SettingsPage() {
       setMfaEnrollCode('');
       setMfaEnabled(true);
       setMfaMsg(t('settings.mfaEnabledMsg'));
+      // Now that we're at aal2, mint recovery codes and show them once.
+      try {
+        setRecoveryCodes(await generateRecoveryCodes());
+      } catch {
+        /* codes can be regenerated later from the card */
+      }
     } catch {
       setMfaMsg(t('settings.mfaInvalidCode'));
+    } finally {
+      setMfaBusy(false);
+    }
+  }
+
+  async function regenerateRecoveryCodes() {
+    setMfaBusy(true);
+    setMfaMsg('');
+    try {
+      setRecoveryCodes(await generateRecoveryCodes());
+    } catch (e: any) {
+      setMfaMsg(e?.message ?? String(e));
     } finally {
       setMfaBusy(false);
     }
@@ -992,13 +1011,22 @@ export default function SettingsPage() {
                   </div>
                 </div>
               ) : mfaEnabled ? (
-                <button
-                  onClick={disableMfa}
-                  disabled={mfaBusy}
-                  className="w-full rounded-lg border border-rose-900/50 bg-rose-950/20 px-4 py-2 text-sm font-medium text-rose-300 hover:bg-rose-950/40 disabled:opacity-50"
-                >
-                  {t('settings.mfaDisable')}
-                </button>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <button
+                    onClick={regenerateRecoveryCodes}
+                    disabled={mfaBusy}
+                    className="flex-1 rounded-lg border border-slate-800 bg-slate-900 px-4 py-2 text-sm font-medium text-slate-200 hover:bg-slate-800 disabled:opacity-50"
+                  >
+                    {t('settings.mfaRegenCodes')}
+                  </button>
+                  <button
+                    onClick={disableMfa}
+                    disabled={mfaBusy}
+                    className="flex-1 rounded-lg border border-rose-900/50 bg-rose-950/20 px-4 py-2 text-sm font-medium text-rose-300 hover:bg-rose-950/40 disabled:opacity-50"
+                  >
+                    {t('settings.mfaDisable')}
+                  </button>
+                </div>
               ) : (
                 <button
                   onClick={startMfaEnroll}
@@ -1007,6 +1035,32 @@ export default function SettingsPage() {
                 >
                   {t('settings.mfaEnable')}
                 </button>
+              )}
+
+              {recoveryCodes && (
+                <div className="space-y-2 rounded-lg border border-amber-900/40 bg-amber-950/10 p-3">
+                  <div className="text-sm font-semibold text-amber-300">{t('settings.mfaCodesTitle')}</div>
+                  <p className="text-xs text-slate-400">{t('settings.mfaCodesHint')}</p>
+                  <div className="grid grid-cols-2 gap-1.5 font-mono text-sm text-slate-100">
+                    {recoveryCodes.map((c) => (
+                      <span key={c} className="rounded bg-slate-900/70 px-2 py-1 text-center tracking-wider">{c}</span>
+                    ))}
+                  </div>
+                  <div className="flex gap-2 pt-1">
+                    <button
+                      onClick={() => { navigator.clipboard?.writeText(recoveryCodes.join('\n')).catch(() => {}); }}
+                      className="flex-1 rounded-lg border border-slate-800 bg-slate-900 px-3 py-1.5 text-xs text-slate-200 hover:bg-slate-800"
+                    >
+                      {t('settings.mfaCopyCodes')}
+                    </button>
+                    <button
+                      onClick={() => setRecoveryCodes(null)}
+                      className="flex-1 rounded-lg toky-grad px-3 py-1.5 text-xs font-semibold text-white"
+                    >
+                      {t('settings.mfaCodesSaved')}
+                    </button>
+                  </div>
+                </div>
               )}
               {!!mfaMsg && <p className="text-xs text-slate-400">{mfaMsg}</p>}
             </div>

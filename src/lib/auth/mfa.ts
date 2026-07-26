@@ -78,3 +78,28 @@ export async function verifyLoginCode(factorId: string, code: string): Promise<v
   const { error } = await supabase.auth.mfa.verify({ factorId, challengeId: ch.id, code: code.trim() });
   if (error) throw error;
 }
+
+async function authHeader(): Promise<Record<string, string>> {
+  const supabase = browserSupabase();
+  const { data: { session } } = await supabase.auth.getSession();
+  return session ? { Authorization: `Bearer ${session.access_token}` } : {};
+}
+
+/** Generate a fresh set of one-time recovery codes (shown once). */
+export async function generateRecoveryCodes(): Promise<string[]> {
+  const res = await fetch('/api/mfa/recovery/generate', { method: 'POST', headers: await authHeader() });
+  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Failed');
+  const data = await res.json();
+  return data.codes as string[];
+}
+
+/** Use a recovery code (lost authenticator): removes TOTP so the session is
+ *  fully authenticated. 2FA ends up off. */
+export async function consumeRecoveryCode(code: string): Promise<void> {
+  const res = await fetch('/api/mfa/recovery/consume', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...(await authHeader()) },
+    body: JSON.stringify({ code }),
+  });
+  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Failed');
+}
