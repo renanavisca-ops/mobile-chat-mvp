@@ -1813,13 +1813,13 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
                         </span>
                         {isMine(m) ? (
                           m.read ? (
-                            // Read — double bright cyan tick.
-                            <span className="ml-2 text-sky-200" title={t('chat.receiptRead')}>✓✓</span>
+                            // Read — double GREEN tick (distinct colour = seen).
+                            <span className="ml-2 font-bold tracking-tighter text-emerald-300" title={t('chat.receiptRead')}>✓✓</span>
                           ) : m.delivery_status === 'delivered' || m.delivery_status === 'read' ? (
-                            // Delivered to their device — double faint tick.
-                            <span className="ml-2 text-white/60" title={t('chat.receiptDelivered')}>✓✓</span>
+                            // Delivered to their device — double solid-white tick.
+                            <span className="ml-2 font-bold tracking-tighter text-white" title={t('chat.receiptDelivered')}>✓✓</span>
                           ) : (
-                            // Sent to the server — single faint tick.
+                            // Sent to the server — single dim tick.
                             <span className="ml-2 text-white/45" title={t('chat.receiptSent')}>✓</span>
                           )
                         ) : null}

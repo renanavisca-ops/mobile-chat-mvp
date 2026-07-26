@@ -27,7 +27,7 @@ export default function HomePage() {
   return (
     <main className="grid min-h-[100dvh] place-items-center bg-slate-950 text-slate-50">
       <div className="flex flex-col items-center gap-4">
-        <div className="grid h-16 w-16 place-items-center rounded-2xl bg-gradient-to-br from-blue-600 to-emerald-500 text-3xl font-extrabold text-white shadow-lg shadow-blue-600/30">
+        <div className="toky-grad toky-ring-brand font-display grid h-16 w-16 place-items-center rounded-3xl text-3xl font-extrabold text-white">
           T
         </div>
         <div className="h-5 w-5 animate-spin rounded-full border-2 border-slate-700 border-t-slate-200" />

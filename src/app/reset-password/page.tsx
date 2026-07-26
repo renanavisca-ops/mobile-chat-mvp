@@ -66,7 +66,7 @@ export default function ResetPasswordPage() {
               <label className="block text-sm text-slate-300 ml-1">{t('resetPassword.newPassword')}</label>
               <input
                 type="password"
-                className="w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
+                className="w-full rounded-xl border border-slate-800 bg-slate-900 px-3.5 py-2.5 text-slate-100 focus:outline-none focus:border-blue-500/60 focus:ring-2 focus:ring-blue-500/20 transition-all"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 placeholder="••••••••"
@@ -78,7 +78,7 @@ export default function ResetPasswordPage() {
               <label className="block text-sm text-slate-300 ml-1">{t('resetPassword.confirmPassword')}</label>
               <input
                 type="password"
-                className="w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
+                className="w-full rounded-xl border border-slate-800 bg-slate-900 px-3.5 py-2.5 text-slate-100 focus:outline-none focus:border-blue-500/60 focus:ring-2 focus:ring-blue-500/20 transition-all"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder="••••••••"
@@ -99,7 +99,7 @@ export default function ResetPasswordPage() {
             <button
               type="submit"
               disabled={busy}
-              className="w-full rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 active:scale-[0.98] transition-all disabled:opacity-50"
+              className="toky-grad toky-ring-brand w-full rounded-xl px-4 py-2.5 text-sm font-semibold text-white active:scale-[0.98] disabled:opacity-50"
             >
               {busy ? t('resetPassword.updating') : t('resetPassword.changePassword')}
             </button>

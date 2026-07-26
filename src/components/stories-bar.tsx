@@ -126,7 +126,7 @@ export function StoriesBar() {
                 type="button"
                 onClick={() => setComposerOpen(true)}
                 aria-label={t('stories.addTitle')}
-                className="absolute right-1 top-11 grid h-5 w-5 place-items-center rounded-full border-2 border-slate-950 bg-indigo-600 text-sm text-white hover:bg-indigo-500"
+                className="absolute right-1 top-11 grid h-5 w-5 place-items-center rounded-full border-2 border-slate-950 toky-grad text-sm text-white"
               >
                 +
               </button>
