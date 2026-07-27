@@ -12,6 +12,8 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const BLUE = '#2f66ff';
 const GREEN = '#12a150';
 const DARK = '#020617';
+// The brand promise: connection, not "messaging & calls".
+const TAGLINE = 'Stay close to the ones you love';
 
 // Keep text well inside the frame — Play can overlay UI near the edges.
 const svg = `
@@ -39,7 +41,7 @@ const svg = `
   <text x="348" y="242" fill="#ffffff" font-family="Helvetica,Arial,sans-serif"
         font-size="92" font-weight="800">Toky Chat</text>
   <text x="352" y="304" fill="#9fb0c9" font-family="Helvetica,Arial,sans-serif"
-        font-size="34" font-weight="500">Private messaging &amp; calls</text>
+        font-size="32" font-weight="500">${TAGLINE}</text>
 </svg>`;
 
 async function main() {

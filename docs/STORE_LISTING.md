@@ -19,8 +19,8 @@ this file is only the marketing listing.
 | Field | Value |
 |---|---|
 | **App Name** (≤30) | Toky Chat |
-| **Subtitle** (≤30) — EN | Private messaging & calls |
-| **Subtitle** (≤30) — ES | Mensajes y llamadas privados |
+| **Subtitle** (≤30) — EN | Stay close to those you love |
+| **Subtitle** (≤30) — ES | Cerca de quienes amas |
 | **Primary category** | Social Networking |
 | **Secondary category** | Productivity |
 | **Support URL** | https://mobile-chat-mvp.vercel.app/support |
@@ -29,22 +29,22 @@ this file is only the marketing listing.
 | **Age rating** | 17+ (user-generated content + communication) |
 
 **Promotional Text** (≤170) — EN
-> Fast, private messaging with voice & video calls, group chats, stories, and end-to-end encryption. Your conversations, your control.
+> Toky Chat keeps you close to the people you love — send messages, share moments, and jump on voice or video calls, one-on-one or in groups. Private by design.
 
 **Promotional Text** (≤170) — ES
-> Mensajería rápida y privada con llamadas de voz y video, grupos, historias y cifrado de extremo a extremo. Tus conversaciones, bajo tu control.
+> Toky Chat te mantiene cerca de quienes amas: envía mensajes, comparte momentos y haz llamadas de voz o video, individuales o en grupo. Privado por diseño.
 
 **Keywords** (≤100, comma-separated, no spaces) — EN
 ```
-chat,messenger,messaging,video call,voice call,groups,encrypted,private,stories,calls
+chat,messenger,family,friends,video call,voice call,groups,connect,private,calls
 ```
 **Keywords** (≤100) — ES
 ```
-chat,mensajería,mensajero,videollamada,llamadas,grupos,cifrado,privado,historias,mensajes
+chat,mensajería,familia,amigos,videollamada,llamadas,grupos,conectar,privado,historias
 ```
 
 **Description** (≤4000) — EN
-> Toky Chat is a fast, modern messenger for staying close to the people who matter. Send messages, share photos, videos, GIFs and emoji, react, and start voice or video calls — one-on-one or in groups. Turn on end-to-end encryption for private chats only you and the recipient can read. Share moments with stories, keep an eye on your call history, and get notified the moment a message arrives — even when the app is closed.
+> Toky Chat is where you stay close to the people you love — a fast, modern messenger for the people who matter most. Send messages, share photos, videos, GIFs and emoji, react, and start voice or video calls — one-on-one or in groups. Turn on end-to-end encryption for private chats only you and the recipient can read. Share moments with stories, keep an eye on your call history, and get notified the moment a message arrives — even when the app is closed.
 >
 > • Voice & video calls, with in-call switch to video
 > • Group chats, reactions, polls, and stories
@@ -52,10 +52,10 @@ chat,mensajería,mensajero,videollamada,llamadas,grupos,cifrado,privado,historia
 > • Block, report, and mute to stay in control
 > • Available in English and Spanish
 >
-> No ads. No tracking. Just conversations.
+> No ads. No tracking. Just the people you love.
 
 **Description** (≤4000) — ES
-> Toky Chat es un mensajero rápido y moderno para mantenerte cerca de las personas que importan. Envía mensajes, comparte fotos, videos, GIFs y emojis, reacciona e inicia llamadas de voz o video, individuales o en grupo. Activa el cifrado de extremo a extremo para chats privados que solo tú y el destinatario pueden leer. Comparte momentos con historias, revisa tu historial de llamadas y recibe notificaciones en el instante en que llega un mensaje, incluso con la app cerrada.
+> Toky Chat es donde te mantienes cerca de quienes amas: un mensajero rápido y moderno para las personas que más importan. Envía mensajes, comparte fotos, videos, GIFs y emojis, reacciona e inicia llamadas de voz o video, individuales o en grupo. Activa el cifrado de extremo a extremo para chats privados que solo tú y el destinatario pueden leer. Comparte momentos con historias, revisa tu historial de llamadas y recibe notificaciones en el instante en que llega un mensaje, incluso con la app cerrada.
 >
 > • Llamadas de voz y video, con cambio a video durante la llamada
 > • Chats grupales, reacciones, encuestas e historias
@@ -63,7 +63,7 @@ chat,mensajería,mensajero,videollamada,llamadas,grupos,cifrado,privado,historia
 > • Bloquea, reporta y silencia para mantener el control
 > • Disponible en español e inglés
 >
-> Sin anuncios. Sin rastreo. Solo conversaciones.
+> Sin anuncios. Sin rastreo. Solo quienes amas.
 
 **App Review — Notes to reviewer**
 > The app's UI loads from our hosted web app inside a native shell (Capacitor);
@@ -89,13 +89,13 @@ chat,mensajería,mensajero,videollamada,llamadas,grupos,cifrado,privado,historia
 | **Content rating** | Teen / Mature 17+ (IARC questionnaire) |
 
 **Short description** (≤80) — EN
-> Private messaging with voice & video calls, groups, and encryption.
+> Stay close to the people you love — chats, voice & video calls, and groups.
 
 **Short description** (≤80) — ES
-> Mensajería privada con llamadas de voz y video, grupos y cifrado.
+> Mantente cerca de quienes amas: chats, llamadas de voz y video, y grupos.
 
 **Full description** (≤4000) — EN
-> Toky Chat is a fast, modern messenger for staying close to the people who matter. Send messages, share photos, videos, GIFs and emoji, react, and start voice or video calls — one-on-one or in groups. Turn on end-to-end encryption for private chats only you and the recipient can read. Share moments with stories, keep an eye on your call history, and get notified the moment a message arrives — even when the app is closed.
+> Toky Chat is where you stay close to the people you love — a fast, modern messenger for the people who matter most. Send messages, share photos, videos, GIFs and emoji, react, and start voice or video calls — one-on-one or in groups. Turn on end-to-end encryption for private chats only you and the recipient can read. Share moments with stories, keep an eye on your call history, and get notified the moment a message arrives — even when the app is closed.
 >
 > Features:
 > • Voice & video calls, with in-call switch to video
@@ -104,10 +104,10 @@ chat,mensajería,mensajero,videollamada,llamadas,grupos,cifrado,privado,historia
 > • Block, report, and mute to stay in control
 > • Available in English and Spanish
 >
-> No ads. No tracking. Just conversations.
+> No ads. No tracking. Just the people you love.
 
 **Full description** (≤4000) — ES
-> Toky Chat es un mensajero rápido y moderno para mantenerte cerca de las personas que importan. Envía mensajes, comparte fotos, videos, GIFs y emojis, reacciona e inicia llamadas de voz o video, individuales o en grupo. Activa el cifrado de extremo a extremo para chats privados que solo tú y el destinatario pueden leer. Comparte momentos con historias, revisa tu historial de llamadas y recibe notificaciones al instante, incluso con la app cerrada.
+> Toky Chat es donde te mantienes cerca de quienes amas: un mensajero rápido y moderno para las personas que más importan. Envía mensajes, comparte fotos, videos, GIFs y emojis, reacciona e inicia llamadas de voz o video, individuales o en grupo. Activa el cifrado de extremo a extremo para chats privados que solo tú y el destinatario pueden leer. Comparte momentos con historias, revisa tu historial de llamadas y recibe notificaciones al instante, incluso con la app cerrada.
 >
 > Funciones:
 > • Llamadas de voz y video, con cambio a video durante la llamada
@@ -116,7 +116,7 @@ chat,mensajería,mensajero,videollamada,llamadas,grupos,cifrado,privado,historia
 > • Bloquea, reporta y silencia para mantener el control
 > • Disponible en español e inglés
 >
-> Sin anuncios. Sin rastreo. Solo conversaciones.
+> Sin anuncios. Sin rastreo. Solo quienes amas.
 
 **App access — test credentials** (Play Console → App content → App access)
 > All functionality requires sign-in. Provide these reviewer credentials:
