@@ -9,6 +9,7 @@ import { addContact, listMyContacts, searchUsers } from '@/lib/db/contacts';
 import { blockUser } from '@/lib/db/safety';
 import { ReportModal } from '@/components/report-modal';
 import { EmptyState } from '@/components/empty-state';
+import { ChatListSkeleton } from '@/components/skeleton';
 import { UsersIcon, UserPlusIcon } from '@/components/icons';
 import { useT, TransBold } from '@/lib/i18n/context';
 import type { ProfileLite } from '@/lib/db/types';
@@ -19,6 +20,10 @@ export default function ContactsPage() {
   const supabase = browserSupabase();
 
   const [contacts, setContacts] = useState<ProfileLite[]>([]);
+  // Gate the empty state on the contacts fetch, not the auth `loading` flag,
+  // which resolves before listMyContacts() returns (otherwise "no contacts yet"
+  // flashes before the list appears).
+  const [contactsLoaded, setContactsLoaded] = useState(false);
   const [err, setErr] = useState('');
 
   // modal state
@@ -36,7 +41,9 @@ export default function ContactsPage() {
 
   useEffect(() => {
     if (loading) return;
-    refreshContacts().catch((e) => setErr(e?.message ?? String(e)));
+    refreshContacts()
+      .catch((e) => setErr(e?.message ?? String(e)))
+      .finally(() => setContactsLoaded(true));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading]);
 
@@ -123,7 +130,9 @@ export default function ContactsPage() {
       <div className="rounded-xl border border-slate-900 bg-slate-950/40 p-3">
         <div className="text-sm text-slate-300">{t('contacts.myContacts')}</div>
 
-        {contacts.length === 0 ? (
+        {loading || !contactsLoaded ? (
+          <ChatListSkeleton rows={6} />
+        ) : contacts.length === 0 ? (
           <EmptyState
             icon={<UsersIcon size={30} />}
             title={t('contacts.noContactsYet')}

@@ -37,12 +37,16 @@ export default function CallsPage() {
   const { t, lang } = useLanguage();
   const { startCall, busy } = useCall();
   const [calls, setCalls] = useState<CallLog[]>([]);
+  // Tracks the calls fetch itself so the empty state doesn't flash before the
+  // list arrives (auth `loading` resolves earlier than this request).
+  const [callsLoaded, setCallsLoaded] = useState(false);
   const [err, setErr] = useState('');
 
   useEffect(() => {
     listCalls()
       .then(setCalls)
-      .catch((e) => setErr(e?.message ?? String(e)));
+      .catch((e) => setErr(e?.message ?? String(e)))
+      .finally(() => setCallsLoaded(true));
   }, []);
 
   function callBack(c: CallLog, video: boolean) {
@@ -54,7 +58,7 @@ export default function CallsPage() {
     <PageShell title={t('calls.title')}>
       {err ? <p className="text-sm text-red-300">{err}</p> : null}
 
-      {loading ? (
+      {loading || !callsLoaded ? (
         <p className="text-sm text-slate-300">{t('chatsList.loading')}</p>
       ) : calls.length === 0 ? (
         <EmptyState icon={<PhoneIcon size={28} />} title={t('calls.empty')} />

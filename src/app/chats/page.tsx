@@ -123,6 +123,10 @@ export default function ChatsPage() {
   const { t, lang } = useLanguage();
   const router = useRouter();
   const [chats, setChats] = useState<ChatSummary[]>([]);
+  // Distinct from the auth `loading` flag: tracks whether the chats fetch itself
+  // has completed at least once. Without this the empty state ("no chats yet")
+  // flashes after auth resolves but before listChats() returns.
+  const [chatsLoaded, setChatsLoaded] = useState(false);
   const [err, setErr] = useState<string>('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -195,17 +199,20 @@ export default function ChatsPage() {
   }
 
   useEffect(() => {
+    // Wait for auth before fetching so we don't run an unauthenticated query
+    // and briefly render the empty state before the real list arrives.
+    if (loading || !user || !profile) return;
+
     const load = () => {
       listChats()
         .then(setChats)
-        .catch((e) => setErr(e?.message ?? String(e)));
+        .catch((e) => setErr(e?.message ?? String(e)))
+        .finally(() => setChatsLoaded(true));
       // Acknowledge delivery of any incoming messages while the app is open,
       // even for chats the user hasn't opened yet (RLS scopes this to my chats).
       void markIncomingDelivered().catch(() => {});
     };
     load();
-
-    if (loading || !user || !profile) return;
 
     const supabase = browserSupabase();
 
@@ -343,7 +350,7 @@ export default function ChatsPage() {
 
             {err ? <p className="text-sm text-red-300">{err}</p> : null}
 
-            {loading ? (
+            {loading || !chatsLoaded ? (
               <ChatListSkeleton rows={8} />
             ) : chats.length === 0 ? (
               <div className="mt-10 flex flex-col items-center px-6 text-center">
