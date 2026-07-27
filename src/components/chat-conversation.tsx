@@ -35,6 +35,7 @@ import type { Gif } from '@/lib/giphy';
 import { useCall } from '@/lib/call/call-provider';
 import { VideoTrimmer, TrimmedVideo } from '@/components/video-trimmer';
 import { suggestReplies, translateText } from '@/lib/ai';
+import { avatarBg, initials } from '@/lib/ui/avatar';
 import { PhoneIcon, VideoIcon, PlusIcon, SmileIcon, MicIcon, PencilIcon, ReplyIcon, ForwardIcon, CopyIcon, DownloadIcon, EyeOffIcon, TrashIcon, PinIcon, FlagIcon, PaperclipIcon, SparklesIcon, GlobeIcon, SendIcon, CheckIcon } from '@/components/icons';
 import type { ChatSummary, MessageRow } from '@/lib/db/types';
 
@@ -1476,8 +1477,11 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
             // eslint-disable-next-line @next/next/no-img-element
             <img src={headerAvatar} alt="" className="h-10 w-10 rounded-xl border border-slate-800 object-cover" />
           ) : (
-            <span className="grid h-10 w-10 place-items-center rounded-xl bg-slate-800 text-sm font-semibold text-slate-300">
-              {headerName.trim().charAt(0).toUpperCase()}
+            <span
+              className="grid h-10 w-10 place-items-center rounded-xl text-sm font-bold text-white shadow-sm shadow-black/25 ring-1 ring-white/20"
+              style={{ backgroundImage: avatarBg(headerName) }}
+            >
+              {initials(headerName)}
             </span>
           )}
         </button>

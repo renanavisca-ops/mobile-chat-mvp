@@ -16,6 +16,7 @@ import { listChats, markIncomingDelivered, setChatArchived } from '@/lib/db/chat
 import { tap, impact } from '@/lib/haptics';
 import { useIsOnline } from '@/components/presence-provider';
 import { useLanguage } from '@/lib/i18n/context';
+import { avatarBg, initials } from '@/lib/ui/avatar';
 
 import type { ChatSummary } from '@/lib/db/types';
 
@@ -38,14 +39,6 @@ function fmt(ts: string | null, locale: string) {
   return d.toLocaleDateString(locale, { day: 'numeric', month: 'short' });
 }
 
-// A deterministic soft gradient per name, so avatar fallbacks feel designed
-// rather than a flat grey block.
-function avatarGradient(seed: string): string {
-  let h = 0;
-  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) % 360;
-  return `linear-gradient(135deg, hsl(${h} 70% 55%), hsl(${(h + 40) % 360} 72% 45%))`;
-}
-
 function Avatar({
   url,
   name,
@@ -55,7 +48,6 @@ function Avatar({
   name?: string | null;
   online?: boolean;
 }) {
-  const initial = (name || '?').trim().charAt(0).toUpperCase() || '?';
   return (
     <span className="relative shrink-0">
       {url ? (
@@ -63,10 +55,10 @@ function Avatar({
         <img src={url} alt="" className="h-12 w-12 rounded-2xl object-cover ring-1 ring-black/10" />
       ) : (
         <span
-          className="grid h-12 w-12 place-items-center rounded-2xl text-base font-bold text-white ring-1 ring-white/10"
-          style={{ backgroundImage: avatarGradient(name || '?') }}
+          className="grid h-12 w-12 place-items-center rounded-2xl text-base font-bold tracking-tight text-white shadow-sm shadow-black/25 ring-1 ring-white/20"
+          style={{ backgroundImage: avatarBg(name) }}
         >
-          {initial}
+          {initials(name)}
         </span>
       )}
       {online && (
