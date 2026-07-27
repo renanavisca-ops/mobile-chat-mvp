@@ -34,6 +34,23 @@ npm run cap:android  # sync + open Android Studio (needs local Android SDK)
 npm run cap:ios      # sync + open Xcode (needs a Mac)
 ```
 
+## Store screenshots
+
+Both stores require screenshots at several device sizes (6.7"/6.5" iPhone, iPad
+12.9", Play phone/tablet). `scripts/store-screenshots.mjs` drives the live app
+with a real login and renders every screen at the exact pixel size each store
+wants — the full matrix in one command:
+
+```bash
+TOKY_EMAIL=demo@toky.chat TOKY_PASSWORD='…' npm run screenshots:store
+# → screenshots/<device>/<screen>.png  (upload per store size)
+```
+
+Use the **reviewer/demo account** here (the same credentials you give App Store
+/ Play reviewers). It needs network access to the hosted app + Supabase, so run
+it on a normal machine — a locked-down CI/agent sandbox will block those hosts.
+Add `TOKY_HEADFUL=1` to watch it, or `TOKY_THEME=light` for light-mode shots.
+
 ## Building without a Mac (Codemagic)
 
 You don't have a Mac, so iOS is built in the cloud with **Codemagic** (macOS
