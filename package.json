@@ -12,6 +12,7 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "icons": "node scripts/generate-icons.mjs",
+    "screenshots:store": "node scripts/store-screenshots.mjs",
     "cap:sync": "cap sync",
     "cap:ios": "cap sync ios && cap open ios",
     "cap:android": "cap sync android && cap open android"
