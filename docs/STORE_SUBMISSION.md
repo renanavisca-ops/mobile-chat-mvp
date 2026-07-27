@@ -114,20 +114,20 @@ practices."
 ## 5. Store listing copy
 
 **App name:** Toky Chat
-**Subtitle (Apple, ≤30):** Private messaging & calls
+**Subtitle (Apple, ≤30):** Stay close to those you love
 **Primary category:** Social Networking · **Secondary:** Productivity
 
 **Promotional text (≤170):**
-Fast, private messaging with voice & video calls, group chats, stories, and
-end-to-end encryption. Your conversations, your control.
+Toky Chat keeps you close to the people you love — send messages, share moments,
+and jump on voice or video calls, one-on-one or in groups. Private by design.
 
 **Description:**
-> Toky Chat is a fast, modern messenger for staying close to the people who
-> matter. Send messages, share photos, videos, GIFs and emoji, react, and start
-> voice or video calls — one-on-one or in groups. Turn on end-to-end encryption
-> for private chats only you and the recipient can read. Share moments with
-> stories, keep an eye on your call history, and get notified the moment a
-> message arrives — even when the app is closed.
+> Toky Chat is where you stay close to the people you love. Send messages, share
+> photos, videos, GIFs and emoji, react, and start voice or video calls —
+> one-on-one or in groups. Turn on end-to-end encryption for private chats only
+> you and the people you love can read. Share moments with stories, keep an eye
+> on your call history, and get notified the moment someone reaches out — even
+> when the app is closed.
 >
 > • Voice & video calls, with in-call switch to video
 > • Group chats, reactions, polls, and stories
@@ -135,10 +135,10 @@ end-to-end encryption. Your conversations, your control.
 > • Block, report, and mute to stay in control
 > • Available in English and Spanish
 >
-> No ads. No tracking. Just conversations.
+> No ads. No tracking. Just the people you love.
 
 **Keywords (Apple, ≤100 chars):**
-chat,messenger,messaging,video call,voice call,groups,encrypted,private,stories,calls
+chat,messenger,family,friends,video call,voice call,groups,connect,private,calls
 
 **Required URLs:**
 - Privacy Policy: `https://mobile-chat-mvp.vercel.app/privacy`
