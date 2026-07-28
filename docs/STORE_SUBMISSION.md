@@ -34,11 +34,13 @@ work.
 **Processors** (infrastructure, not sold/shared for ads): Supabase (database,
 auth, storage), Google Firebase (push delivery), Vercel (hosting), Cloudflare
 (STUN/TURN for calls), and — when enabled — Sentry (crash/error diagnostics).
-**In transit:** all traffic is HTTPS/TLS. **End-to-end encryption:** direct-chat
-message text is end-to-end encrypted only when both participants have set up
-encryption; group chats, channels, and messages predating encryption are stored
-server-readable. Media attachments are not end-to-end encrypted (disclose
-messages as collected either way). **Deletion:** in-app account deletion removes the
+**In transit:** all traffic is HTTPS/TLS. **End-to-end encryption:** new direct
+chats require E2EE and fail closed (they will not send unless the message can be
+encrypted); in those chats both message text **and attachments** are end-to-end
+encrypted. Group chats, channels, legacy direct chats, and anything sent before
+encryption was set up are stored server-readable. (Disclose messages and media as
+collected either way.) The encryption is a standard-primitive composition and is
+not independently audited. **Deletion:** in-app account deletion removes the
 account and its data, purges the user's Storage files, and cascades profile,
 devices, tokens, contacts, blocks, memberships, and encryption keys; residual
 backup copies purged within 90 days.
@@ -126,7 +128,7 @@ and jump on voice or video calls, one-on-one or in groups. Private by design.
 **Description:**
 > Toky Chat is where you stay close to the people you love. Send messages, share
 > photos, videos, GIFs and emoji, react, and start voice or video calls —
-> one-on-one or in groups. Turn on end-to-end encryption for private chats only
+> one-on-one or in groups. Private one-to-one chats are end-to-end encrypted so only
 > you and the people you love can read. Share moments with stories, keep an eye
 > on your call history, and get notified the moment someone reaches out — even
 > when the app is closed.

@@ -33,6 +33,34 @@ variable **names** are referenced.
 
 ---
 
+## Update log (changes since this point-in-time review)
+
+Read the sections below together with this log — the shipped work changes several
+findings (notably "conditional/optional E2EE" and "media not E2EE"):
+
+- **Phase 2 — mandatory fail-closed E2EE for new direct chats (shipped).** New
+  direct chats are marked `enc_required`; the send path **throws rather than
+  storing plaintext** when a required chat cannot be sealed (unit-tested). Legacy
+  chats/messages are unchanged and never relabeled as encrypted. Groups/channels
+  unchanged.
+- **Phase 3 — direct-chat media E2EE (`toky-media-v1`, shipped).** Attachments in
+  encrypted chats are encrypted **on-device before upload** (AES-GCM-256, fresh
+  per-object key + 96-bit IV); Supabase Storage receives **ciphertext**. Cap
+  25 MB single-shot; larger rejected. See `docs/MEDIA_ENCRYPTION.md`.
+- **Phase 4 — native key storage (still pending).** The identity private key is
+  **still** a plaintext exportable JWK in IndexedDB on all platforms; Apple
+  Keychain / Android Keystore hardening is **not yet implemented**, so §6 remains
+  accurate as written.
+
+Net current state: for **new** direct chats, message text **and** attachments are
+end-to-end encrypted and fail-closed; group chats, channels, legacy direct chats,
+and anything sent before encryption remain server-readable. Calls remain WebRTC
+DTLS-SRTP with no separate audited application-level call protocol. The system is
+still a standard-primitive composition that has **not** been independently
+audited.
+
+---
+
 ## 1. Executive summary
 
 - **Standard primitives, custom composition.** Toky implements **no proprietary

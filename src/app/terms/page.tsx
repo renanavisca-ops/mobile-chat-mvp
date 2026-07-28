@@ -24,7 +24,7 @@ function En() {
         </section>
         <section>
           <h2 className={H2}>2. The Service</h2>
-          <p>Toky Chat lets you send messages and media, make voice and video calls, and create one-to-one and group chats. We may add, change, or remove features at any time. Direct chats use end-to-end encryption once both participants have set up encryption; group chats and channels are not end-to-end encrypted. See the Privacy Policy for details.</p>
+          <p>Toky Chat lets you send messages and media, make voice and video calls, and create one-to-one and group chats. We may add, change, or remove features at any time. New direct chats require end-to-end encryption and will not send until both people have set it up; attachments in encrypted chats are end-to-end encrypted too. Group chats and channels are not end-to-end encrypted, and messages sent before encryption remain unencrypted. See the Privacy Policy for details.</p>
         </section>
         <section>
           <h2 className={H2}>3. Your account</h2>
