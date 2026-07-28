@@ -17,6 +17,8 @@ import { browserSupabase } from '@/lib/supabase/client';
 import * as e2ee from './e2ee';
 import type { Jwk, WrappedKey, Sealed, KeyBackup } from './e2ee';
 import type { Json } from '@/lib/db/database.types';
+import { migrateKey, type KeyBackend } from './key-migration';
+import { secureBackend, secureStorageSupported } from './secure-store';
 
 let identityPrivate: CryptoKey | null = null;
 let identityPubJwk: Jwk | null = null;
@@ -70,6 +72,29 @@ async function idbDel(key: string): Promise<void> {
   });
 }
 
+// ---------- key backend (native secure storage vs. web IndexedDB) ----------
+
+// Web fallback: the private key lives in IndexedDB as a JWK object. The backend
+// serializes to/from a string so it shares the KeyBackend contract with secure
+// storage and the migration helper.
+const idbBackend: KeyBackend = {
+  async get() {
+    const jwk = await idbGet<Jwk>(PRIV_KEY);
+    return jwk ? JSON.stringify(jwk) : null;
+  },
+  async set(value: string) {
+    await idbSet(PRIV_KEY, JSON.parse(value) as Jwk);
+  },
+  async remove() {
+    await idbDel(PRIV_KEY);
+  },
+};
+
+/** Where the private key is stored on THIS runtime: secure storage on native, IndexedDB on web. */
+function activeBackend(): KeyBackend {
+  return secureStorageSupported() ? secureBackend : idbBackend;
+}
+
 // ---------- init / state ----------
 
 /** Load the local private key from IndexedDB, if this device is enrolled. */
@@ -77,13 +102,20 @@ export function initKeystore(): Promise<void> {
   if (initPromise) return initPromise;
   initPromise = (async () => {
     try {
-      const jwk = await idbGet<Jwk>(PRIV_KEY);
-      if (jwk) {
+      // On native, move any legacy IndexedDB key into OS secure storage first.
+      // Idempotent and safe: the IndexedDB copy is deleted only after the
+      // secure-storage write is verified by read-back.
+      if (secureStorageSupported()) {
+        await migrateKey(idbBackend, secureBackend).catch(() => {});
+      }
+      const raw = await activeBackend().get();
+      if (raw) {
+        const jwk = JSON.parse(raw) as Jwk;
         identityPrivate = await e2ee.importPrivateJwk(jwk);
         identityPubJwk = e2ee.publicJwkFromPrivate(jwk);
       }
     } catch {
-      // no local key / IndexedDB unavailable
+      // no local key / storage unavailable
     }
   })();
   return initPromise;
@@ -130,7 +162,7 @@ async function publishIdentityPub(): Promise<void> {
 export async function enrollNewIdentity(): Promise<void> {
   const pair = await e2ee.generateIdentity();
   const privJwk = await e2ee.exportPrivateJwk(pair.privateKey);
-  await idbSet(PRIV_KEY, privJwk);
+  await activeBackend().set(JSON.stringify(privJwk));
   identityPrivate = pair.privateKey;
   identityPubJwk = await e2ee.exportPublicJwk(pair.publicKey);
   await publishIdentityPub();
@@ -193,7 +225,7 @@ export async function restoreFromPassphrase(passphrase: string): Promise<void> {
   if (!data?.backup) throw new Error('No backup found for this account.');
   const priv = await e2ee.restorePrivateKey(passphrase, data.backup as unknown as KeyBackup);
   const privJwk = await e2ee.exportPrivateJwk(priv);
-  await idbSet(PRIV_KEY, privJwk);
+  await activeBackend().set(JSON.stringify(privJwk));
   identityPrivate = priv;
   identityPubJwk = e2ee.publicJwkFromPrivate(privJwk);
   chatKeyCache.clear();
@@ -202,7 +234,10 @@ export async function restoreFromPassphrase(passphrase: string): Promise<void> {
 
 /** Remove the local key from this device (does not touch the server backup). */
 export async function forgetLocalKey(): Promise<void> {
-  await idbDel(PRIV_KEY);
+  // Clear from BOTH stores so logout / account deletion / user switch never
+  // leaves key material behind on the device.
+  await idbBackend.remove().catch(() => {});
+  if (secureStorageSupported()) await secureBackend.remove().catch(() => {});
   identityPrivate = null;
   identityPubJwk = null;
   chatKeyCache.clear();

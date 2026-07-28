@@ -34,6 +34,8 @@ workflows:
     scripts:
       - name: Install JS dependencies
         script: npm ci
+      - name: Run unit tests (E2EE fail-closed, media & key-migration invariants)
+        script: npm test
       - name: Capacitor sync (copies loader + plugins into ios/)
         script: npx cap sync ios
       - name: Install CocoaPods
@@ -70,6 +72,8 @@ workflows:
     scripts:
       - name: Install JS dependencies
         script: npm ci
+      - name: Run unit tests (E2EE fail-closed, media & key-migration invariants)
+        script: npm test
       - name: Capacitor sync (copies loader + plugins into android/)
         script: npx cap sync android
       - name: Set version code
