@@ -35,8 +35,10 @@ work.
 auth, storage), Google Firebase (push delivery), Vercel (hosting), Cloudflare
 (STUN/TURN for calls), and — when enabled — Sentry (crash/error diagnostics).
 **In transit:** all traffic is HTTPS/TLS. **End-to-end encryption:** direct-chat
-message text is E2E-encrypted; media attachments are not yet (disclose messages
-as collected either way). **Deletion:** in-app account deletion removes the
+message text is end-to-end encrypted only when both participants have set up
+encryption; group chats, channels, and messages predating encryption are stored
+server-readable. Media attachments are not end-to-end encrypted (disclose
+messages as collected either way). **Deletion:** in-app account deletion removes the
 account and its data, purges the user's Storage files, and cascades profile,
 devices, tokens, contacts, blocks, memberships, and encryption keys; residual
 backup copies purged within 90 days.

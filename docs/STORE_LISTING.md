@@ -70,7 +70,8 @@ chat,mensajería,familia,amigos,videollamada,llamadas,grupos,conectar,privado,hi
 > native features (push notifications, camera, and voice/video calls) run
 > through native APIs and can be demonstrated with the demo account. Sign in
 > with the credentials below; the account already has chats, a group, and
-> contacts. Encryption is on by default for direct chats.
+> contacts. Direct chats encrypt automatically once both people have set up
+> encryption; group chats and channels are not end-to-end encrypted.
 >
 > Demo account — Email: appreview@toky.chat · Password: TokyReview!2026
 

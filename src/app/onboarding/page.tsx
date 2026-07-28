@@ -99,7 +99,8 @@ export default function OnboardingPage() {
       setStatus(t('onboarding.statusGeneratingKeys'));
       // Real end-to-end-encryption identity: creates the private key on this
       // device and publishes the public key so others can encrypt to us. This
-      // is what lets direct chats be encrypted by default.
+      // is what lets a direct chat encrypt automatically once BOTH people have
+      // enrolled (best-effort at chat creation; unenrolled peers stay plaintext).
       await ensureIdentity();
       const identityPub = await getMyIdentityPub();
       const registrationId = Math.floor(Math.random() * 16380) + 1;
