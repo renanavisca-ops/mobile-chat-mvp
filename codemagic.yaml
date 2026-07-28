@@ -61,7 +61,9 @@ workflows:
 
   android:
     name: Toky Android (Play Store)
-    instance_type: linux_x2
+    # mac_mini_m2 is the instance covered by Codemagic's free tier; Android
+    # builds run fine on it (the macOS image includes the Android SDK/JDK).
+    instance_type: mac_mini_m2
     max_build_duration: 60
     environment:
       # Note: the `toky_android` variable group (GCLOUD_SERVICE_ACCOUNT) and the
