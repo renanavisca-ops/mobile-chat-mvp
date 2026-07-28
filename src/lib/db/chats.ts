@@ -8,6 +8,9 @@ import {
   lockChat as ksLockChat,
   shareChatKeyWith,
 } from '@/lib/crypto/keystore';
+import { buildOutgoingEnvelope, EncryptionRequiredError } from '@/lib/db/outgoing-envelope';
+
+export { EncryptionRequiredError };
 
 /** Parse a message ciphertext column into a JSON object, or null. */
 function parseEnvelope(ciphertext: string | null | undefined): Record<string, unknown> | null {
@@ -222,10 +225,16 @@ export async function createDirectChatWith(userId: string): Promise<string> {
 
   const chatId = data as string;
 
-  // Encrypt direct chats by default. This only locks when BOTH people have an
-  // encryption identity; if the other user hasn't enrolled yet it stays plain
-  // (and the guard in lockChat makes re-opening an existing chat a no-op, so a
-  // locked chat is never re-keyed).
+  // Phase 2: new direct chats REQUIRE end-to-end encryption. Mark them so the
+  // send path fails closed (never stores plaintext) until the chat can be
+  // locked. Existing/legacy chats are unaffected (enc_required stays false).
+  const { error: reqErr } = await supabase.from('chats').update({ enc_required: true }).eq('id', chatId);
+  if (reqErr) console.error('Could not mark chat as encryption-required:', reqErr.message);
+
+  // Try to lock immediately. This only succeeds when BOTH people have an
+  // encryption identity; if the other user hasn't enrolled yet the chat stays
+  // enc_required-but-unlocked, and sending is blocked (fail-closed) until they
+  // do. lockChat is idempotent, so a locked chat is never re-keyed.
   try {
     await ksLockChat(chatId, [userId]);
   } catch {
@@ -373,22 +382,30 @@ export async function sendMessage(chatId: string, payload: MessagePayload) {
 
   const { data: chatRow } = await supabase
     .from('chats')
-    .select('disappearing_seconds, encrypted')
+    .select('disappearing_seconds, encrypted, enc_required')
     .eq('id', chatId)
     .maybeSingle();
 
   const plaintext = JSON.stringify({ v: 1, ...payload });
-  let ciphertext = plaintext;
-  let content: string | null = payload.text || null;
 
-  if (chatRow?.encrypted) {
-    const sealed = await encryptForChat(chatId, plaintext);
-    if (!sealed) {
-      throw new Error('Encryption is locked on this device. Unlock it in Settings to send here.');
-    }
-    ciphertext = JSON.stringify({ e: 1, ...sealed });
-    content = null; // the server must never see plaintext in a locked chat
+  // A chat must be encrypted if it's already locked, or if it's a chat that
+  // requires E2EE (new direct chats). Legacy chats keep sending plaintext.
+  const mustEncrypt = !!(chatRow?.encrypted || chatRow?.enc_required);
+
+  // For an enc_required chat that isn't locked yet (the peer hadn't enrolled at
+  // creation), try to establish encryption now. If it still can't be locked,
+  // fail closed below rather than sending plaintext.
+  if (mustEncrypt && !chatRow?.encrypted) {
+    const res = await enableChatEncryption(chatId).catch(() => ({ ok: false, missing: [] as string[] }));
+    if (!res.ok) throw new EncryptionRequiredError(res.missing);
   }
+
+  const { ciphertext, content } = await buildOutgoingEnvelope({
+    mustEncrypt,
+    plaintext,
+    text: payload.text || null,
+    seal: (pt) => encryptForChat(chatId, pt),
+  });
 
   const nonce = crypto.randomUUID();
 

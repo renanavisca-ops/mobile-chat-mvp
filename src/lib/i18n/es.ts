@@ -253,6 +253,7 @@ const es: Dictionary = {
     encryptedLocked: 'Mensaje cifrado — activa el cifrado para leerlo',
     encryptionSetupFirst: 'Primero configura el cifrado en Ajustes → Cifrado.',
     encryptionMissingMembers: 'Todos aquí deben configurar el cifrado primero.',
+    encryptionRequiredToSend: 'Este chat tiene cifrado de extremo a extremo y no puede enviar hasta que la otra persona termine de configurar el cifrado. Pídele que abra Toky e inténtalo de nuevo. Configura tu propia clave en Ajustes → Cifrado.',
   },
   contacts: {
     title: 'Contactos',
