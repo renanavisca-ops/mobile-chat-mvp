@@ -12,12 +12,14 @@ const DICTS: Record<LangCode, Dictionary> = { en, es };
 const PREF_KEY = 'toky_lang_pref';
 
 function detectSystemLang(): LangCode {
-  if (typeof navigator === 'undefined') return 'en';
+  // Spanish-first (Guatemala launch): default to Spanish, and only use English
+  // when the device explicitly prefers English.
+  if (typeof navigator === 'undefined') return 'es';
   const langs = navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language];
   for (const l of langs) {
-    if (l && l.toLowerCase().startsWith('es')) return 'es';
+    if (l && l.toLowerCase().startsWith('en')) return 'en';
   }
-  return 'en';
+  return 'es';
 }
 
 function readPreference(): LangPreference {
@@ -57,17 +59,18 @@ type Ctx = {
 };
 
 const LanguageContext = createContext<Ctx>({
-  lang: 'en',
+  lang: 'es',
   preference: 'auto',
   setPreference: () => {},
   t: (key: string) => key,
 });
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
-  // Start with 'en' so server and first client render match (avoids hydration
-  // mismatch); resolve the real preference/system language right after mount.
+  // Start with 'es' (our default) so server and first client render match
+  // (avoids hydration mismatch); resolve the real preference/system language
+  // right after mount.
   const [preference, setPreferenceState] = useState<LangPreference>('auto');
-  const [lang, setLang] = useState<LangCode>('en');
+  const [lang, setLang] = useState<LangCode>('es');
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
