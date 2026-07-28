@@ -1,298 +1,466 @@
-# Toky — Encryption Export-Compliance Technical Review
+# Toky — Encryption Export-Compliance Technical Review (Revised)
 
-**Purpose.** A factual technical description of every encryption mechanism in the
-Toky codebase, prepared so a qualified export-control professional can evaluate
-U.S. Export Administration Regulations (EAR) applicability. This document makes
-**no legal determinations**. It distinguishes throughout between:
+**Purpose.** A factual, source-verified technical description of every encryption
+mechanism in the Toky codebase, prepared so a **qualified export-control
+professional** can evaluate U.S. Export Administration Regulations (EAR)
+applicability. This document makes **no** EAR jurisdiction, ECCN, License
+Exception ENC, mass-market, sanctions, or other legal determination.
 
-- **[FACT]** — verified directly in the source code (file/line cited).
-- **[CONCLUSION]** — a reasonable technical inference from the code plus a widely
-  documented standard/provider behavior.
-- **[ASSUMPTION]** — not verifiable from this repository; needs confirmation.
-- **[LEGAL]** — a question requiring professional export-compliance/legal review.
+**Evidence labels used throughout:**
 
-No passwords, private keys, service-role credentials, API tokens, VAPID private
-keys, APNs keys, or environment-variable **values** are included. Only variable
-**names** are referenced where relevant.
+- **[FACT — repository]** — verified in this repository's source (file/line cited).
+- **[FACT — live configuration]** — would require the running deployment/console
+  to confirm; flagged where used.
+- **[PROVIDER-DOCUMENTED]** — behavior of a third-party service per its public
+  documentation (link + checked-date given; see note on link verification).
+- **[CONCLUSION]** — reasonable technical inference from code + a documented
+  standard.
+- **[ASSUMPTION]** — not verifiable from this repository; must be confirmed.
+- **[LEGAL]** — a question requiring professional export-control/legal review.
+
+**No secrets** (passwords, private keys, service-role keys, API tokens, VAPID
+private keys, APNs/signing keys, or full env-var values) are included; only
+variable **names** are referenced.
+
+> **Link-verification note.** The review environment has restricted outbound
+> network access, so the external URLs below were **not fetched** during this
+> review. They are the canonical/authoritative locations and should be opened and
+> re-confirmed by the reader. "Checked" dates reflect the review date
+> (2026-07-28) as a *to-verify* marker, not a successful fetch.
+
+> **Scope note (important).** This is an **export-compliance technical
+> inventory, not a cryptographic security audit.** See §14.
 
 ---
 
 ## 1. Executive summary
 
-- Toky is a civilian, consumer messaging web/mobile application (Next.js web app
-  wrapped as iOS/Android via Capacitor).
-- **All cryptography Toky implements itself uses standard primitives from the
-  browser/runtime Web Crypto API.** There are **no custom or proprietary
-  algorithms**, no modified algorithms, and no third-party crypto libraries for
-  the message E2EE (the only crypto-related npm dependency is `web-push` for Web
-  Push notifications). **[FACT]** (`src/lib/crypto/e2ee.ts`, `package.json`)
-- **Optional** end-to-end encryption (E2EE) is available for chats and is
-  **opt-in per chat** (a "lock chat" action), not on by default. When a chat is
-  locked, message text is sealed with AES-GCM-256 under a per-chat key wrapped to
-  each member via ECDH P-256; the server stores only ciphertext and public/
-  wrapped-key material. When a chat is **not** locked, message text is stored as
-  **plaintext** server-side (protected only by TLS in transit and database
-  access controls at rest). **[FACT]** (`src/lib/db/chats.ts:380-391`,
-  `src/lib/crypto/keystore.ts:294`)
-- Voice/video calls use standard WebRTC, which mandates DTLS-SRTP media
-  encryption implemented by the browser/OS; Cloudflare provides STUN/TURN only.
-  **[FACT/CONCLUSION]** (`src/lib/call/call-provider.tsx`,
-  `src/app/api/turn/route.ts`)
-- Transport is HTTPS/TLS to Supabase and Vercel. Password hashing, TOTP MFA, and
-  at-rest database/storage encryption are **provided by third parties** (Supabase
-  Auth / infrastructure), not implemented by Toky. **[FACT/ASSUMPTION]**
-- **No sanctions/geo controls are implemented** (no country registration limits,
-  no sanctioned-territory blocking, no denied-party screening). The only
-  "country" field in code is a business routing field (`GT`/`CR`), not a control.
-  **[FACT]** (`src/types/chat.ts:4`, `src/app/api/chat/start/route.ts:11`)
-- **[LEGAL]** The presence of standard encryption (TLS + AES/ECDH E2EE) commonly
-  places consumer software using encryption within scope of EAR Category 5 Part 2
-  analysis (e.g., ECCN 5D002 vs. mass-market 5D992 / License Exception ENC). This
-  requires professional confirmation — see §11.
-
----
-
-## 2. Encryption inventory table
-
-| # | Mechanism | Library / Service | Version | Algorithm(s) | Key size | Implemented by | Toky modifies crypto? | Source public? | Key file(s) |
-|---|---|---|---|---|---|---|---|---|---|
-| 1 | Transport security | Browser/OS TLS + Supabase/Vercel | platform | HTTPS/TLS 1.2/1.3 | n/a | Platform + providers | No | Yes (platform) | app-wide (`https://…` endpoints) |
-| 2 | Message E2EE (opt-in) — content sealing | Web Crypto API | platform | AES-GCM | 256-bit, 96-bit IV | Toky (standard primitive) | No | Yes (browser) | `src/lib/crypto/e2ee.ts:82,137` |
-| 3 | Message E2EE — identity keypair | Web Crypto API | platform | ECDH, curve P-256 | 256-bit curve | Toky | No | Yes | `e2ee.ts:42` |
-| 4 | Message E2EE — chat-key wrapping (ECIES) | Web Crypto API | platform | Ephemeral ECDH P-256 → AES-GCM-256 | 256 | Toky | No | Yes | `e2ee.ts:107-131` |
-| 5 | Key backup KDF | Web Crypto API | platform | PBKDF2-HMAC-SHA-256, 210,000 iters → AES-GCM-256 | 256 | Toky | No | Yes | `e2ee.ts:156-193` |
-| 6 | Safety-number / fingerprint | Web Crypto API | platform | SHA-256 digest | n/a (hash) | Toky | No | Yes | `e2ee.ts:197`, `src/lib/crypto/fingerprint.ts:3` |
-| 7 | Voice/video call media | WebRTC (browser/OS) | platform | DTLS-SRTP (mandatory in WebRTC) | negotiated | Browser/OS | No | Yes | `src/lib/call/call-provider.tsx:362-393` |
-| 8 | STUN/TURN relay | Cloudflare Realtime TURN + public STUN | service | Relays DTLS-SRTP; TURN creds via HMAC | n/a | Cloudflare | No | Service | `src/app/api/turn/route.ts` |
-| 9 | Password hashing | Supabase Auth (GoTrue) | service | bcrypt | n/a | Supabase | No | Yes (GoTrue OSS) | provider (verified: demo users hash as bcrypt) |
-| 10 | MFA (TOTP) | Supabase Auth | service | TOTP (RFC 6238, HMAC-SHA1) | n/a | Supabase | No | Yes | `src/lib/auth/mfa.ts` |
-| 11 | MFA recovery codes | Node `crypto` | platform | SHA-256 (hash of code; codes never stored plaintext) | n/a | Toky | No | Yes | `src/lib/auth/recovery-hash.ts:10` |
-| 12 | Web Push payload encryption | `web-push` (npm) | ^3.6.7 | RFC 8291: ECDH P-256 + HKDF-SHA-256 + AES-128-GCM (VAPID) | 128 (content), P-256 | Open-source lib | No | Yes | `src/app/api/push/send/route.ts`, `push/call/route.ts` |
-| 13 | Native push transport | Firebase Cloud Messaging | service | Provider transport encryption | n/a | Google/Firebase | No | Service | `src/app/api/push/*` (FCM path) |
-| 14 | Database/storage at rest | Supabase (Postgres + Storage) | service | Provider-managed (AES-256 typical) | n/a | Supabase | No | Service | provider — **[ASSUMPTION]** |
-| 15 | Hosting/edge | Vercel | service | TLS termination, provider at-rest | n/a | Vercel | No | Service | provider — **[ASSUMPTION]** |
-
----
-
-## 3. Algorithms and key sizes (Toky-implemented items only)
-
-All items below are **standard NIST/IETF algorithms invoked via the Web Crypto
-API** with no modification. **[FACT]** (`src/lib/crypto/e2ee.ts`)
-
-- **ECDH, curve P-256** — identity keypair; ephemeral keys for key wrapping.
-- **AES-GCM, 256-bit keys, 96-bit (12-byte) random IVs** — chat-key generation,
-  chat-key wrapping, and message-content sealing. IVs from
-  `crypto.getRandomValues`.
-- **PBKDF2-HMAC-SHA-256, 210,000 iterations, 16-byte random salt** — derives a
-  256-bit AES-GCM key-encryption-key from a user passphrase to protect the
-  identity private-key backup.
-- **SHA-256** — safety-number fingerprint of a public key; MFA recovery-code
-  hashing (server side, Node `crypto`).
-
-## 4. Libraries and versions
-
-- **Web Crypto API** — runtime/OS/browser-provided (no npm package). Used for all
-  Toky-implemented E2EE. **[FACT]** (`e2ee.ts` imports nothing crypto-related.)
-- **`web-push` `^3.6.7`** (+ `@types/web-push` `^3.6.4`) — open-source; performs
-  RFC 8291 Web Push encryption for browser push. **[FACT]** (`package.json`)
-- **`@supabase/supabase-js` `^2.49.1`** — client to Supabase Auth/DB/Storage;
-  crypto (bcrypt password hashing, TOTP) executes in the Supabase service.
-- **Node `crypto`** (runtime built-in) — SHA-256 for recovery-code hashing.
-- No `libsodium`, `tweetnacl`, `libsignal`, `crypto-js`, `openpgp`, `node-forge`,
-  or similar are present. **[FACT]** (`package.json`)
-
-## 5. File references supporting each finding
-
-- E2EE primitives: `src/lib/crypto/e2ee.ts` (generateIdentity `:42`, AES-GCM key
-  `:82`, deriveSharedAesKey `:90`, wrap/unwrap `:107-131`, encrypt/decrypt
-  `:137-150`, PBKDF2 backup `:156-193`, fingerprint `:197`).
-- Key management/storage: `src/lib/crypto/keystore.ts` (IndexedDB private key
-  `:28-60`, publish public key to `user_keys` `:125`, passphrase backup to
-  `key_backups` `:174-201`, per-chat wrapped keys in `chat_keys` `:221-320`,
-  `lockChat` sets `chats.encrypted=true` `:294`).
-- Encryption gating on send: `src/lib/db/chats.ts:380-391` (plaintext unless
-  `chatRow.encrypted`).
-- Fingerprint: `src/lib/crypto/fingerprint.ts:3`.
-- WebRTC: `src/lib/call/call-provider.tsx` (RTCPeerConnection `:365`, offer/answer
-  `:393`), ICE/TURN `src/app/api/turn/route.ts`.
-- MFA: `src/lib/auth/mfa.ts` (Supabase TOTP), recovery hashing
-  `src/lib/auth/recovery-hash.ts:10`.
-- Web Push: `src/app/api/push/send/route.ts`, `src/app/api/push/call/route.ts`.
-- Business "country" field (not a control): `src/types/chat.ts:4`,
-  `src/app/api/chat/start/route.ts:11`.
-
-## 6. End-to-end encryption assessment
-
-- **Which conversations are E2EE:** only chats explicitly **locked** by a user.
-  Locking calls `lockChat`, which generates a random AES-GCM-256 chat key, wraps
-  it to each member's ECDH P-256 public key, stores wrapped keys in `chat_keys`,
-  and sets `chats.encrypted=true`. **[FACT]** (`keystore.ts:252-300`)
-- **Which are not:** all other chats (the default). For unlocked chats the send
-  path stores the message as **plaintext** in `messages.ciphertext` (JSON
-  `{"v":1,"text":…}`) **and** in a plaintext `content` column. **[FACT]**
-  (`chats.ts:380-391`) → *The operator/database can read unlocked-chat content.*
-- **Attachments/media:** **not** end-to-end encrypted by Toky. Media is uploaded
-  to Supabase Storage (`chat-media` bucket) and referenced by URL; no
-  application-layer encryption of media bytes was found. For a locked chat the
-  message **payload** (which may include the media URL/metadata) is sealed, but
-  the stored media object itself is protected only by TLS + Storage access rules.
-  **[FACT/CONCLUSION]** (no media-encryption code found; `STORE_SUBMISSION.md`
-  states the same.)
-- **Where private keys are generated/stored:** generated in-browser via Web
-  Crypto; the **identity private key is stored locally in IndexedDB**
-  (`toky-e2ee` DB) and does **not** leave the device except as an **optional,
-  passphrase-encrypted backup** (PBKDF2 → AES-GCM) uploaded to `key_backups`.
-  **[FACT]** (`keystore.ts:28-60,174-201`)
-- **What the server stores:** identity **public** keys (`user_keys`), opaque
-  **wrapped** chat keys (`chat_keys`), optional **passphrase-encrypted** private-
-  key backups (`key_backups`), and message **ciphertext** for locked chats.
-  **[FACT]**
-- **Can the operator decrypt locked-chat messages?** Not from stored data alone:
-  the server holds only public keys, ciphertext, and passphrase-encrypted
-  backups (the passphrase is never sent). **[CONCLUSION]** (standard ECIES/AES-GCM
-  model; assumes the client is honest and the passphrase is strong — see §13.)
-- **Key backup mechanism:** identity private key JWK → encrypted with
-  PBKDF2-HMAC-SHA-256 (210k iters, random salt) derived AES-GCM-256 key → stored
-  as `{salt, iv, ct}`. Restore requires the user passphrase. **[FACT]**
-  (`e2ee.ts:169-193`)
-
-## 7. WebRTC encryption assessment
-
-- Calls use `RTCPeerConnection`; media is therefore protected by **DTLS-SRTP**,
-  which is **mandatory in the WebRTC standard** and implemented by the
-  browser/OS, not by Toky. **[FACT/CONCLUSION]** (`call-provider.tsx:362-393`)
-- **ICE servers:** public STUN (`stun.cloudflare.com`, `stun.l.google.com`) plus
-  **Cloudflare Realtime TURN**, with short-lived credentials minted server-side
-  in `src/app/api/turn/route.ts` using `CLOUDFLARE_TURN_KEY_ID` /
-  `CLOUDFLARE_TURN_API_TOKEN` (values not shown). If unset, STUN-only. **[FACT]**
-- **Can TURN see call content?** TURN **relays** the already-encrypted DTLS-SRTP
-  media; a standards-compliant TURN relay cannot decrypt it. **[CONCLUSION]**
-- **Custom call encryption layer?** **None** — Toky adds no additional encryption
-  on top of WebRTC's DTLS-SRTP. Note: with a TURN relay, calls are not
-  cryptographically end-to-end beyond WebRTC's standard peer encryption; there is
-  no Toky-added E2EE for calls. **[FACT]**
-
-## 8. Third-party encryption services
-
-- **Supabase** — Auth (bcrypt password hashing, TOTP MFA), Postgres database and
-  Storage; TLS in transit; provider-managed at-rest encryption. Toky does not
-  implement these. **[FACT for usage; ASSUMPTION for at-rest specifics]**
-- **Vercel** — hosting/edge, TLS termination; provider at-rest. **[ASSUMPTION]**
-- **Firebase Cloud Messaging** — native push transport (provider-encrypted).
-- **Cloudflare** — STUN/TURN for calls (relay only).
-- **Apple / Google platform APIs** — OS TLS, keychain/keystore, WebRTC DTLS-SRTP,
-  APNs/FCM transport. Provided by the OS/platform.
-
-## 9. Custom-cryptography confirmation
-
-Based on a review of the source:
-
-- **Custom or proprietary algorithms:** **None.** **[FACT]**
-- **Modifications to standard algorithms:** **None** — algorithms are invoked
-  through the Web Crypto API / standard libraries with standard parameters.
-  **[FACT]**
-- **User-selectable algorithms or key sizes:** **None** — parameters are
-  hard-coded (P-256, AES-GCM-256, PBKDF2-SHA-256/210k). **[FACT]**
-- **Cryptanalysis / interception / surveillance tooling:** **None found.**
-- **Military/government/intelligence-specific functionality:** **None found.**
-
-## 10. Intended-use confirmation
-
-- **Civilian consumer messaging application** (chats, calls, stories, contacts).
-  **[FACT — product scope]**
-- **No** military/intelligence/weapons/surveillance/restricted-government
-  functionality found. **[FACT — absence in code]**
-- Currently positioned for **controlled testing / limited initial distribution**
-  (internal testing / TestFlight per `docs/STORE_SUBMISSION.md`). **[FACT — docs]**
-- **No code mechanism** intentionally distributes to, or screens out, sanctioned
-  persons/uses (see §12). Intended-use statements about *not* targeting
-  prohibited end-uses are **business representations**, not technical controls.
-  **[LEGAL/ASSUMPTION]**
-
-## 11. Potential export-classification considerations *(for professional review)*
-
-Label all of the following **[LEGAL]** — issues to be confirmed by a qualified
-export-control professional; none is a determination:
-
-- Whether Toky is **subject to the EAR** given it incorporates encryption
-  (standard TLS + AES/ECDH E2EE).
-- Whether **ECCN 5D002** applies to the software (information-security
-  functionality using >56-bit symmetric / >512-bit asymmetric — Toky uses
-  AES-256 and ECDH P-256).
-- Whether Toky qualifies as **"mass-market"** encryption software (consumer app,
-  generally available, encryption not user-modifiable) and the interaction with
-  **License Exception ENC** (§740.17) and possible **self-classification report**
-  vs. **BIS classification (CCATS) request**.
-- Whether **reclassification to 5D992** (mass-market) may apply after satisfying
-  applicable requirements.
-- Whether an **encryption registration / annual self-classification report** is
-  required, and to which email/agencies.
-- Whether any **country restrictions / license requirements** apply (e.g., EAR
-  §740.17 excluded destinations; embargoed countries).
-
-Supporting technical facts a professional will need are provided in §§2–9
-(algorithms, key sizes, that encryption is standard/unmodified and not
-user-configurable, and that the app is mass-market consumer software).
-
-## 12. Sanctions-control findings (actual implementation)
-
-Reviewed for controls; **findings reflect the current code**:
-
-- **Limit Google Play distribution by country:** not controlled in code (a store-
-  console setting, not implemented in-app). **Gap.**
-- **Restrict registration by country:** **not implemented.** Sign-up is
-  email/password via Supabase Auth with no country gate. **Gap.**
-- **Block sanctioned territories (geo-blocking):** **not implemented.** No IP/geo
-  checks found. **Gap.**
-- **Screen restricted persons/organizations (denied-party screening):** **not
-  implemented.** **Gap.**
-- **Prevent prohibited end uses:** **not implemented** beyond Terms/PP text.
-  **Gap.**
-- The `country` values `GT`/`CR` in `src/types/chat.ts` and
-  `src/app/api/chat/start/route.ts` are **business routing** (matching a user to a
-  regional "store"), **not** an export/sanctions control. **[FACT]**
-
-*(Per instructions, no restrictions were implemented as part of this review.)*
-
-## 13. Unanswered questions
-
-- Provider at-rest encryption specifics (cipher, key management) for Supabase and
-  Vercel — not verifiable from this repo. **[ASSUMPTION]**
-- Whether media/attachments should be E2E-encrypted for locked chats (currently
-  not). **[FACT: not encrypted]** — product decision.
-- Whether E2EE should be **default-on** for direct chats (currently opt-in);
-  marketing copy in `docs/STORE_SUBMISSION.md` states direct chats are E2E, which
-  is **broader than the code** (code = opt-in per chat). This discrepancy should
-  be reconciled before making public encryption claims. **[FACT — discrepancy]**
-- Exact Supabase GoTrue password-hash parameters (bcrypt cost) — provider default.
-- Whether any additional environments enable/disable features that affect
-  crypto (e.g., VAPID/TURN configured in production).
-
-## 14. Recommended next steps
-
-1. Engage a qualified **export-control professional** with §§2–9 to determine
-   ECCN (5D002 vs. 5D992), ENC eligibility, and any registration/reporting.
-2. Reconcile the **E2EE claim discrepancy**: either make encryption default-on
-   for direct chats, or adjust store/marketing copy to say "optional E2EE."
-3. Decide on **media E2EE** for locked chats (currently plaintext-at-rest in
-   Storage, protected by TLS + access rules).
-4. If required by counsel, add **sanctions/geo controls** (store-country limits,
-   registration/geo checks, denied-party screening) — currently none exist.
-5. Keep an **encryption fact sheet** (this document) updated as crypto changes.
-
-## 15. Statements requiring professional legal confirmation
-
-- Any EAR applicability, ECCN (5D002/5D992), License Exception ENC eligibility,
-  mass-market status, and registration/reporting obligations. **[LEGAL]**
-- Whether the current absence of sanctions/geo controls is acceptable for the
-  intended distribution, or whether specific controls are legally required.
+- **Standard primitives, custom composition.** Toky implements **no proprietary
+  cryptographic algorithms**. It uses standard primitives from the **Web Crypto
+  API** (AES-GCM, ECDH P-256, PBKDF2, SHA-256). However, Toky implements its
+  **own application-level protocol** for identity-key management, per-chat key
+  generation, key wrapping/distribution, encrypted key backup, message-envelope
+  formatting, and per-chat encryption activation. This composition **has not been
+  identified as an implementation of a complete externally standardized messaging
+  protocol** (e.g., it is not Signal/MLS) and **has not been independently
+  audited.** **[FACT — repository]** (`src/lib/crypto/e2ee.ts`,
+  `src/lib/crypto/keystore.ts`)
+- **E2EE is optional / conditional, not universal.** Direct chats attempt to
+  enable end-to-end encryption **automatically at creation on a best-effort
+  basis**, but only succeed when **every participant has already enrolled an
+  E2EE identity**. When that condition is not met — and for **group chats and
+  channels**, and for messages sent **before** a chat was locked — message
+  content is stored **server-readable** (protected by TLS in transit and database
+  access controls, **not** by E2EE). **[FACT — repository]**
+  (`src/lib/db/chats.ts:211-232,380-391`, `src/lib/crypto/keystore.ts:252-299`)
+- **Unlocked messages are server-readable.** For non-encrypted chats the message
+  is stored as plaintext JSON in `messages.ciphertext` **and** in a plaintext
+  `content` column. **[FACT — repository]** (`chats.ts:380-391`)
+- **Attachments/media are not application-level E2EE.** Media is uploaded to
+  Supabase Storage; for encrypted chats the message payload (which may reference
+  the media) is sealed, but the **media object itself is stored without Toky
+  application-layer encryption.** **[FACT — repository]**
+- **Calls** use standard **WebRTC DTLS-SRTP** (implemented by the browser/OS) in a
+  **full-mesh peer-to-peer** topology; Cloudflare provides **STUN/TURN relay
+  only**; no SFU/MCU/recording service and **no user-facing call-peer identity
+  verification** were found. **[FACT — repository / CONCLUSION]**
+- **Private keys** are stored as an **exported plaintext JWK in the app's
+  IndexedDB** (browser/Capacitor WebView). The reviewed code does **not**
+  demonstrate Apple Keychain, Android Keystore, Secure Enclave, or hardware-backed
+  storage. **[FACT — repository]** (`keystore.ts:131-133,195-196`)
+- **No sanctions or geographic controls** (country registration limits, IP
+  geoblocking, denied-party/sanctioned-person screening, prohibited-end-use
+  detection) were found. **[FACT — repository]**
+- **Export classification is unresolved.** Toky uses AES-GCM-256 and ECDH P-256;
+  classification under EAR Category 5, Part 2 (e.g., 5D002 vs. 5D992, License
+  Exception ENC) requires professional review and is **not** determined here.
   **[LEGAL]**
-- Whether "civilian/consumer, non-military" intended-use representations are
-  sufficient as business statements absent technical enforcement. **[LEGAL]**
-- Any country/destination restrictions or license requirements. **[LEGAL]**
+- **No cryptographic security audit** (protocol review, pentest, formal
+  verification) was performed. **[FACT — scope]**
+
+---
+
+## 2. Encryption inventory (corrected)
+
+| # | Function | Library / Service | Version | Algorithm(s) | Key/param | Implemented by | Toky modifies crypto? | Source public? | Evidence |
+|---|---|---|---|---|---|---|---|---|---|
+| 1 | Transport security | Browser/OS + Supabase/Vercel/Cloudflare | platform/service | HTTPS/TLS (version negotiated) | n/a | Platform + providers | No | Yes | app-wide; exact TLS version **[PROVIDER-DOCUMENTED/ASSUMPTION]** |
+| 2 | Message content sealing (locked chats) | Web Crypto API | platform | AES-GCM | 256-bit key, 96-bit random IV | Toky (standard primitive) | No | Yes | `e2ee.ts:82,137` **[FACT — repository]** |
+| 3 | Identity keypair | Web Crypto API | platform | ECDH P-256 | 256-bit curve, extractable | Toky | No | Yes | `e2ee.ts:42-47` **[FACT — repository]** |
+| 4 | Chat-key wrapping (app-level, ECIES-style) | Web Crypto API | platform | ephemeral ECDH P-256 → AES-GCM | 256-bit | Toky (custom composition) | No | Yes | `e2ee.ts:107-131` **[FACT — repository]** |
+| 5 | Passphrase key backup (KDF) | Web Crypto API | platform | PBKDF2-HMAC-SHA-256 → AES-GCM | 210,000 iters, 16-byte salt, 256-bit | Toky | No | Yes | `e2ee.ts:156-193` **[FACT — repository]** |
+| 6 | Safety-number fingerprint | Web Crypto API | platform | SHA-256 | 60 hex chars of digest | Toky | No | Yes | `e2ee.ts:197`, `fingerprint.ts:3` **[FACT — repository]** |
+| 7 | Call media | WebRTC (browser/OS) | platform | DTLS-SRTP (mandatory in WebRTC) | negotiated | Browser/OS | No | Yes | `call-provider.tsx:362-393` **[CONCLUSION]** |
+| 8 | STUN/TURN | Cloudflare Realtime TURN + public STUN | service | Relays DTLS-SRTP; TURN cred issuance | short-lived creds | Cloudflare | No | Service | `api/turn/route.ts` **[FACT — repository / PROVIDER-DOCUMENTED]** |
+| 9 | Web Push **payload** encryption | `web-push` | ^3.6.7 | RFC 8291: ECDH P-256 + HKDF-SHA-256 + AES-128-GCM | 128-bit content key | Open-source lib | No | Yes | `api/push/send/route.ts`, `push/call/route.ts` **[FACT — repository]** |
+| 10 | Web Push **server auth (VAPID)** — *distinct from #9* | `web-push` | ^3.6.7 | RFC 8292 VAPID: ECDSA P-256-signed JWT | n/a (auth, not payload) | Open-source lib | No | Yes | same files **[FACT — repository / CONCLUSION]** |
+| 11 | Native push transport | Firebase Cloud Messaging | service | Provider transport | n/a | Google | No | Service | FCM path **[PROVIDER-DOCUMENTED]** |
+| 12 | Password hashing | Supabase Auth (GoTrue) | service | bcrypt (observed in a test record) | provider-set cost | Supabase | No | Yes (GoTrue OSS) | see §9 **[PROVIDER-DOCUMENTED/ASSUMPTION]** |
+| 13 | MFA (TOTP) | Supabase Auth | service | TOTP (RFC 6238) | provider params | Supabase | No | Yes | `auth/mfa.ts` **[PROVIDER-DOCUMENTED]** |
+| 14 | MFA recovery-code hashing | Node `crypto` | runtime | SHA-256 (unsalted, unkeyed) | see §10 | Toky | No | Yes | `recovery-hash.ts:10` **[FACT — repository]** |
+| 15 | DB/Storage at rest | Supabase | service | provider-managed | n/a | Supabase | No | Service | **[PROVIDER-DOCUMENTED/ASSUMPTION]** |
+| 16 | Hosting/edge at rest | Vercel | service | provider-managed | n/a | Vercel | No | Service | **[PROVIDER-DOCUMENTED/ASSUMPTION]** |
+
+## 3. Toky's custom protocol composition (explicit)
+
+Distinguishing the three layers, as required:
+
+1. **Standard algorithms** (not invented, not modified): AES-GCM, ECDH P-256,
+   PBKDF2-HMAC-SHA-256, SHA-256 — all via the Web Crypto API. **[FACT — repository]**
+2. **Toky's application-specific composition of those algorithms** (custom, in
+   the sense of being Toky's own design, though built from standard parts):
+   identity-key lifecycle, per-chat symmetric key generation, ECIES-style key
+   wrapping to each member, server-side wrapped-key distribution (`chat_keys`),
+   passphrase-encrypted private-key backup, message-envelope JSON formatting
+   (`{"v":1,…}` plaintext vs. `{"e":1,iv,ct}` sealed), and per-chat activation.
+   **[FACT — repository]** (`e2ee.ts`, `keystore.ts`, `chats.ts:380-391`)
+3. **A professionally audited standardized protocol**: **not present.** The system
+   is **not** identified as Signal, MLS (RFC 9420), OTR, or any complete published
+   specification, and **no independent audit** was found. **[FACT — repository /
+   scope]**
+
+> Do not describe Toky's complete E2EE system as "a standard protocol." It is a
+> standard-primitive-based, custom, unaudited composition.
+
+## 4. End-to-end encryption assessment (corrected)
+
+- **Optional / conditional, not guaranteed by default.** `createDirectChatWith`
+  calls `lockChat` **best-effort** at creation (wrapped in try/catch), so a
+  direct chat becomes encrypted **only if** `lockChat` succeeds.
+  **[FACT — repository]** (`chats.ts:211-232`)
+- **`lockChat` succeeds only when every member has a published identity public
+  key.** If any member is missing (`missing.length > 0`), it returns `{ok:false}`
+  and does **not** set `encrypted=true` — the chat stays plaintext. **[FACT —
+  repository]** (`keystore.ts:266-274,294`)
+- **Group chats / channels are not auto-locked.** `createGroupChat` /
+  `createChannel` do not call `lockChat`. Treat groups and channels as **not
+  E2EE** unless a user explicitly locks a group and all members are enrolled.
+  **[FACT — repository]** (`chats.ts:234-260`)
+- **No retroactive encryption.** `lockChat` is idempotent and never re-keys an
+  already-locked chat; messages sent **before** locking remain in their original
+  (plaintext) form. **[FACT — repository]** (`keystore.ts:261-264`)
+- **Unlocked chats are server-readable.** Send path stores plaintext JSON in
+  `ciphertext` and plaintext in `content`. **[FACT — repository]**
+  (`chats.ts:380-391`)
+- **Locked chats:** message text is AES-GCM-256 sealed under a per-chat key
+  wrapped to each member's ECDH P-256 public key; server stores only public keys,
+  wrapped keys, and ciphertext. Absent client compromise or a weak backup
+  passphrase, stored server data does not reveal locked-chat content.
+  **[CONCLUSION]**
+
+**Suggested accurate wording:** *"Toky provides optional application-level
+end-to-end encryption for chats where encryption has been enabled (direct chats
+attempt this automatically when both participants have set up encryption). Chats
+that are not encrypted — including group chats, channels, and messages predating
+activation — store message content in server-readable form, protected by
+transport encryption and database access controls but not by end-to-end
+encryption."*
+
+## 5. Attachment / media encryption (corrected)
+
+- Images, videos, audio, and files are uploaded to **Supabase Storage** and
+  referenced by path/URL. **[FACT — repository]**
+- For a locked chat, the **message payload** (which may contain the media
+  reference/metadata) is sealed, **but encrypting a reference does not encrypt the
+  underlying file.** **[FACT — repository]** (no media-byte encryption found)
+- The media object remains accessible per **Supabase Storage access policies**;
+  **Storage access controls + TLS are not equivalent to E2EE.** An operator or
+  infrastructure administrator with service-level access may technically access
+  stored media. **[CONCLUSION]**
+
+**Suggested wording:** *"Attachments are not currently end-to-end encrypted by
+Toky. For encrypted chats the message payload containing the attachment reference
+may be encrypted, but the underlying media object is stored without Toky
+application-layer encryption."*
+
+## 6. Private-key storage (corrected)
+
+- The identity private key is **exported to a JWK and written as plaintext into
+  the app's IndexedDB** (`toky-e2ee` database, `keys` store, `identity-priv`
+  key). It is **not** stored in Apple Keychain, Android Keystore, Secure Enclave,
+  or any hardware-backed store in the reviewed code. **[FACT — repository]**
+  (`keystore.ts:28-60,131-133,195-196`)
+- Documented sub-findings:
+  - **Extractable from a compromised device:** The key is stored as a plaintext
+    JWK, so an attacker with access to the app's IndexedDB could read it. **[FACT
+    — repository]**
+  - **Marked non-exportable?** No — the CryptoKey is generated `extractable=true`
+    and is exported to JWK for storage. **[FACT — repository]** (`e2ee.ts:42`)
+  - **Stored as plaintext locally?** Yes (unencrypted JWK). **[FACT — repository]**
+  - **Included in device backups?** Whether OS/cloud backups capture app
+    IndexedDB is platform-dependent and **not** determinable from the repo.
+    **[ASSUMPTION / unanswered]**
+  - **Removed on app-data clear?** Clearing the app's site/WebView data would
+    remove IndexedDB and thus the key. **[CONCLUSION]**
+  - **Screen-lock / biometric protection?** None found in the reviewed code.
+    **[FACT — repository: absence]**
+- Optional server backup is a **passphrase-encrypted** copy (PBKDF2 → AES-GCM) in
+  `key_backups`; the passphrase never leaves the device. **[FACT — repository]**
+
+**Suggested wording:** *"Toky stores the local private identity key in the
+application's IndexedDB inside the browser or Capacitor WebView context. The OS
+may sandbox app storage, but the reviewed code does not demonstrate storage in
+Apple Keychain, Android Keystore, Secure Enclave, or hardware-backed key storage;
+the key is held as a plaintext, exportable JWK."*
+
+## 7. WebRTC call-encryption assessment (corrected)
+
+*"Toky calls use WebRTC. Media is protected between WebRTC peers using DTLS-SRTP,
+including when encrypted packets are relayed through a standards-compliant TURN
+server. A TURN relay forwards encrypted media and ordinarily cannot decrypt its
+contents. Toky does not implement an additional application-level
+media-encryption protocol or a user-facing cryptographic identity-verification
+mechanism for calls."*
+
+Additional required detail:
+
+- **Topology:** **full-mesh peer-to-peer** — one `RTCPeerConnection` per remote
+  participant (`Map<string, RTCPeerConnection>`), local tracks added to each.
+  **[FACT — repository]** (`call-provider.tsx:128,365-366`)
+- **SFU / MCU / recording / media-processing service:** **none found.** No
+  server-side media component, no `MediaRecorder`, no recording route.
+  **[FACT — repository: absence]**
+- **Independent authentication of signaling fingerprints:** DTLS fingerprints are
+  exchanged via WebRTC signaling; **no separate/out-of-band authentication of
+  those fingerprints** is implemented. **[FACT — repository: absence]**
+- **User-facing call-peer verification (safety number for the call):** **not
+  present.** (A SHA-256 safety-number exists for **chat identity keys**, not for
+  verifying a call peer's media session.) **[FACT — repository]**
+- **Cloudflare role:** **STUN/TURN relay only** (`api/turn/route.ts`), with
+  short-lived credentials. **[FACT — repository]**
+
+## 8. Third-party services and provider labels (corrected)
+
+The following are **not** repository-verified and are labeled accordingly; each
+needs confirmation against authoritative provider documentation (links to verify):
+
+- **Supabase** — Auth (bcrypt, TOTP), Postgres, Storage; TLS in transit;
+  at-rest encryption & key management **[PROVIDER-DOCUMENTED / ASSUMPTION]**.
+  Verify: https://supabase.com/docs/guides/platform (and GoTrue source,
+  https://github.com/supabase/auth). Checked (to-verify): 2026-07-28.
+- **Vercel** — hosting/edge, TLS termination, at-rest **[PROVIDER-DOCUMENTED /
+  ASSUMPTION]**. Verify: https://vercel.com/docs/security. 2026-07-28.
+- **Firebase Cloud Messaging** — native push transport **[PROVIDER-DOCUMENTED]**.
+  Verify: https://firebase.google.com/docs/cloud-messaging. 2026-07-28.
+- **Cloudflare Realtime TURN** — STUN/TURN **[PROVIDER-DOCUMENTED]**. Verify:
+  https://developers.cloudflare.com/realtime/turn/. 2026-07-28.
+- **Standards** — Web Crypto:
+  https://developer.mozilla.org/en-US/docs/Web/API/Web_Crypto_API ; RFC 8291
+  (Web Push payload), RFC 8292 (VAPID), RFC 6238 (TOTP), RFC 8446 (TLS 1.3),
+  RFC 8827 (WebRTC DTLS-SRTP mandatory). Checked (to-verify): 2026-07-28.
+
+Exact **TLS versions**, **Supabase/Vercel at-rest algorithms and key
+management**, **Firebase transport details**, **Cloudflare infra encryption**,
+and **Apple/Google hardware-backed protection** are **not** repository-verifiable
+and must not be presented as repository facts. **[ASSUMPTION / PROVIDER-DOCUMENTED]**
+
+## 9. Password hashing and MFA (clarified)
+
+- **Password hashing:** A **test-user** password record examined during earlier
+  work used a **bcrypt-formatted** hash. Toky does **not** control Supabase's
+  service-side hashing configuration; the exact production algorithm and cost
+  must be confirmed via Supabase/GoTrue documentation or configuration. No hash
+  value is reproduced here. **[FACT — repository (test record) / PROVIDER-DOCUMENTED
+  (production)]**
+- **MFA (TOTP)** — three distinct layers:
+  1. **Toky client** calls Supabase MFA APIs (`supabase.auth.mfa.enroll/challenge/
+     verify`). **[FACT — repository]** (`auth/mfa.ts`)
+  2. **Supabase service-side TOTP** implementation and parameters (secret storage,
+     algorithm, digits, period). **[PROVIDER-DOCUMENTED]**
+  3. **Recovery-code hashing implemented by Toky** (see §10). **[FACT —
+     repository]**
+
+## 10. Recovery-code protection (detailed)
+
+From `api/mfa/recovery/generate/route.ts`, `consume/route.ts`, `recovery-hash.ts`,
+`rate-limit.ts`. **[FACT — repository]**
+
+- **Count / length / format:** 10 codes; each 10 symbols shown as `XXXXX-XXXXX`.
+- **Alphabet:** `ABCDEFGHJKLMNPQRSTUVWXYZ23456789` — 32 symbols (0/O/1/I removed).
+- **Entropy:** 10 symbols × log2(32) = **~50 bits** per code. Because the alphabet
+  size (32) divides 256, `byte % 32` is unbiased. **[CONCLUSION]**
+- **RNG:** Node `crypto.randomBytes` (CSPRNG). **[FACT — repository]**
+- **Storage:** only the **SHA-256 hex hash** (`code_hash`) is stored; **no salt,
+  no keyed HMAC**. (Acceptable given ~50-bit entropy + rate limiting, but noted;
+  unsalted fast-hash offers no protection for *low*-entropy secrets.) **[FACT —
+  repository]**
+- **One-time consumption:** a code matches only where `used_at IS NULL`, then is
+  marked used. **[FACT — repository]**
+- **Rate limits:** generate 10/60s, consume 5/60s per user — but the limiter is
+  **in-memory per process** (per warm serverless instance), **not a durable
+  global cap**. **[FACT — repository]** (`rate-limit.ts`)
+- **Regeneration:** generating new codes **deletes all previous codes** first
+  (previous codes are invalidated). **[FACT — repository]**
+- **Effect of successful recovery:** all TOTP factors are **deleted** (2FA turned
+  **off**) and all recovery codes cleared; the user must re-enable 2FA. **[FACT —
+  repository]**
+- **Audit logging of recovery events:** **none found** in the reviewed code.
+  **[FACT — repository: absence / unanswered]**
+
+*Do not claim hashing alone makes codes safe.* Safety here rests on **~50-bit
+entropy + one-time use + rate limiting**; note the rate limiter's per-instance
+scope as a limitation.
+
+## 11. Web Push terminology (corrected)
+
+- **Payload encryption (RFC 8291):** protects push **message content** using
+  **ECDH P-256 + HKDF-SHA-256 + AES-128-GCM**. **[FACT — repository / CONCLUSION]**
+- **VAPID (RFC 8292):** authenticates the **application server** to the push
+  service via an **ECDSA P-256-signed JWT**. **VAPID is server identification,
+  not the payload-encryption mechanism.** The two are separate functions (see
+  inventory rows #9 and #10). **[FACT — repository / CONCLUSION]**
+
+## 12. Sanctions-control findings (qualified)
+
+Current implementation — **each absence is stated as "not implemented," not as a
+legal violation**:
+
+- **Country registration restriction:** Not implemented. **[FACT — repository]**
+- **IP-based geoblocking:** Not implemented. **[FACT — repository]**
+- **Denied-party / sanctioned-person screening:** Not implemented. **[FACT —
+  repository]**
+- **Prohibited-end-use detection:** Not implemented. **[FACT — repository]**
+
+> For each: *"Not implemented. Whether this control is legally required for Toky's
+> intended distribution requires professional sanctions/export-control review."*
+> **[LEGAL]**
+
+Distinctions that matter for a reviewer:
+
+- **Google Play country availability** is a store-console setting (not in code)
+  and does **not** restrict the **web app** (Vercel), **Supabase account
+  registration**, **existing users traveling**, or **backend services** that keep
+  operating outside Play. **[CONCLUSION]**
+- The `country` values `GT`/`CR` (`src/types/chat.ts:4`,
+  `api/chat/start/route.ts:11`) are **business routing**, not an export/sanctions
+  control. **[FACT — repository]**
+
+## 13. Distribution findings (evidence-based)
+
+- **Web application (Vercel):** the app is a public Next.js site; **no
+  geographic/registration gate was found in the repository.** Whether the
+  deployment is publicly reachable and in which regions is a **[FACT — live
+  configuration]** to confirm in Vercel — not inferable from code alone.
+- **Registration:** email/password sign-up via Supabase Auth; **no invitation-only
+  gate or country gate found in code.** **[FACT — repository]** (`app/login`)
+- **Public customer-chat routes:** `GET/POST /api/public-chat/[token]` and
+  `/public-chat/[token]` allow **token-scoped access without user
+  authentication** (anyone holding a valid `public_token`). **[FACT —
+  repository]**
+- **Google Play track, TestFlight availability, selected Play countries:** **not
+  determinable from the repository** (they live in the store consoles). Do **not**
+  infer "limited distribution" from planning docs such as `STORE_SUBMISSION.md`.
+  **[ASSUMPTION / live configuration — unanswered]**
+- **Supabase auth geographic restrictions:** none found in code; provider/console
+  setting. **[ASSUMPTION]**
+
+## 14. Security-review limitation
+
+> This review is an **export-compliance technical inventory, not a cryptographic
+> security audit.** The use of standard algorithms does **not** establish that
+> Toky's custom key-management and encryption protocol is secure. **No independent
+> protocol review, penetration test, formal verification, or cryptographic audit
+> was performed.** An independent cryptographic security review is recommended
+> before making strong public E2EE claims.
+
+## 15. Inaccurate / broader-than-supported public claims (with file references)
+
+Each item below is **broader than the verified code** (which makes E2EE
+conditional; see §4). Recommended path per item: **(a)** change the
+implementation so the claim becomes universally true (e.g., enforce E2EE and
+block sends when it can't be established), **or (b)** revise the wording to match
+the current conditional behavior. *(No public files were modified in this
+review.)*
+
+- `src/app/privacy/page.tsx:68` — *"in direct (one-to-one) chats, the text and
+  details of your messages are **end-to-end encrypted by default** … we cannot
+  read that content."* → Overbroad: E2EE is best-effort/conditional; unenrolled
+  counterpart or pre-lock messages are server-readable.
+  *(Correctly states media not E2E and groups/channels not E2E.)*
+- `src/app/terms/page.tsx:27` — *"Direct chats are **end-to-end encrypted by
+  default**; group chats and channels may not be."* → Overbroad ("by default"
+  unqualified).
+- `docs/STORE_SUBMISSION.md:37-38` — *"direct-chat message text is
+  E2E-encrypted."* → Overbroad (states unconditionally).
+- `docs/STORE_LISTING.md:73` — *"Encryption is on by default for direct chats."*
+  (reviewer notes) → Overbroad.
+- `docs/STORE_LISTING.md:47,98,127` and `docs/STORE_SUBMISSION.md:127` — *"Turn on
+  end-to-end encryption for private chats **only you and the recipient can
+  read**."* → The "turn on" framing is closer to accurate, but "only you and the
+  recipient can read" should be scoped to **locked** chats with **both** parties
+  enrolled.
+- `src/app/onboarding/page.tsx:100-102` — code comment *"is what lets direct chats
+  be encrypted **by default**."* → Internal comment overstates; enrollment enables
+  the *ability*, not guaranteed encryption of every chat.
+- **Not found (good):** no claim that **all** messages are E2EE, that **media** is
+  E2EE, that **calls** have independently verified E2EE, or that private keys are
+  in **Apple Keychain / Android Keystore**. If such claims are added later
+  (marketing, screenshots), they would be unsupported by current code.
+
+## 16. Potential export-classification considerations (professional review) — [LEGAL]
+
+- Whether Toky is **subject to the EAR** given it incorporates encryption.
+- Whether **ECCN 5D002** applies. *Do not determine this from key size alone:*
+
+> Toky uses AES-GCM-256 and ECDH P-256. A qualified export-control professional
+> must evaluate these functions under the current EAR Category 5, Part 2 criteria,
+> definitions, notes, exclusions, and License Exception ENC requirements. This
+> report does not determine classification from key size alone.
+
+- Whether Toky qualifies as **mass-market** software and the interplay with
+  **License Exception ENC (§740.17)**, **self-classification report** vs. **BIS
+  CCATS**, and possible **5D992** treatment.
+- Whether **encryption registration / annual self-classification reporting** is
+  required.
+- Whether any **country/destination license requirements** apply.
+
+None of the above is asserted as a conclusion. **[LEGAL]**
+
+## 17. Unanswered questions
+
+- Provider at-rest algorithms/key management (Supabase, Vercel); exact TLS
+  versions; Firebase/Cloudflare infra crypto. **[ASSUMPTION / PROVIDER-DOCUMENTED]**
+- Whether OS/cloud device backups capture the IndexedDB private key. **[ASSUMPTION]**
+- Whether recovery events are logged anywhere (none found in code). **[unanswered]**
+- Live distribution posture: Play track, TestFlight, selected Play countries, web
+  reachability, whether registration is effectively open. **[live configuration]**
+- Exact Supabase bcrypt cost and TOTP parameters. **[PROVIDER-DOCUMENTED]**
+- Whether a decision will be made to make E2EE mandatory (and block sends when it
+  can't be established) vs. keep it conditional. **[product]**
+
+## 18. Recommended next steps (technical + legal)
+
+**Technical**
+1. Reconcile public E2EE claims (§15): either enforce E2EE for direct chats (and
+   fail-closed) or revise Privacy/Terms/Store copy to describe conditional E2EE.
+2. Decide on **media E2EE** for locked chats (currently plaintext-at-rest in
+   Storage behind access controls).
+3. Consider hardware-backed/OS-protected key storage and marking keys
+   non-exportable; consider at-rest protection of the local JWK.
+4. Consider durable (cross-instance) rate limiting and audit logging for recovery.
+5. Consider a user-facing verification story for calls if stronger call claims are
+   desired.
+
+**Legal / compliance**
+6. Engage a **qualified export-control professional** with §§2–11 to determine
+   ECCN, ENC eligibility, and any registration/reporting.
+7. Obtain **sanctions/export counsel** on whether any country/registration/
+   screening controls are required for the intended distribution (none exist
+   today).
+8. Commission an **independent cryptographic audit** before strong public E2EE
+   claims (§14).
+
+## Final conclusion
+
+> This report provides **technical facts** for export-classification analysis. It
+> does **not** establish EAR jurisdiction, ECCN classification, mass-market
+> status, License Exception ENC eligibility, reporting obligations, license
+> requirements, or sanctions compliance — and **checking the Google Play export-law
+> declaration is not, by itself, sufficient to establish compliance.** Those
+> determinations require review by a qualified export-control professional.
 
 ---
 
 *Prepared from source inspection only; the application and database were not
-modified. Verification labels indicate the basis for each statement. This is a
-technical description, not legal advice.*
+modified. Evidence labels indicate the basis for each statement. Not legal advice;
+not a security audit.*
