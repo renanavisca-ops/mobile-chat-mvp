@@ -51,6 +51,24 @@ Use the **reviewer/demo account** here (the same credentials you give App Store
 it on a normal machine — a locked-down CI/agent sandbox will block those hosts.
 Add `TOKY_HEADFUL=1` to watch it, or `TOKY_THEME=light` for light-mode shots.
 
+## Native key storage (E2EE private key)
+
+On the **native apps**, the end-to-end-encryption identity **private key** is
+stored with the OS secure-storage plugin
+[`@aparajita/capacitor-secure-storage`](https://github.com/aparajita/capacitor-secure-storage)
+(MIT; v6 line for Capacitor 6): **Apple Keychain** on iOS,
+**EncryptedSharedPreferences (Android Keystore-backed)** on Android. On the
+**web** the key stays in the browser's **IndexedDB** (documented fallback).
+
+- Runtime is detected with `isNativeApp()`; the plugin is only loaded on native.
+- On first launch after updating, a **one-time, verified migration** moves any
+  existing IndexedDB key into secure storage and deletes the IndexedDB copy
+  **only after** a successful read-back (`src/lib/crypto/key-migration.ts`,
+  unit-tested). If verification fails, the IndexedDB copy is kept (recoverable).
+- `cap sync` auto-links the native plugin — no extra native config needed.
+- We do **not** claim Secure Enclave / hardware-backed storage; that depends on
+  the device and is not asserted.
+
 ## Building without a Mac (Codemagic)
 
 You don't have a Mac, so iOS is built in the cloud with **Codemagic** (macOS

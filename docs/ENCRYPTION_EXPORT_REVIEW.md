@@ -47,10 +47,14 @@ findings (notably "conditional/optional E2EE" and "media not E2EE"):
   encrypted chats are encrypted **on-device before upload** (AES-GCM-256, fresh
   per-object key + 96-bit IV); Supabase Storage receives **ciphertext**. Cap
   25 MB single-shot; larger rejected. See `docs/MEDIA_ENCRYPTION.md`.
-- **Phase 4 — native key storage (still pending).** The identity private key is
-  **still** a plaintext exportable JWK in IndexedDB on all platforms; Apple
-  Keychain / Android Keystore hardening is **not yet implemented**, so §6 remains
-  accurate as written.
+- **Phase 4 — native key storage (implemented; on-device verification via
+  Codemagic).** On the native apps the identity private key is now stored via
+  `@aparajita/capacitor-secure-storage` — **Apple Keychain** (iOS) /
+  **EncryptedSharedPreferences, Android Keystore-backed** (Android) — with a
+  one-time verified IndexedDB→secure migration (unit-tested). The **web** build
+  keeps the IndexedDB fallback, so §6 still describes the web case. We do **not**
+  claim Secure Enclave / hardware-backed storage; final on-device confirmation is
+  done in the Codemagic build.
 
 Net current state: for **new** direct chats, message text **and** attachments are
 end-to-end encrypted and fail-closed; group chats, channels, legacy direct chats,
