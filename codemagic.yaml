@@ -86,6 +86,7 @@ workflows:
       - name: Build release AAB
         script: |
           cd android
+          chmod +x ./gradlew
           ./gradlew bundleRelease \
             -PversionCode=$(($BUILD_NUMBER + 1))
     artifacts:
