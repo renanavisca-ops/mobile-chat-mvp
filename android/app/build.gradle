@@ -19,8 +19,23 @@ android {
             ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    // Release signing. On CI (Codemagic) the keystore is provided through the
+    // CM_* environment variables set by `android_signing`; locally these are
+    // unset and release stays unsigned (we don't build release locally).
+    signingConfigs {
+        release {
+            def ksPath = System.getenv('CM_KEYSTORE_PATH')
+            if (ksPath) {
+                storeFile file(ksPath)
+                storePassword System.getenv('CM_KEYSTORE_PASSWORD')
+                keyAlias System.getenv('CM_KEY_ALIAS')
+                keyPassword System.getenv('CM_KEY_PASSWORD')
+            }
+        }
+    }
     buildTypes {
         release {
+            signingConfig signingConfigs.release
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
