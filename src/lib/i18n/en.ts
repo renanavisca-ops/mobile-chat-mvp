@@ -251,6 +251,7 @@ const en = {
     encryptedLocked: 'Encrypted message — unlock encryption to read',
     encryptionSetupFirst: 'Set up encryption first in Settings → Encryption.',
     encryptionMissingMembers: 'Everyone here must set up encryption first.',
+    encryptionRequiredToSend: 'This chat is end-to-end encrypted and can’t send until the other person finishes setting up encryption. Ask them to open Toky, then try again. Set up your own key in Settings → Encryption.',
   },
   contacts: {
     title: 'Contacts',

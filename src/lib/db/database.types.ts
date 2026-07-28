@@ -72,6 +72,7 @@ export type Database = {
           created_by: string | null
           description: string | null
           disappearing_seconds: number | null
+          enc_required: boolean
           encrypted: boolean
           id: string
           is_public: boolean
@@ -88,6 +89,7 @@ export type Database = {
           created_by?: string | null
           description?: string | null
           disappearing_seconds?: number | null
+          enc_required?: boolean
           encrypted?: boolean
           id?: string
           is_public?: boolean
@@ -104,6 +106,7 @@ export type Database = {
           created_by?: string | null
           description?: string | null
           disappearing_seconds?: number | null
+          enc_required?: boolean
           encrypted?: boolean
           id?: string
           is_public?: boolean

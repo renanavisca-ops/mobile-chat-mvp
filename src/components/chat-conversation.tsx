@@ -13,7 +13,7 @@ import { getWallpaperId, wallpaperCss, getCustomWallpaperUrl, CUSTOM_WALLPAPER_I
 import { blockUser, unblockUser, isBlockedByMe } from '@/lib/db/safety';
 import { EmojiPicker } from '@/components/emoji-picker';
 import { useRequireAuth } from '@/lib/auth/use-require-auth';
-import { listChats, sendMessage, deleteMessage, hideMessageForMe, editMessage, pinMessage, unpinMessage, searchMessages, setChatMuted, getChatMuted, toggleReaction, createPoll, votePoll, setDisappearingMessages, enableChatEncryption } from '@/lib/db/chats';
+import { listChats, sendMessage, deleteMessage, hideMessageForMe, editMessage, pinMessage, unpinMessage, searchMessages, setChatMuted, getChatMuted, toggleReaction, createPoll, votePoll, setDisappearingMessages, enableChatEncryption, EncryptionRequiredError } from '@/lib/db/chats';
 import { initKeystore, isUnlocked } from '@/lib/crypto/keystore';
 import { forwardMessageToChats, type ForwardPayload } from '@/lib/db/forward';
 import { uploadChatImage, uploadChatMedia, uploadChatAudio, uploadChatFile, createSignedChatMediaUrl } from '@/lib/storage/upload';
@@ -258,7 +258,7 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
       }
       setChat((prev) => (prev ? { ...prev, encrypted: true } : prev));
     } catch (e: any) {
-      setErr(e?.message ?? String(e));
+      setErr(sendErrorMessage(e));
     } finally {
       setEncBusy(false);
       setSafetyMenuOpen(false);
@@ -271,7 +271,7 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
       await setDisappearingMessages(chatId, seconds);
       setChat((prev) => (prev ? { ...prev, disappearing_seconds: seconds || null } : prev));
     } catch (e: any) {
-      setErr(e?.message ?? String(e));
+      setErr(sendErrorMessage(e));
     } finally {
       setDisappearingBusy(false);
       setDisappearingMenuOpen(false);
@@ -286,7 +286,7 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
       await setChatMuted(chatId, next);
       setMuted(next);
     } catch (e: any) {
-      setErr(e?.message ?? String(e));
+      setErr(sendErrorMessage(e));
     } finally {
       setMuteBusy(false);
       setSafetyMenuOpen(false);
@@ -341,6 +341,16 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
 
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
+
+  // Turn a send failure into a clear, localized message. A fail-closed E2EE
+  // chat (peer hasn't set up encryption) surfaces an actionable explanation
+  // instead of the raw error.
+  function sendErrorMessage(e: any): string {
+    if (e instanceof EncryptionRequiredError || e?.name === 'EncryptionRequiredError') {
+      return t('chat.encryptionRequiredToSend');
+    }
+    return e?.message ?? String(e);
+  }
 
   // Signed URL cache (path -> url)
   const [signedUrls, setSignedUrls] = useState<Record<string, string>>({});
@@ -555,7 +565,7 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
     try {
       await toggleReaction(messageId, chatId, emoji);
     } catch (e: any) {
-      setErr(e?.message ?? String(e));
+      setErr(sendErrorMessage(e));
     }
   }
 
@@ -567,7 +577,7 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
     try {
       await votePoll(messageId, chatId, optionIndex);
     } catch (e: any) {
-      setErr(e?.message ?? String(e));
+      setErr(sendErrorMessage(e));
     }
   }
 
@@ -639,7 +649,7 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
     try {
       await sendMessage(chatId, payload as any);
     } catch (e: any) {
-      setErr(e?.message ?? String(e));
+      setErr(sendErrorMessage(e));
     }
   }
 
@@ -694,7 +704,7 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
         setBlocked(true);
       }
     } catch (e: any) {
-      setErr(e?.message ?? String(e));
+      setErr(sendErrorMessage(e));
     } finally {
       setBlockBusy(false);
       setSafetyMenuOpen(false);
@@ -748,7 +758,7 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
         tap();
       }
     } catch (e: any) {
-      setErr(e?.message ?? String(e));
+      setErr(sendErrorMessage(e));
       setStarredIds((prev) => {
         const n = new Set(prev);
         if (starred) n.add(messageId);
@@ -980,7 +990,7 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
     try {
       for (const id of ids) await hideMessageForMe(id, chatId);
     } catch (e: any) {
-      setErr(e?.message ?? String(e));
+      setErr(sendErrorMessage(e));
     } finally {
       setBusy(false);
     }
@@ -1197,7 +1207,7 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
       setReplyingTo(null);
       await sendMessage(chatId, payload as any);
     } catch (e: any) {
-      setErr(e?.message ?? String(e));
+      setErr(sendErrorMessage(e));
     } finally {
       setBusy(false);
     }
@@ -1309,7 +1319,7 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
         setEditingId(null);
         setText('');
       } catch (e: any) {
-        setErr(e?.message ?? String(e));
+        setErr(sendErrorMessage(e));
       } finally {
         setBusy(false);
       }
@@ -1412,7 +1422,7 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
       setText('');
       await sendMessage(chatId, payload as any);
     } catch (e: any) {
-      setErr(e?.message ?? String(e));
+      setErr(sendErrorMessage(e));
     } finally {
       setBusy(false);
     }
@@ -1812,7 +1822,7 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
                   setChat((prev) => (prev ? { ...prev, pinned_message_id: actionsMsg.id } : prev));
                 }
               } catch (e: any) {
-                setErr(e?.message ?? String(e));
+                setErr(sendErrorMessage(e));
               }
             },
           },
