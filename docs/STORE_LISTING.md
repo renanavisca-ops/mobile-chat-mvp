@@ -44,7 +44,7 @@ chat,mensajería,familia,amigos,videollamada,llamadas,grupos,conectar,privado,hi
 ```
 
 **Description** (≤4000) — EN
-> Toky Chat is where you stay close to the people you love — a fast, modern messenger for the people who matter most. Send messages, share photos, videos, GIFs and emoji, react, and start voice or video calls — one-on-one or in groups. Turn on end-to-end encryption for private chats only you and the recipient can read. Share moments with stories, keep an eye on your call history, and get notified the moment a message arrives — even when the app is closed.
+> Toky Chat is where you stay close to the people you love — a fast, modern messenger for the people who matter most. Send messages, share photos, videos, GIFs and emoji, react, and start voice or video calls — one-on-one or in groups. Private one-to-one chats are end-to-end encrypted, so only you and the recipient can read them. Share moments with stories, keep an eye on your call history, and get notified the moment a message arrives — even when the app is closed.
 >
 > • Voice & video calls, with in-call switch to video
 > • Group chats, reactions, polls, and stories
@@ -70,8 +70,9 @@ chat,mensajería,familia,amigos,videollamada,llamadas,grupos,conectar,privado,hi
 > native features (push notifications, camera, and voice/video calls) run
 > through native APIs and can be demonstrated with the demo account. Sign in
 > with the credentials below; the account already has chats, a group, and
-> contacts. Direct chats encrypt automatically once both people have set up
-> encryption; group chats and channels are not end-to-end encrypted.
+> contacts. New direct chats require end-to-end encryption (they will not send
+> until both people have set it up), and attachments in encrypted chats are
+> encrypted too; group chats and channels are not end-to-end encrypted.
 >
 > Demo account — Email: appreview@toky.chat · Password: TokyReview!2026
 
@@ -96,7 +97,7 @@ chat,mensajería,familia,amigos,videollamada,llamadas,grupos,conectar,privado,hi
 > Mantente cerca de quienes amas: chats, llamadas de voz y video, y grupos.
 
 **Full description** (≤4000) — EN
-> Toky Chat is where you stay close to the people you love — a fast, modern messenger for the people who matter most. Send messages, share photos, videos, GIFs and emoji, react, and start voice or video calls — one-on-one or in groups. Turn on end-to-end encryption for private chats only you and the recipient can read. Share moments with stories, keep an eye on your call history, and get notified the moment a message arrives — even when the app is closed.
+> Toky Chat is where you stay close to the people you love — a fast, modern messenger for the people who matter most. Send messages, share photos, videos, GIFs and emoji, react, and start voice or video calls — one-on-one or in groups. Private one-to-one chats are end-to-end encrypted, so only you and the recipient can read them. Share moments with stories, keep an eye on your call history, and get notified the moment a message arrives — even when the app is closed.
 >
 > Features:
 > • Voice & video calls, with in-call switch to video
