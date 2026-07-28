@@ -64,8 +64,10 @@ workflows:
     instance_type: linux_x2
     max_build_duration: 60
     environment:
-      groups:
-        - toky_android
+      # Note: the `toky_android` variable group (GCLOUD_SERVICE_ACCOUNT) and the
+      # google_play auto-publishing block are omitted for now — the first
+      # releases are uploaded to Play by hand. Add them back to auto-publish
+      # once a Google Play service account is configured.
       android_signing:
         - keystore_reference
       node: 20
@@ -87,8 +89,3 @@ workflows:
     artifacts:
       - android/app/build/outputs/**/*.aab
       - android/app/build/outputs/**/*.apk
-    publishing:
-      google_play:
-        credentials: $GCLOUD_SERVICE_ACCOUNT
-        track: internal
-        submit_as_draft: true
