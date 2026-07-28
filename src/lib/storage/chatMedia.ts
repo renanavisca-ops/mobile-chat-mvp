@@ -1,6 +1,7 @@
 'use client';
 
 import { browserSupabase } from '@/lib/supabase/client';
+import { encryptMedia, decryptMedia, type MediaEnc } from '@/lib/crypto/media';
 
 const IMAGE_MIME = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const IMAGE_EXT = new Set(['jpg', 'jpeg', 'png', 'webp']);
@@ -184,6 +185,41 @@ export async function createSignedChatMediaUrl(path: string, expiresSeconds = 60
   const { data, error } = await supabase.storage.from('chat-media').createSignedUrl(path, expiresSeconds);
   if (error) throw error;
   return data.signedUrl;
+}
+
+/**
+ * Encrypt a file with toky-media-v1 and upload only the ciphertext to
+ * chats/<chatId>/enc/. Returns the storage path plus the per-object encryption
+ * metadata to embed in the (sealed) message payload. Used for encrypted chats.
+ */
+export async function uploadEncryptedChatMedia(input: {
+  chatId: string;
+  file: Blob;
+}): Promise<{ path: string; enc: MediaEnc }> {
+  const { chatId, file } = input;
+  const { cipher, enc } = await encryptMedia(file);
+  const path = `chats/${chatId}/enc/${Date.now()}_${crypto.randomUUID()}.enc`;
+  const supabase = browserSupabase();
+  const { error } = await supabase.storage.from('chat-media').upload(path, cipher, {
+    contentType: 'application/octet-stream',
+    upsert: false,
+  });
+  if (error) throw error;
+  return { path, enc };
+}
+
+/**
+ * Download an encrypted object via a short-lived signed URL, decrypt it in
+ * memory, and return an object URL of the plaintext. The caller must
+ * URL.revokeObjectURL(...) it when done.
+ */
+export async function fetchDecryptedMediaUrl(path: string, enc: MediaEnc): Promise<string> {
+  const signed = await createSignedChatMediaUrl(path, 300);
+  const res = await fetch(signed);
+  if (!res.ok) throw new Error('Could not fetch encrypted media.');
+  const bytes = await res.arrayBuffer();
+  const blob = await decryptMedia(bytes, enc);
+  return URL.createObjectURL(blob);
 }
 
 const MAX_FILE_BYTES = 25 * 1024 * 1024; // 25MB
