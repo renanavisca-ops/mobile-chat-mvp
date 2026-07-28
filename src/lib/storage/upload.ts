@@ -4,5 +4,5 @@
  * Exporta helpers oficiales desde chatMedia.ts
  * (evita que imports viejos usen helpers incorrectos)
  */
-export { uploadChatImage, uploadChatMedia, uploadChatAudio, uploadChatFile, createSignedChatMediaUrl } from '@/lib/storage/chatMedia';
+export { uploadChatImage, uploadChatMedia, uploadChatAudio, uploadChatFile, createSignedChatMediaUrl, uploadEncryptedChatMedia, fetchDecryptedMediaUrl } from '@/lib/storage/chatMedia';
 export type { UploadedFile } from '@/lib/storage/chatMedia';

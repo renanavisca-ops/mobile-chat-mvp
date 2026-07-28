@@ -13,10 +13,11 @@ import { getWallpaperId, wallpaperCss, getCustomWallpaperUrl, CUSTOM_WALLPAPER_I
 import { blockUser, unblockUser, isBlockedByMe } from '@/lib/db/safety';
 import { EmojiPicker } from '@/components/emoji-picker';
 import { useRequireAuth } from '@/lib/auth/use-require-auth';
-import { listChats, sendMessage, deleteMessage, hideMessageForMe, editMessage, pinMessage, unpinMessage, searchMessages, setChatMuted, getChatMuted, toggleReaction, createPoll, votePoll, setDisappearingMessages, enableChatEncryption, EncryptionRequiredError } from '@/lib/db/chats';
+import { listChats, sendMessage, deleteMessage, hideMessageForMe, editMessage, pinMessage, unpinMessage, searchMessages, setChatMuted, getChatMuted, toggleReaction, createPoll, votePoll, setDisappearingMessages, enableChatEncryption, chatMustEncrypt, EncryptionRequiredError } from '@/lib/db/chats';
 import { initKeystore, isUnlocked } from '@/lib/crypto/keystore';
 import { forwardMessageToChats, type ForwardPayload } from '@/lib/db/forward';
-import { uploadChatImage, uploadChatMedia, uploadChatAudio, uploadChatFile, createSignedChatMediaUrl } from '@/lib/storage/upload';
+import { uploadChatImage, uploadChatMedia, uploadChatAudio, uploadChatFile, createSignedChatMediaUrl, uploadEncryptedChatMedia, fetchDecryptedMediaUrl } from '@/lib/storage/upload';
+import type { MediaEnc } from '@/lib/crypto/media';
 import { useChatRealtime } from '@/lib/realtime/use-chat-realtime';
 import { browserSupabase } from '@/lib/supabase/client';
 import { useOnlineUsers } from '@/components/presence-provider';
@@ -57,6 +58,8 @@ type Payload = {
   reply_to?: string;
   is_deleted?: boolean;
   poll?: { question: string; options: string[] };
+  /** Per-path media encryption metadata (toky-media-v1) for encrypted chats. */
+  enc?: Record<string, MediaEnc>;
 };
 
 function formatBytes(bytes?: number): string {
@@ -352,8 +355,45 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
     return e?.message ?? String(e);
   }
 
-  // Signed URL cache (path -> url)
+  // Signed URL cache (path -> url). For encrypted media the value is a decrypted
+  // object URL; those are tracked so we can revoke them on unmount.
   const [signedUrls, setSignedUrls] = useState<Record<string, string>>({});
+  const objectUrlsRef = useRef<string[]>([]);
+  function trackObjectUrl(url: string) {
+    objectUrlsRef.current.push(url);
+  }
+  useEffect(() => {
+    return () => {
+      for (const u of objectUrlsRef.current) {
+        try { URL.revokeObjectURL(u); } catch {}
+      }
+      objectUrlsRef.current = [];
+    };
+  }, []);
+
+  // Upload one attachment for this chat. In an encrypted chat the bytes are
+  // encrypted client-side (toky-media-v1) and only ciphertext is uploaded; a
+  // local object URL of the original is cached for instant preview. In a legacy
+  // chat the original is uploaded and a signed URL prefetched.
+  async function putMedia(
+    file: Blob,
+    encMode: boolean,
+    legacyUpload: () => Promise<{ path: string }>,
+  ): Promise<{ path: string; enc?: MediaEnc }> {
+    if (encMode) {
+      const { path, enc } = await uploadEncryptedChatMedia({ chatId, file });
+      const localUrl = URL.createObjectURL(file);
+      trackObjectUrl(localUrl);
+      setSignedUrls((prev) => ({ ...prev, [path]: localUrl }));
+      return { path, enc };
+    }
+    const { path } = await legacyUpload();
+    try {
+      const url = await createSignedChatMediaUrl(path, 300);
+      setSignedUrls((prev) => ({ ...prev, [path]: url }));
+    } catch {}
+    return { path };
+  }
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const [showScrollDown, setShowScrollDown] = useState(false);
   // Swipe-to-reply: track the gesture start and the live horizontal pull.
@@ -895,8 +935,10 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
   async function sendAudioMessage(blob: Blob) {
     setBusy(true);
     try {
-      const { path } = await uploadChatAudio(chatId, blob);
+      const encMode = await chatMustEncrypt(chatId);
+      const { path, enc } = await putMedia(blob, encMode, () => uploadChatAudio(chatId, blob));
       const payload: Payload = { audioPath: path };
+      if (enc) payload.enc = { [path]: enc };
       if (replyingTo) payload.reply_to = replyingTo.id;
 
       const temp: MessageRow = {
@@ -933,15 +975,27 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
     let cancelled = false;
 
     async function resolveMissing() {
-      const allPaths = new Set<string>();
-      for (const m of items) for (const p of extractAllPaths(m.body)) allPaths.add(p);
+      // Map each media path to its per-object encryption metadata (if any).
+      const encByPath = new Map<string, MediaEnc | undefined>();
+      for (const m of items) {
+        for (const p of extractAllPaths(m.body)) {
+          if (!encByPath.has(p)) encByPath.set(p, m.body.enc?.[p]);
+        }
+      }
 
-      const missing = Array.from(allPaths).filter((p) => !signedUrls[p]);
+      const missing = Array.from(encByPath.keys()).filter((p) => !signedUrls[p]);
       if (missing.length === 0) return;
 
       try {
         const pairs = await Promise.all(
           missing.map(async (path) => {
+            const enc = encByPath.get(path);
+            if (enc) {
+              // Encrypted media: download ciphertext, decrypt to an object URL.
+              const url = await fetchDecryptedMediaUrl(path, enc);
+              trackObjectUrl(url);
+              return [path, url] as const;
+            }
             const url = await createSignedChatMediaUrl(path, 300);
             return [path, url] as const;
           })
@@ -1180,19 +1234,34 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
     setErr('');
     setBusy(true);
     try {
-      const uploaded = await uploadChatFile(chatId, file);
-      const payload: Payload = {
-        filePath: uploaded.path,
-        fileName: uploaded.name,
-        fileSize: uploaded.size,
-        fileMime: uploaded.mime,
-      };
+      const encMode = await chatMustEncrypt(chatId);
+      let payload: Payload;
+      if (encMode) {
+        const { path, enc } = await uploadEncryptedChatMedia({ chatId, file });
+        const localUrl = URL.createObjectURL(file);
+        trackObjectUrl(localUrl);
+        setSignedUrls((prev) => ({ ...prev, [path]: localUrl }));
+        payload = {
+          filePath: path,
+          fileName: sanitizeFilename(file.name),
+          fileSize: file.size,
+          fileMime: file.type || 'application/octet-stream',
+          enc: { [path]: enc },
+        };
+      } else {
+        const uploaded = await uploadChatFile(chatId, file);
+        payload = {
+          filePath: uploaded.path,
+          fileName: uploaded.name,
+          fileSize: uploaded.size,
+          fileMime: uploaded.mime,
+        };
+        try {
+          const url = await createSignedChatMediaUrl(uploaded.path, 300);
+          setSignedUrls((prev) => ({ ...prev, [uploaded.path]: url }));
+        } catch {}
+      }
       if (replyingTo) payload.reply_to = replyingTo.id;
-
-      try {
-        const url = await createSignedChatMediaUrl(uploaded.path, 300);
-        setSignedUrls((prev) => ({ ...prev, [uploaded.path]: url }));
-      } catch {}
 
       const temp: MessageRow = {
         id: `local-${crypto.randomUUID()}`,
@@ -1333,15 +1402,13 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
     try {
       // VIDEO
       if (pendingVideo) {
-        const { path } = await uploadChatMedia({ chatId, file: pendingVideo, kind: 'video' });
-
-        // Prefetch signed url for instant render
-        try {
-          const url = await createSignedChatMediaUrl(path, 300);
-          setSignedUrls((prev) => ({ ...prev, [path]: url }));
-        } catch {}
+        const encMode = await chatMustEncrypt(chatId);
+        const { path, enc } = await putMedia(pendingVideo, encMode, () =>
+          uploadChatMedia({ chatId, file: pendingVideo, kind: 'video' }),
+        );
 
         const payload: Payload = t2 ? { text: t2, videoPath: path } : { videoPath: path };
+        if (enc) payload.enc = { [path]: enc };
         if (pendingVideoTrim) {
           payload.videoTrimStart = Math.round(pendingVideoTrim.start * 10) / 10;
           payload.videoTrimEnd = Math.round(pendingVideoTrim.end * 10) / 10;
@@ -1369,20 +1436,16 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
 
       // IMAGES (multi)
       if (pendingImages.length > 0) {
-        const results = await Promise.all(pendingImages.map((file) => uploadChatImage(chatId, file)));
+        const encMode = await chatMustEncrypt(chatId);
+        const results = await Promise.all(
+          pendingImages.map((file) => putMedia(file, encMode, () => uploadChatImage(chatId, file))),
+        );
         const paths = results.map((r) => r.path);
 
-        // Prefetch signed urls
-        try {
-          const pairs = await Promise.all(paths.map(async (p) => [p, await createSignedChatMediaUrl(p, 300)] as const));
-          setSignedUrls((prev) => {
-            const next = { ...prev };
-            for (const [p, u] of pairs) next[p] = u;
-            return next;
-          });
-        } catch {}
-
         const payload: Payload = t2 ? { text: t2, imagePaths: paths } : { imagePaths: paths };
+        const encMap: Record<string, MediaEnc> = {};
+        for (const r of results) if (r.enc) encMap[r.path] = r.enc;
+        if (Object.keys(encMap).length) payload.enc = encMap;
         if (replyingTo) payload.reply_to = replyingTo.id;
 
         const temp: MessageRow = {

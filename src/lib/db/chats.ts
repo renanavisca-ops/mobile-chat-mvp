@@ -591,6 +591,18 @@ export async function isChatEncrypted(chatId: string): Promise<boolean> {
 }
 
 /**
+ * Whether outgoing content (messages AND media) for this chat must be encrypted:
+ * true if the chat is already locked, or requires E2EE (new direct chats). Used
+ * so media is encrypted before upload rather than leaking plaintext when the
+ * fail-closed send would reject it.
+ */
+export async function chatMustEncrypt(chatId: string): Promise<boolean> {
+  const supabase = browserSupabase();
+  const { data } = await supabase.from('chats').select('encrypted, enc_required').eq('id', chatId).maybeSingle();
+  return !!(data?.encrypted || data?.enc_required);
+}
+
+/**
  * Turn on E2EE for a chat: generate a chat key and wrap it for every member.
  * Returns { ok, missing } — if any member has not set up encryption yet, we
  * return their ids and do NOT lock the chat.
