@@ -392,6 +392,7 @@ export default function ChatsPage() {
                 ) : null}
                 {visible.map((c, i) => {
                   const active = c.id === selectedId;
+                  const unread = c.unread_count ?? 0;
                   return (
                     <li key={c.id} className="toky-rise" style={{ animationDelay: `${Math.min(i, 12) * 28}ms` }}>
                       <button
@@ -412,7 +413,7 @@ export default function ChatsPage() {
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center justify-between gap-3">
                             <div className="flex min-w-0 items-center gap-1.5">
-                              <span className="truncate font-semibold">
+                              <span className={`truncate ${unread > 0 ? 'font-extrabold text-white' : 'font-semibold'}`}>
                                 {c.kind === 'group' ? c.title ?? t('chatsList.group') : c.title ?? t('chatsList.directChat')}
                               </span>
                               {c.encrypted && <LockGlyph />}
@@ -431,9 +432,16 @@ export default function ChatsPage() {
                                 </span>
                               )}
                             </div>
-                            <div className="shrink-0 text-xs font-medium text-slate-500">{fmt(c.last_message_at, lang)}</div>
+                            <div className={`shrink-0 text-xs font-medium ${unread > 0 ? 'text-blue-400' : 'text-slate-500'}`}>{fmt(c.last_message_at, lang)}</div>
                           </div>
-                          <div className="mt-0.5 truncate text-[13px] text-slate-400">{preview(c)}</div>
+                          <div className="mt-0.5 flex items-center gap-2">
+                            <div className={`min-w-0 flex-1 truncate text-[13px] ${unread > 0 ? 'font-medium text-slate-200' : 'text-slate-400'}`}>{preview(c)}</div>
+                            {unread > 0 && (
+                              <span className="toky-grad grid h-5 min-w-[1.25rem] shrink-0 place-items-center rounded-full px-1.5 text-[11px] font-bold text-white">
+                                {unread > 99 ? '99+' : unread}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </button>
                     </li>

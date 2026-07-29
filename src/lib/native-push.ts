@@ -34,6 +34,8 @@ function platform(): 'ios' | 'android' {
 let currentUserId: string | null = null;
 let lastToken: string | null = null;
 let listenersReady = false;
+let tapHandlerReady = false;
+let navigateFn: ((url: string) => void) | null = null;
 
 async function storeToken(userId: string, token: string): Promise<void> {
   lastToken = token;
@@ -44,9 +46,9 @@ async function storeToken(userId: string, token: string): Promise<void> {
   if (error) throw error;
 }
 
-// Register handlers once: FCM can rotate the token, and a notification tap
-// carries the target path in data.url — navigate the WebView there (it's
-// already on the app origin).
+// Register the token-refresh handler once (FCM can rotate the token). The
+// notification-TAP handler is registered separately in initNativeNotifications
+// so it's attached on every app launch, not only when the user enables push.
 async function setupListeners(): Promise<void> {
   if (listenersReady) return;
   listenersReady = true;
@@ -59,11 +61,33 @@ async function setupListeners(): Promise<void> {
       }
     }
   });
-  await FirebaseMessaging.addListener('notificationActionPerformed', (event) => {
-    const data = event?.notification?.data as Record<string, unknown> | undefined;
-    const url = data?.url;
-    if (typeof url === 'string' && url) window.location.href = url;
-  });
+}
+
+/**
+ * Attach the notification-tap handler so tapping a push opens the RIGHT chat
+ * (the target path travels in data.url). This must run on every native app
+ * launch — not just when enabling notifications — otherwise a tap has no
+ * handler and the app merely resumes whatever chat was last open. Idempotent.
+ * `navigate` is refreshed on each call so it always uses the live SPA router.
+ */
+export async function initNativeNotifications(navigate: (url: string) => void): Promise<void> {
+  if (!isNativeApp()) return;
+  navigateFn = navigate;
+  if (tapHandlerReady) return;
+  tapHandlerReady = true;
+  try {
+    await FirebaseMessaging.addListener('notificationActionPerformed', (event) => {
+      const data = event?.notification?.data as Record<string, unknown> | undefined;
+      const url = data?.url;
+      if (typeof url === 'string' && url) {
+        if (navigateFn) navigateFn(url);
+        else window.location.href = url;
+      }
+    });
+  } catch {
+    // If the listener can't attach, leave tapHandlerReady set so we don't spin;
+    // the next launch retries from a fresh module state.
+  }
 }
 
 /** True once the OS notification permission is granted for this device. */
@@ -131,6 +155,9 @@ export async function unregisterNativePush(): Promise<void> {
     // best effort
   }
   listenersReady = false;
+  // removeAllListeners() above also dropped the tap handler; allow it to be
+  // re-attached (next app launch, via initNativeNotifications).
+  tapHandlerReady = false;
   if (lastToken) {
     const supabase = browserSupabase();
     await supabase.from('device_tokens').delete().eq('token', lastToken);

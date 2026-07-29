@@ -26,6 +26,8 @@ export type ChatSummary = {
   encrypted?: boolean | null;
   /** Whether the current user has archived this chat. */
   archived?: boolean;
+  /** Count of incoming messages I haven't read yet in this chat. */
+  unread_count?: number;
 };
 
 export type ProfileLite = {
