@@ -12,8 +12,9 @@ Mensajes listos para enviar a tu equipo. Hay **dos formas de probar**:
 > Para la app de Play: cada tester debe iniciar sesión en su teléfono con el
 > **mismo correo de Gmail** que agregaste a la lista, o dirá que no está disponible.
 
-**Antes de enviar:** crea tu propia cuenta en la app y comparte tu usuario para que
-te puedan escribir por Toky. Reemplaza **`[TU_USUARIO]`** abajo.
+**Antes de enviar:** crea tu propia cuenta en la app (correo
+`renanavisca@gmail.com`, usuario `sammyg23`) para que el equipo te pueda escribir
+por Toky.
 
 ---
 
@@ -38,7 +39,7 @@ lanzamiento. La idea es que la usemos para comunicarnos entre nosotros.
   **cifrado** de los chats.
 - Para chatear en privado con otra persona, **ambos deben haber creado su cuenta**;
   si no, el mensaje no se enviará (es por seguridad, funciona así a propósito).
-- Agréguenme como contacto: **[TU_USUARIO]**.
+- Agréguenme como contacto: **sammyg23**.
 
 **🐞 Reporte de errores:**
 - **Primero, repórtenlo por Toky**: mándenme un mensaje directo contándome qué
@@ -57,7 +58,7 @@ Gracias por el apoyo con las pruebas.
 > comunicarnos.*
 > *• Web (más rápido): **https://mobile-chat-mvp.vercel.app***
 > *• Android: **[ENLACE]** → "Convertirme en tester" → "Descargar en Google Play".*
-> *Creen su cuenta al abrirla (activa el cifrado) y agréguenme: **[TU_USUARIO]**.*
+> *Creen su cuenta al abrirla (activa el cifrado) y agréguenme: **sammyg23**.*
 > *Reporten errores por Toky (mándenme mensaje); si la app falla, por WhatsApp
 > +502 5809-8374. Manden captura y modelo de teléfono. ¡Gracias!*
 
