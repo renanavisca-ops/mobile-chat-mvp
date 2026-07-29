@@ -51,4 +51,29 @@ describe('buildOutgoingEnvelope — fail-closed encryption', () => {
       }),
     ).rejects.toBeTruthy();
   });
+
+  it('opportunistic mode: still SEALS when a key is available (E2EE not skipped)', async () => {
+    const env = await buildOutgoingEnvelope({
+      mustEncrypt: true,
+      opportunistic: true,
+      plaintext,
+      text: 'hola',
+      seal: async () => ({ iv: 'IV', ct: 'CT' }),
+    });
+    expect(env.content).toBeNull();
+    expect(env.ciphertext).toBe(JSON.stringify({ e: 1, iv: 'IV', ct: 'CT' }));
+    expect(env.ciphertext).not.toContain('hola');
+  });
+
+  it('opportunistic mode: falls back to TLS plaintext (does NOT throw) when sealing is unavailable', async () => {
+    const env = await buildOutgoingEnvelope({
+      mustEncrypt: true,
+      opportunistic: true,
+      plaintext,
+      text: 'hola',
+      seal: async () => null, // no chat key on this device yet
+    });
+    expect(env.ciphertext).toBe(plaintext);
+    expect(env.content).toBe('hola');
+  });
 });
