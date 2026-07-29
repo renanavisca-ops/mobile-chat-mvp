@@ -200,6 +200,8 @@ const en = {
     saveEdit: 'Save',
     recordAudio: 'Record audio',
     stopAndSend: 'Stop and send',
+    recording: 'Recording…',
+    stopRecording: 'Stop',
     micError: 'Could not access the microphone: {{error}}',
     onlyJpgPngWebp: 'Only JPG, PNG or WEBP.',
     maxImageSize: 'Maximum 5MB per image.',

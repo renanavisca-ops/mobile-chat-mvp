@@ -168,6 +168,23 @@ export async function listChats(): Promise<ChatSummary[]> {
     latestByChat.set(m.chat_id, { created_at: m.created_at, content: content || null, kind });
   }
 
+  // Per-chat unread count: messages from other people that I haven't read yet.
+  // Queried directly (not derived from the capped preview fetch above) so it
+  // stays accurate even for users active in many busy chats.
+  const unreadByChat = new Map<string, number>();
+  {
+    const { data: unreadRows } = await supabase
+      .from('messages')
+      .select('chat_id')
+      .in('chat_id', chatIds)
+      .eq('read', false)
+      .neq('sender_id', user.id)
+      .limit(2000);
+    for (const r of unreadRows ?? []) {
+      unreadByChat.set(r.chat_id, (unreadByChat.get(r.chat_id) ?? 0) + 1);
+    }
+  }
+
   // Public channels are globally visible via RLS (for discovery); the main
   // list must only show chats I actually belong to (plus store chats I staff).
   const myChats = chatList.filter((c) => myMemberChatIds.has(c.id) || !!c.store_id);
