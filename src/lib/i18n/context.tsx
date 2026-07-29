@@ -12,13 +12,10 @@ const DICTS: Record<LangCode, Dictionary> = { en, es };
 const PREF_KEY = 'toky_lang_pref';
 
 function detectSystemLang(): LangCode {
-  // Spanish-first (Guatemala launch): default to Spanish, and only use English
-  // when the device explicitly prefers English.
-  if (typeof navigator === 'undefined') return 'es';
-  const langs = navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language];
-  for (const l of langs) {
-    if (l && l.toLowerCase().startsWith('en')) return 'en';
-  }
+  // Guatemala launch is Spanish-only: always default to Spanish regardless of
+  // the device locale (test phones set to English still open in Spanish).
+  // English remains available when the user explicitly picks it in
+  // Settings → Language (preference = 'en'), which bypasses this function.
   return 'es';
 }
 

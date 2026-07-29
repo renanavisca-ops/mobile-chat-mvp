@@ -688,6 +688,7 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
     setReplyingTo(null);
     try {
       await sendMessage(chatId, payload as any);
+      setErr('');
     } catch (e: any) {
       setErr(sendErrorMessage(e));
     }
@@ -953,6 +954,7 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
       appendLocal(temp);
       setReplyingTo(null);
       await sendMessage(chatId, payload as any);
+      setErr('');
     } catch (e: any) {
       setErr(e.message);
     } finally {
@@ -1275,6 +1277,7 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
       appendLocal(temp);
       setReplyingTo(null);
       await sendMessage(chatId, payload as any);
+      setErr('');
     } catch (e: any) {
       setErr(sendErrorMessage(e));
     } finally {
@@ -1431,6 +1434,7 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
         clearPendingVideo();
 
         await sendMessage(chatId, payload as any);
+        setErr('');
         return;
       }
 
@@ -1463,6 +1467,7 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
         clearPendingImages();
 
         await sendMessage(chatId, payload as any);
+        setErr('');
         return;
       }
 
@@ -1484,6 +1489,7 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
 
       setText('');
       await sendMessage(chatId, payload as any);
+      setErr('');
     } catch (e: any) {
       setErr(sendErrorMessage(e));
     } finally {
