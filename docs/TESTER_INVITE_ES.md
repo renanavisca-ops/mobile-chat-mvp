@@ -35,10 +35,12 @@ lanzamiento. La idea es que la usemos para comunicarnos entre nosotros.
   *(Si aparece como no disponible, esperen unos minutos y reintenten.)*
 
 **✅ Primer uso:**
-- **Creen su cuenta** (correo y contraseña). Esto activa automáticamente el
-  **cifrado** de los chats.
-- Para chatear en privado con otra persona, **ambos deben haber creado su cuenta**;
-  si no, el mensaje no se enviará (es por seguridad, funciona así a propósito).
+- **Creen su cuenta** (correo y contraseña).
+- Para escribirle a alguien, búsquenlo por su usuario y manden el mensaje. La
+  conversación le aparecerá a la otra persona **cuando le llegue el primer
+  mensaje** (no antes).
+- Los chats se **cifran automáticamente** en cuanto ambas personas ya tienen su
+  cuenta creada.
 - Agréguenme como contacto: **sammyg23**.
 
 **🐞 Reporte de errores:**
@@ -58,7 +60,8 @@ Gracias por el apoyo con las pruebas.
 > comunicarnos.*
 > *• Web (más rápido): **https://mobile-chat-mvp.vercel.app***
 > *• Android: **[ENLACE]** → "Convertirme en tester" → "Descargar en Google Play".*
-> *Creen su cuenta al abrirla (activa el cifrado) y agréguenme: **sammyg23**.*
+> *Creen su cuenta al abrirla y agréguenme: **sammyg23**. Los chats se cifran
+> automáticamente cuando ambos ya tienen cuenta.*
 > *Reporten errores por Toky (mándenme mensaje); si la app falla, por WhatsApp
 > +502 5809-8374. Manden captura y modelo de teléfono. ¡Gracias!*
 

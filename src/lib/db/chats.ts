@@ -200,15 +200,24 @@ export async function listChats(): Promise<ChatSummary[]> {
     };
   });
 
+  // Hide direct chats that have no messages yet: a one-to-one conversation only
+  // appears once someone has actually sent something. The person who starts the
+  // chat is taken straight into the conversation view, so nothing is lost — the
+  // chat surfaces in both people's lists the moment the first message lands.
+  // (Groups and channels always show, since you were deliberately added/joined.)
+  const visibleSummaries = summaries.filter(
+    (s) => s.kind !== 'direct' || s.last_message_at !== null
+  );
+
   // Most recently active chats first (fall back to chat creation time for
   // chats with no messages yet).
-  summaries.sort((a, b) => {
+  visibleSummaries.sort((a, b) => {
     const ta = new Date(a.last_message_at ?? a.created_at).getTime();
     const tb = new Date(b.last_message_at ?? b.created_at).getTime();
     return tb - ta;
   });
 
-  return summaries;
+  return visibleSummaries;
 }
 
 export async function createDirectChatWith(userId: string): Promise<string> {
@@ -388,20 +397,20 @@ export async function sendMessage(chatId: string, payload: MessagePayload) {
 
   const plaintext = JSON.stringify({ v: 1, ...payload });
 
-  // A chat must be encrypted if it's already locked, or if it's a chat that
-  // requires E2EE (new direct chats). Legacy chats keep sending plaintext.
-  const mustEncrypt = !!(chatRow?.encrypted || chatRow?.enc_required);
-
-  // For an enc_required chat that isn't locked yet (the peer hadn't enrolled at
-  // creation), try to establish encryption now. If it still can't be locked,
-  // fail closed below rather than sending plaintext.
-  if (mustEncrypt && !chatRow?.encrypted) {
+  // Opportunistic E2EE: encrypt whenever a chat key can be established on THIS
+  // device; otherwise send normally (still protected in transit by TLS). We
+  // never block the user from sending — a message auto-upgrades to end-to-end
+  // encryption as soon as the chat can be locked (both parties enrolled and a
+  // key present on this device).
+  let canEncrypt = !!chatRow?.encrypted;
+  if (!canEncrypt && chatRow?.enc_required) {
     const res = await enableChatEncryption(chatId).catch(() => ({ ok: false, missing: [] as string[] }));
-    if (!res.ok) throw new EncryptionRequiredError(res.missing);
+    canEncrypt = res.ok;
   }
 
   const { ciphertext, content } = await buildOutgoingEnvelope({
-    mustEncrypt,
+    mustEncrypt: canEncrypt,
+    opportunistic: true,
     plaintext,
     text: payload.text || null,
     seal: (pt) => encryptForChat(chatId, pt),
