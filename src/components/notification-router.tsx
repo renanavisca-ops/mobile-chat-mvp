@@ -2,7 +2,8 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { isNativeApp, initNativeNotifications } from '@/lib/native-push';
+import { isNativeApp, initNativeNotifications, clearDeliveredNotifications } from '@/lib/native-push';
+import { App } from '@capacitor/app';
 
 /**
  * Bridges service-worker notification clicks to in-app (SPA) navigation.
@@ -37,6 +38,23 @@ export function NotificationRouter() {
     if (!isNativeApp()) return;
     void initNativeNotifications((url) => router.push(url));
   }, [router]);
+
+  // Once the user is in the app, the per-message notifications are effectively
+  // "seen" — clear the system tray on launch and on every foreground so they
+  // don't have to dismiss each one by hand.
+  useEffect(() => {
+    if (!isNativeApp()) return;
+    void clearDeliveredNotifications();
+    let remove: (() => void) | undefined;
+    void App.addListener('appStateChange', ({ isActive }) => {
+      if (isActive) void clearDeliveredNotifications();
+    }).then((handle) => {
+      remove = () => void handle.remove();
+    });
+    return () => {
+      if (remove) remove();
+    };
+  }, []);
 
   return null;
 }

@@ -212,6 +212,7 @@ const en = {
     savePending: 'Save: coming in a future update.',
     cantPlayInline: "Couldn't play inline.",
     openVideo: 'Open video',
+    mediaRetry: 'Tap to retry',
     edited: '(edited)',
     today: 'Today',
     yesterday: 'Yesterday',

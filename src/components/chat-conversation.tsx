@@ -365,6 +365,10 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
   // Signed URL cache (path -> url). For encrypted media the value is a decrypted
   // object URL; those are tracked so we can revoke them on unmount.
   const [signedUrls, setSignedUrls] = useState<Record<string, string>>({});
+  // Paths whose media failed to resolve (missing object, transient RLS/auth
+  // race, or decrypt error). Tracked per-path so one bad attachment never
+  // blanks the whole conversation; the tile offers a tap-to-retry instead.
+  const [failedMedia, setFailedMedia] = useState<Set<string>>(new Set());
   const objectUrlsRef = useRef<string[]>([]);
   function trackObjectUrl(url: string) {
     objectUrlsRef.current.push(url);
@@ -1053,33 +1057,64 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
         }
       }
 
-      const missing = Array.from(encByPath.keys()).filter((p) => !signedUrls[p]);
+      // Skip paths already resolved or already marked failed (tap-to-retry
+      // clears the failed mark, which re-admits the path here).
+      const missing = Array.from(encByPath.keys()).filter(
+        (p) => !signedUrls[p] && !failedMedia.has(p)
+      );
       if (missing.length === 0) return;
 
-      try {
-        const pairs = await Promise.all(
-          missing.map(async (path) => {
-            const enc = encByPath.get(path);
-            if (enc) {
-              // Encrypted media: download ciphertext, decrypt to an object URL.
-              const url = await fetchDecryptedMediaUrl(path, enc);
-              trackObjectUrl(url);
-              return [path, url] as const;
-            }
-            const url = await createSignedChatMediaUrl(path, 300);
-            return [path, url] as const;
-          })
-        );
+      // Resolve a single attachment. On the first failure we refresh the auth
+      // session once and retry: on native cold-start the storage request can
+      // fire before the Supabase session is attached, which the RLS layer sees
+      // as anon and answers "Object not found" even though the object exists
+      // and the viewer is a member.
+      async function resolveOne(path: string): Promise<string> {
+        const enc = encByPath.get(path);
+        const attempt = () =>
+          enc ? fetchDecryptedMediaUrl(path, enc) : createSignedChatMediaUrl(path, 300);
+        try {
+          return await attempt();
+        } catch {
+          try {
+            await browserSupabase().auth.getSession();
+          } catch {}
+          return attempt();
+        }
+      }
 
-        if (cancelled) return;
+      // Resolve independently so one bad attachment can't reject the batch or
+      // surface a raw "Object not found" banner over the whole conversation.
+      const results = await Promise.allSettled(
+        missing.map(async (path) => {
+          const url = await resolveOne(path);
+          if (encByPath.get(path)) trackObjectUrl(url);
+          return [path, url] as const;
+        })
+      );
 
+      if (cancelled) return;
+
+      const resolved: Array<readonly [string, string]> = [];
+      const failed: string[] = [];
+      results.forEach((r, i) => {
+        if (r.status === 'fulfilled') resolved.push(r.value);
+        else failed.push(missing[i]);
+      });
+
+      if (resolved.length) {
         setSignedUrls((prev) => {
           const next = { ...prev };
-          for (const [p, u] of pairs) next[p] = u;
+          for (const [p, u] of resolved) next[p] = u;
           return next;
         });
-      } catch (e: any) {
-        if (!cancelled) setErr(e?.message ?? String(e));
+      }
+      if (failed.length) {
+        setFailedMedia((prev) => {
+          const next = new Set(prev);
+          for (const p of failed) next.add(p);
+          return next;
+        });
       }
     }
 
@@ -1087,7 +1122,17 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
     return () => {
       cancelled = true;
     };
-  }, [items, signedUrls]);
+  }, [items, signedUrls, failedMedia]);
+
+  // Tap-to-retry: drop the failed mark so the resolver effect re-admits it.
+  function retryMedia(path: string) {
+    setFailedMedia((prev) => {
+      if (!prev.has(path)) return prev;
+      const next = new Set(prev);
+      next.delete(path);
+      return next;
+    });
+  }
 
   // -------- Multi-select
   function enterSelect(id: string) {
@@ -2343,19 +2388,35 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
                         <div className="mt-2 grid grid-cols-2 gap-2">
                           {Array.from(new Set(imgPaths)).map((path) => {
                             const url = signedUrls[path] || '';
-                            return url ? (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img
-                                key={path}
-                                src={url}
-                                alt="chat image"
-                                onClick={() => {
-                                  if (selectMode) toggleSelect(m.id);
-                                  else setLightboxUrl(url);
-                                }}
-                                className="max-h-80 w-auto cursor-zoom-in rounded-lg border border-slate-900 transition-opacity hover:opacity-90"
-                              />
-                            ) : (
+                            if (url) {
+                              return (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img
+                                  key={path}
+                                  src={url}
+                                  alt="chat image"
+                                  onClick={() => {
+                                    if (selectMode) toggleSelect(m.id);
+                                    else setLightboxUrl(url);
+                                  }}
+                                  className="max-h-80 w-auto cursor-zoom-in rounded-lg border border-slate-900 transition-opacity hover:opacity-90"
+                                />
+                              );
+                            }
+                            if (failedMedia.has(path)) {
+                              return (
+                                <button
+                                  key={path}
+                                  type="button"
+                                  onClick={() => retryMedia(path)}
+                                  className="flex h-28 w-full flex-col items-center justify-center gap-1 rounded-lg border border-slate-800 bg-slate-900/60 text-xs text-slate-400 hover:bg-slate-800"
+                                >
+                                  <DownloadIcon size={18} />
+                                  <span>{t('chat.mediaRetry')}</span>
+                                </button>
+                              );
+                            }
+                            return (
                               <div key={path} className="h-28 w-full animate-pulse rounded-lg border border-slate-900 bg-slate-800" />
                             );
                           })}

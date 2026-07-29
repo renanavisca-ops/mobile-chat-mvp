@@ -90,6 +90,23 @@ export async function initNativeNotifications(navigate: (url: string) => void): 
   }
 }
 
+/**
+ * Clear every push notification this app has posted to the system tray. Called
+ * when the app becomes active so that opening the app on one device dismisses
+ * the pile of per-message notifications the user has effectively "seen" — they
+ * don't have to swipe each one away by hand. Best-effort and a no-op on web.
+ */
+export async function clearDeliveredNotifications(): Promise<void> {
+  if (!isNativeApp()) return;
+  try {
+    if (typeof FirebaseMessaging?.removeAllDeliveredNotifications === 'function') {
+      await FirebaseMessaging.removeAllDeliveredNotifications();
+    }
+  } catch {
+    // best effort — never let tray cleanup throw into app startup/resume
+  }
+}
+
 /** True once the OS notification permission is granted for this device. */
 export async function isNativeRegistered(): Promise<boolean> {
   if (!isNativeApp()) return false;
