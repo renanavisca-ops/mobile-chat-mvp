@@ -31,9 +31,20 @@ async function getPlugin(): Promise<SecureStoragePlugin> {
   return _plugin;
 }
 
-/** True only inside the native shells, where secure storage is available. */
+/**
+ * Whether to use the native secure-storage backend.
+ *
+ * TEMPORARILY DISABLED: on-device the plugin call hung during onboarding
+ * ("Generating local keys…"), blocking sign-up. Until it's verified working on
+ * real devices, fall back to IndexedDB on every platform (the reliable path used
+ * before Phase 4; the web already used it). The migration/backend code stays in
+ * place so it can be re-enabled after on-device testing.
+ */
 export function secureStorageSupported(): boolean {
-  return isNativeApp();
+  // Force the IndexedDB fallback for now (see note above). isNativeApp() is kept
+  // referenced so re-enabling later is a one-line change.
+  if (isNativeApp()) return false;
+  return false;
 }
 
 export const secureBackend: KeyBackend = {
