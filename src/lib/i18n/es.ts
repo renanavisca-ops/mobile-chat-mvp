@@ -202,6 +202,8 @@ const es: Dictionary = {
     saveEdit: 'Guardar',
     recordAudio: 'Grabar audio',
     stopAndSend: 'Parar y enviar',
+    recording: 'Grabando…',
+    stopRecording: 'Detener',
     micError: 'No se pudo acceder al micrófono: {{error}}',
     onlyJpgPngWebp: 'Solo JPG, PNG o WEBP.',
     maxImageSize: 'Máximo 5MB por imagen.',

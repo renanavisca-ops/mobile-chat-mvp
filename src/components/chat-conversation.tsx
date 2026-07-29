@@ -334,8 +334,14 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
   }
 
   const [isRecording, setIsRecording] = useState(false);
+  const [recSeconds, setRecSeconds] = useState(0);
+  // A finished recording waiting for the user to send or discard it (we no
+  // longer auto-send the moment recording stops).
+  const [pendingAudio, setPendingAudio] = useState<Blob | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+  const recTimerRef = useRef<number | null>(null);
+  const recCanceledRef = useRef(false);
   const [replyingTo, setReplyingTo] = useState<MessageRow | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
 
@@ -902,37 +908,98 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
     return () => clearTimeout(clearTyping);
   }, [text, setMeTyping]);
 
-  // Audio recording
+  // Audio recording. Recording shows a live timer; stopping produces a preview
+  // the user can play, then send or discard — it is NOT sent automatically.
   async function startRecording() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const recorder = new MediaRecorder(stream);
       mediaRecorderRef.current = recorder;
       audioChunksRef.current = [];
+      recCanceledRef.current = false;
 
       recorder.ondataavailable = (e) => {
         if (e.data.size > 0) audioChunksRef.current.push(e.data);
       };
 
-      recorder.onstop = async () => {
+      recorder.onstop = () => {
+        stream.getTracks().forEach((t) => t.stop());
+        if (recTimerRef.current) {
+          window.clearInterval(recTimerRef.current);
+          recTimerRef.current = null;
+        }
+        setIsRecording(false);
+        if (recCanceledRef.current) {
+          audioChunksRef.current = [];
+          return; // discarded — nothing to preview
+        }
         const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        stream.getTracks().forEach(t => t.stop());
-        await sendAudioMessage(blob);
+        setPendingAudio(blob);
       };
 
       recorder.start();
       setIsRecording(true);
+      setRecSeconds(0);
+      if (recTimerRef.current) window.clearInterval(recTimerRef.current);
+      recTimerRef.current = window.setInterval(() => setRecSeconds((s) => s + 1), 1000);
     } catch (e: any) {
       setErr(t('chat.micError', { error: e.message }));
     }
   }
 
+  // Stop and keep the take (moves to the send/discard preview).
   function stopRecording() {
     if (mediaRecorderRef.current && isRecording) {
+      recCanceledRef.current = false;
       mediaRecorderRef.current.stop();
-      setIsRecording(false);
     }
   }
+
+  // Stop and throw the take away (the trash button while recording).
+  function cancelRecording() {
+    if (mediaRecorderRef.current && isRecording) {
+      recCanceledRef.current = true;
+      mediaRecorderRef.current.stop();
+    }
+  }
+
+  // Discard a finished-but-unsent take.
+  function discardPendingAudio() {
+    setPendingAudio(null);
+    audioChunksRef.current = [];
+  }
+
+  // Send the finished take, then clear the preview.
+  async function sendPendingAudio() {
+    const blob = pendingAudio;
+    if (!blob) return;
+    setPendingAudio(null);
+    await sendAudioMessage(blob);
+  }
+
+  function fmtRecTime(s: number): string {
+    const m = Math.floor(s / 60);
+    const sec = s % 60;
+    return `${m}:${sec.toString().padStart(2, '0')}`;
+  }
+
+  // Object URL for playing back a finished-but-unsent take; revoked when it
+  // changes or the component unmounts.
+  const pendingAudioUrl = useMemo(
+    () => (pendingAudio ? URL.createObjectURL(pendingAudio) : null),
+    [pendingAudio]
+  );
+  useEffect(() => {
+    return () => {
+      if (pendingAudioUrl) URL.revokeObjectURL(pendingAudioUrl);
+    };
+  }, [pendingAudioUrl]);
+  // Stop the recording timer if we unmount mid-record.
+  useEffect(() => {
+    return () => {
+      if (recTimerRef.current) window.clearInterval(recTimerRef.current);
+    };
+  }, []);
 
   async function sendAudioMessage(blob: Blob) {
     setBusy(true);
@@ -2552,7 +2619,39 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
 
           {canPost ? (
           <div ref={composerRef} className="toky-glass relative -mx-3 flex items-end gap-2 border-t border-slate-800/70 px-2 py-2">
-            {/* Rounded input pill: emoji · text · AI · attach */}
+            {/* Rounded input pill — replaced by a live recording strip while
+                recording, or an audio preview (play / discard) once stopped. */}
+            {isRecording ? (
+              <div className="flex min-w-0 flex-1 items-center gap-3 rounded-3xl border border-red-500/40 bg-red-500/10 px-3 py-2.5">
+                <button
+                  type="button"
+                  onClick={cancelRecording}
+                  className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-red-300 hover:bg-red-500/20"
+                  title={t('common.cancel')}
+                  aria-label={t('common.cancel')}
+                >
+                  <TrashIcon size={18} />
+                </button>
+                <span className="h-2.5 w-2.5 shrink-0 animate-pulse rounded-full bg-red-500" />
+                <span className="text-sm font-medium text-red-200">{t('chat.recording')}</span>
+                <span className="ml-auto text-sm tabular-nums text-red-200/90">{fmtRecTime(recSeconds)}</span>
+              </div>
+            ) : pendingAudio ? (
+              <div className="flex min-w-0 flex-1 items-center gap-2 rounded-3xl border border-slate-800 bg-slate-900 px-2 py-1.5">
+                <button
+                  type="button"
+                  onClick={discardPendingAudio}
+                  className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-slate-400 hover:bg-slate-800 hover:text-rose-300"
+                  title={t('common.delete')}
+                  aria-label={t('common.delete')}
+                >
+                  <TrashIcon size={18} />
+                </button>
+                <div className="min-w-0 flex-1">
+                  {pendingAudioUrl && <AudioMessage src={pendingAudioUrl} />}
+                </div>
+              </div>
+            ) : (
             <div className="flex min-w-0 flex-1 items-center gap-0.5 rounded-3xl border border-slate-800 bg-slate-900 px-1.5">
               <div className="relative shrink-0">
                 <button
@@ -2621,13 +2720,36 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
                 <PlusIcon size={22} />
               </button>
             </div>
+            )}
 
-            {/* Circular send (when typing/editing) or mic button */}
-            {text.trim() || editingId ? (
+            {/* Right button: stop-recording · send-audio · send · mic */}
+            {isRecording ? (
+              <button
+                className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-red-600 text-white disabled:opacity-60"
+                onClick={stopRecording}
+                type="button"
+                title={t('chat.stopRecording')}
+                aria-label={t('chat.stopRecording')}
+              >
+                <span className="h-4 w-4 rounded-[3px] bg-white" />
+              </button>
+            ) : pendingAudio ? (
+              <button
+                className="toky-grad toky-ring-brand grid h-11 w-11 shrink-0 place-items-center rounded-full text-white disabled:opacity-60"
+                onClick={sendPendingAudio}
+                type="button"
+                disabled={busy || blocked}
+                title={t('chat.send')}
+                aria-label={t('chat.send')}
+              >
+                <SendIcon size={20} />
+              </button>
+            ) : text.trim() || editingId || pendingImages.length > 0 || pendingVideo ? (
               <button
                 className="toky-grad toky-ring-brand grid h-11 w-11 shrink-0 place-items-center rounded-full text-white disabled:opacity-60"
                 onClick={onSend}
-                disabled={busy || isRecording || blocked}
+                type="button"
+                disabled={busy || blocked}
                 title={editingId ? t('chat.saveEdit') : t('chat.send')}
                 aria-label={editingId ? t('chat.saveEdit') : t('chat.send')}
               >
@@ -2635,11 +2757,12 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
               </button>
             ) : (
               <button
-                className={`grid h-11 w-11 shrink-0 place-items-center rounded-full text-white disabled:opacity-60 ${isRecording ? 'animate-pulse bg-red-600' : 'toky-grad toky-ring-brand'}`}
-                onClick={isRecording ? stopRecording : startRecording}
+                className="toky-grad toky-ring-brand grid h-11 w-11 shrink-0 place-items-center rounded-full text-white disabled:opacity-60"
+                onClick={startRecording}
+                type="button"
                 disabled={busy}
-                title={isRecording ? t('chat.stopAndSend') : t('chat.recordAudio')}
-                aria-label={isRecording ? t('chat.stopAndSend') : t('chat.recordAudio')}
+                title={t('chat.recordAudio')}
+                aria-label={t('chat.recordAudio')}
               >
                 <MicIcon size={20} />
               </button>

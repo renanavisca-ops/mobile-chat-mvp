@@ -130,12 +130,7 @@ export async function listChats(): Promise<ChatSummary[]> {
     string,
     { created_at: string; content: string | null; kind: 'text' | 'photo' | 'video' | 'audio' | 'gif' | 'poll' | 'file' | 'deleted' | null }
   >();
-  // Count messages from other people that I haven't read yet, per chat.
-  const unreadByChat = new Map<string, number>();
   for (const m of msgsRes.data ?? []) {
-    if ((m as { sender_id?: string | null }).sender_id !== user.id && !(m as { read?: boolean }).read) {
-      unreadByChat.set(m.chat_id, (unreadByChat.get(m.chat_id) ?? 0) + 1);
-    }
     if (latestByChat.has(m.chat_id)) continue;
     let content = m.content || '';
     let kind: 'text' | 'photo' | 'video' | 'audio' | 'gif' | 'poll' | 'file' | 'deleted' | null = content ? 'text' : null;
@@ -166,6 +161,23 @@ export async function listChats(): Promise<ChatSummary[]> {
       } catch {}
     }
     latestByChat.set(m.chat_id, { created_at: m.created_at, content: content || null, kind });
+  }
+
+  // Per-chat unread count: messages from other people that I haven't read yet.
+  // Queried directly (not derived from the capped preview fetch above) so it
+  // stays accurate even for users active in many busy chats.
+  const unreadByChat = new Map<string, number>();
+  {
+    const { data: unreadRows } = await supabase
+      .from('messages')
+      .select('chat_id')
+      .in('chat_id', chatIds)
+      .eq('read', false)
+      .neq('sender_id', user.id)
+      .limit(2000);
+    for (const r of unreadRows ?? []) {
+      unreadByChat.set(r.chat_id, (unreadByChat.get(r.chat_id) ?? 0) + 1);
+    }
   }
 
   // Public channels are globally visible via RLS (for discovery); the main
