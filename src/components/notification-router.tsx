@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { isNativeApp, initNativeNotifications } from '@/lib/native-push';
 
 /**
  * Bridges service-worker notification clicks to in-app (SPA) navigation.
@@ -27,6 +28,14 @@ export function NotificationRouter() {
 
     navigator.serviceWorker.addEventListener('message', onMessage);
     return () => navigator.serviceWorker.removeEventListener('message', onMessage);
+  }, [router]);
+
+  // Native (Capacitor) push: attach the FCM notification-tap handler on every
+  // launch so tapping a notification opens the specific chat it's about,
+  // instead of just resuming whatever chat was last open.
+  useEffect(() => {
+    if (!isNativeApp()) return;
+    void initNativeNotifications((url) => router.push(url));
   }, [router]);
 
   return null;

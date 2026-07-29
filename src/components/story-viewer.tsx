@@ -28,7 +28,13 @@ export function StoryViewer({
   // Only start the auto-advance countdown once the story's content is actually
   // on screen — otherwise a slow-loading image gets skipped before it appears.
   const [loaded, setLoaded] = useState(false);
+  // Press-and-hold to pause: hold the story to freeze it, release to continue.
+  const [paused, setPaused] = useState(false);
   const timerRef = useRef<number | null>(null);
+  const startRef = useRef<number>(0); // when the current run segment started
+  const remainingRef = useRef<number>(DURATION); // ms left on the current story
+  const holdTimer = useRef<number | null>(null);
+  const wasHold = useRef(false);
 
   const group = groups[groupIndex];
   const story = group?.stories[storyIndex];
@@ -70,6 +76,9 @@ export function StoryViewer({
     let alive = true;
     setMediaUrl(null);
     setViewCount(null);
+    // Fresh story: full duration, not paused.
+    remainingRef.current = DURATION;
+    setPaused(false);
     // Text stories have nothing to download, so they're "loaded" right away.
     setLoaded(!story.media_path);
 
@@ -89,15 +98,60 @@ export function StoryViewer({
   }, [groupIndex, storyIndex]);
 
   // Arm the auto-advance timer only once the content is loaded (see `loaded`).
+  // While paused (finger held down) we don't arm it; on release we re-arm for
+  // just the time that was left, so the story resumes where it froze.
   useEffect(() => {
-    if (!story || !loaded) return;
+    if (!story || !loaded || paused) return;
     if (timerRef.current) window.clearTimeout(timerRef.current);
-    timerRef.current = window.setTimeout(next, DURATION);
+    startRef.current = Date.now();
+    timerRef.current = window.setTimeout(next, remainingRef.current);
     return () => {
       if (timerRef.current) window.clearTimeout(timerRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loaded, groupIndex, storyIndex]);
+  }, [loaded, groupIndex, storyIndex, paused]);
+
+  // Pause/resume helpers for press-and-hold.
+  const pause = useCallback(() => {
+    setPaused((p) => {
+      if (p) return p;
+      if (timerRef.current) {
+        window.clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+      remainingRef.current = Math.max(0, remainingRef.current - (Date.now() - startRef.current));
+      return true;
+    });
+  }, []);
+  const resume = useCallback(() => {
+    setPaused(false);
+  }, []);
+
+  function onHoldStart() {
+    wasHold.current = false;
+    if (holdTimer.current) window.clearTimeout(holdTimer.current);
+    // A short delay distinguishes a hold from a quick tap (which pages the story).
+    holdTimer.current = window.setTimeout(() => {
+      wasHold.current = true;
+      pause();
+    }, 200);
+  }
+  function onHoldEnd() {
+    if (holdTimer.current) {
+      window.clearTimeout(holdTimer.current);
+      holdTimer.current = null;
+    }
+    if (wasHold.current) resume();
+  }
+  // Tap zones: ignore the click that ends a press-and-hold (don't page).
+  function onTapPrev() {
+    if (wasHold.current) { wasHold.current = false; return; }
+    prev();
+  }
+  function onTapNext() {
+    if (wasHold.current) { wasHold.current = false; return; }
+    next();
+  }
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -143,7 +197,7 @@ export function StoryViewer({
                   i < storyIndex
                     ? { width: '100%' }
                     : i === storyIndex && loaded
-                    ? { animation: `storyProgress ${DURATION}ms linear forwards` }
+                    ? { animation: `storyProgress ${DURATION}ms linear forwards`, animationPlayState: paused ? 'paused' : 'running' }
                     : { width: '0%' }
                 }
               />
@@ -178,7 +232,13 @@ export function StoryViewer({
         </div>
 
         {/* Content */}
-        <div className="relative flex flex-1 items-center justify-center overflow-hidden">
+        <div
+          className="relative flex flex-1 items-center justify-center overflow-hidden"
+          onPointerDown={onHoldStart}
+          onPointerUp={onHoldEnd}
+          onPointerLeave={onHoldEnd}
+          onPointerCancel={onHoldEnd}
+        >
           {story.media_path ? (
             mediaUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -204,13 +264,13 @@ export function StoryViewer({
           {/* Tap zones */}
           <button
             type="button"
-            onClick={prev}
+            onClick={onTapPrev}
             aria-label={t('stories.previous')}
             className="absolute inset-y-0 left-0 w-1/3"
           />
           <button
             type="button"
-            onClick={next}
+            onClick={onTapNext}
             aria-label={t('stories.nextStory')}
             className="absolute inset-y-0 right-0 w-2/3"
           />
