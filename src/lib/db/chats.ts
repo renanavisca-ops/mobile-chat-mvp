@@ -130,12 +130,7 @@ export async function listChats(): Promise<ChatSummary[]> {
     string,
     { created_at: string; content: string | null; kind: 'text' | 'photo' | 'video' | 'audio' | 'gif' | 'poll' | 'file' | 'deleted' | null }
   >();
-  // Count messages from other people that I haven't read yet, per chat.
-  const unreadByChat = new Map<string, number>();
   for (const m of msgsRes.data ?? []) {
-    if ((m as { sender_id?: string | null }).sender_id !== user.id && !(m as { read?: boolean }).read) {
-      unreadByChat.set(m.chat_id, (unreadByChat.get(m.chat_id) ?? 0) + 1);
-    }
     if (latestByChat.has(m.chat_id)) continue;
     let content = m.content || '';
     let kind: 'text' | 'photo' | 'video' | 'audio' | 'gif' | 'poll' | 'file' | 'deleted' | null = content ? 'text' : null;
