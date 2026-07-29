@@ -4,6 +4,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { ChevronLeftIcon, SearchIcon, InfoIcon, MoreVerticalIcon, XIcon } from '@/components/icons';
 import { ForwardModal } from '@/components/forward-modal';
+import { AudioMessage } from '@/components/audio-message';
 import { MessageActionsSheet } from '@/components/message-actions-sheet';
 import { AttachSheet } from '@/components/attach-sheet';
 import { CameraCapture } from '@/components/camera-capture';
@@ -1534,7 +1535,7 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
           </button>
         </div>
       )}
-      <header className={`toky-glass flex items-center gap-1.5 border-b border-slate-800/70 px-2 py-2 ${embedded ? '' : 'pt-safe'}`}>
+      <header className={`toky-glass relative z-40 flex items-center gap-1.5 border-b border-slate-800/70 px-2 py-2 ${embedded ? '' : 'pt-safe'}`}>
         {!embedded && (
           <Link
             href="/chats"
@@ -1640,7 +1641,7 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
             {safetyMenuOpen && (
               <>
               <div
-                className="absolute right-0 top-11 z-30 w-56 overflow-hidden rounded-xl border border-slate-700 bg-slate-900 text-sm shadow-2xl ring-1 ring-black/50"
+                className="absolute right-0 top-11 z-50 w-56 overflow-hidden rounded-xl border border-slate-700 bg-slate-900 text-sm shadow-2xl ring-1 ring-black/50"
                 onMouseLeave={() => {
                   setSafetyMenuOpen(false);
                   setDisappearingMenuOpen(false);
@@ -2322,11 +2323,11 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
                       ) : null}
 
                       {audioPath ? (
-                        <div className="mt-2">
+                        <div className="mt-1 w-56 max-w-full">
                           {signedUrls[audioPath] ? (
-                            <audio src={signedUrls[audioPath]} controls className="w-full h-10" />
+                            <AudioMessage src={signedUrls[audioPath]} mine={isMine(m)} />
                           ) : (
-                            <div className="h-10 w-full animate-pulse rounded-lg border border-slate-900 bg-slate-800" />
+                            <div className="h-10 w-full animate-pulse rounded-full border border-slate-900 bg-slate-800" />
                           )}
                         </div>
                       ) : null}
