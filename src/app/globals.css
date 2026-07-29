@@ -310,3 +310,34 @@ html[data-accent='fuchsia'] .bg-indigo-600 { background-color: #c026d3; }
 html[data-accent='fuchsia'] .bg-indigo-500 { background-color: #d946ef; }
 html[data-accent='fuchsia'] .border-indigo-500 { border-color: #d946ef; }
 html[data-accent='fuchsia'] .ring-indigo-500 { --tw-ring-color: #d946ef; }
+
+/* Compact chat audio player slider (AudioMessage). Keeps a clean white thumb
+   and hides the native track so the inline gradient progress is what shows. */
+.toky-audio-range {
+  -webkit-appearance: none;
+  appearance: none;
+  outline: none;
+}
+.toky-audio-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 9999px;
+  background: #ffffff;
+  border: none;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  cursor: pointer;
+}
+.toky-audio-range::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 9999px;
+  background: #ffffff;
+  border: none;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  cursor: pointer;
+}
+.toky-audio-range::-moz-range-track {
+  background: transparent;
+}
