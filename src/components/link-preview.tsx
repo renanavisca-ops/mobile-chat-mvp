@@ -1,5 +1,6 @@
 'use client';
 
+import { apiFetch } from '@/lib/api/client';
 import { useEffect, useState } from 'react';
 
 type Preview = {
@@ -19,7 +20,7 @@ async function loadPreview(url: string): Promise<Preview | null> {
   if (inflight.has(url)) return inflight.get(url)!;
   const p = (async () => {
     try {
-      const res = await fetch(`/api/link-preview?url=${encodeURIComponent(url)}`);
+      const res = await apiFetch(`/api/link-preview?url=${encodeURIComponent(url)}`);
       if (!res.ok) return null;
       const data = (await res.json()) as Preview;
       // Only worth showing if we got at least a title or image.

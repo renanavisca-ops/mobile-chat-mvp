@@ -36,7 +36,11 @@ workflows:
         script: npm ci
       - name: Run unit tests (E2EE fail-closed, media & key-migration invariants)
         script: npm test
-      - name: Capacitor sync (copies loader + plugins into ios/)
+      - name: Build bundled web UI (static export -> mobile/www)
+        # Requires NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY and
+        # NEXT_PUBLIC_API_BASE_URL to be set in the Codemagic environment.
+        script: node scripts/build-mobile.mjs --no-sync
+      - name: Capacitor sync (copies bundled UI + plugins into ios/)
         script: npx cap sync ios
       - name: Install CocoaPods
         script: cd ios/App && pod install
@@ -78,7 +82,11 @@ workflows:
         script: npm ci
       - name: Run unit tests (E2EE fail-closed, media & key-migration invariants)
         script: npm test
-      - name: Capacitor sync (copies loader + plugins into android/)
+      - name: Build bundled web UI (static export -> mobile/www)
+        # Requires NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY and
+        # NEXT_PUBLIC_API_BASE_URL to be set in the Codemagic environment.
+        script: node scripts/build-mobile.mjs --no-sync
+      - name: Capacitor sync (copies bundled UI + plugins into android/)
         script: npx cap sync android
       - name: Set version code
         script: |

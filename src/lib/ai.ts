@@ -1,5 +1,6 @@
 'use client';
 
+import { apiFetch } from '@/lib/api/client';
 import { browserSupabase } from '@/lib/supabase/client';
 
 /**
@@ -13,7 +14,7 @@ type AIResult = { configured: boolean; error: string | null; data: any };
 async function callAI(body: Record<string, unknown>): Promise<AIResult> {
   const supabase = browserSupabase();
   const { data: sess } = await supabase.auth.getSession();
-  const res = await fetch('/api/ai', {
+  const res = await apiFetch('/api/ai', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${sess.session?.access_token}` },
     body: JSON.stringify(body),

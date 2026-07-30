@@ -1,5 +1,6 @@
 'use client';
 
+import { apiFetch } from '@/lib/api/client';
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { PageShell } from '@/components/page-shell';
@@ -306,7 +307,7 @@ export default function SettingsPage() {
       if (reauthErr) throw new Error(t('settings.deleteWrongPassword'));
 
       const { data: { session } } = await supabase.auth.getSession();
-      const res = await fetch('/api/account/delete', {
+      const res = await apiFetch('/api/account/delete', {
         method: 'POST',
         headers: { Authorization: `Bearer ${session?.access_token}` },
       });

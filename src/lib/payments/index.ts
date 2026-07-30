@@ -1,5 +1,6 @@
 'use client';
 
+import { apiFetch } from '@/lib/api/client';
 import { browserSupabase } from '@/lib/supabase/client';
 
 /**
@@ -46,7 +47,7 @@ export async function startCheckout(
 ): Promise<{ configured: false } | { configured: true; clientSecret?: string; url?: string }> {
   const supabase = browserSupabase();
   const { data } = await supabase.auth.getSession();
-  const res = await fetch('/api/payments/checkout', {
+  const res = await apiFetch('/api/payments/checkout', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

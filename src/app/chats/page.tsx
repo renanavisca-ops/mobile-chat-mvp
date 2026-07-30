@@ -187,7 +187,7 @@ export default function ChatsPage() {
   // full-page conversation.
   function openChat(id: string) {
     if (isWide()) setSelectedId(id);
-    else router.push(`/chats/${id}`);
+    else router.push(`/chats/view?c=${id}`);
   }
 
   useEffect(() => {

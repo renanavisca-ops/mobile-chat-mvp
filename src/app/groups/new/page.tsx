@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { PageShell } from '@/components/page-shell';
 import { useRequireAuth } from '@/lib/auth/use-require-auth';
 import { listMyContacts, searchUsers } from '@/lib/db/contacts';
@@ -9,6 +10,7 @@ import { useT } from '@/lib/i18n/context';
 import type { ProfileLite } from '@/lib/db/types';
 
 export default function NewGroupPage() {
+  const router = useRouter();
   const { loading: authLoading } = useRequireAuth();
   const t = useT();
 
@@ -69,7 +71,7 @@ export default function NewGroupPage() {
     setBusy(true);
     try {
       const chatId = await createGroupChat(trimmed, Array.from(selected.keys()));
-      window.location.href = `/chats/${chatId}`;
+      router.push(`/chats/view?c=${chatId}`);
     } catch (e: any) {
       setErr(e?.message ?? String(e));
     } finally {

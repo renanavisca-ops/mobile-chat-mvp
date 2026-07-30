@@ -22,6 +22,16 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
+            <!-- Auth deep links: Supabase email / password-reset links redirect
+                 to tokychat://auth/callback (and tokychat://reset-password),
+                 which reopen the installed app. Handled by NativeAuthLinks. -->
+            <intent-filter android:autoVerify="false">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="tokychat" />
+            </intent-filter>
+
         </activity>
 
         <provider

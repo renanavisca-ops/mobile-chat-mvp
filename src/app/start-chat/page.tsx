@@ -1,5 +1,6 @@
 'use client';
 
+import { apiFetch } from '@/lib/api/client';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useT } from '@/lib/i18n/context';
@@ -22,7 +23,7 @@ export default function StartChatPage() {
     setError(null);
 
     try {
-      const res = await fetch('/api/chat/start', {
+      const res = await apiFetch('/api/chat/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData)
@@ -34,7 +35,7 @@ export default function StartChatPage() {
         throw new Error(data.error || t('startChat.errorFailed'));
       }
 
-      router.push(`/public-chat/${data.token}`);
+      router.push(`/public-chat?token=${data.token}`);
     } catch (err: any) {
       setError(err.message);
       setLoading(false);

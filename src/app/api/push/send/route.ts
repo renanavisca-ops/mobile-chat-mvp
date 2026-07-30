@@ -69,7 +69,7 @@ export async function POST(req: Request) {
     const body = chat?.encrypted
       ? '🔒 New encrypted message'
       : message.content || 'Sent an attachment';
-    const url = `/chats/${message.chat_id}`;
+    const url = `/chats/view?c=${message.chat_id}`;
 
     // --- Web Push (browsers) ---
     let webSent = 0;

@@ -1,5 +1,6 @@
 'use client';
 
+import { apiFetch } from '@/lib/api/client';
 import {
   createContext,
   useCallback,
@@ -324,7 +325,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
   async function getIceServers(): Promise<RTCIceServer[]> {
     try {
       const { data } = await supabase.auth.getSession();
-      const res = await fetch('/api/turn', {
+      const res = await apiFetch('/api/turn', {
         method: 'POST',
         headers: { Authorization: `Bearer ${data.session?.access_token}` },
       });
@@ -527,7 +528,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
         // Also push a notification so callees with the app closed get alerted.
         try {
           const { data: sess } = await supabase.auth.getSession();
-          void fetch('/api/push/call', {
+          void apiFetch('/api/push/call', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${sess.session?.access_token}` },
             body: JSON.stringify({

@@ -1,5 +1,6 @@
 'use client';
 
+import { apiFetch } from '@/lib/api/client';
 import { browserSupabase } from '@/lib/supabase/client';
 
 /**
@@ -20,7 +21,7 @@ export async function uploadAvatar(_userId: string, file: File): Promise<string>
   const form = new FormData();
   form.append('file', file);
 
-  const res = await fetch('/api/avatar', {
+  const res = await apiFetch('/api/avatar', {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}` },
     body: form,

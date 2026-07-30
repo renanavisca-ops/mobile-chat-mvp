@@ -1,5 +1,6 @@
 'use client';
 
+import { apiFetch } from '@/lib/api/client';
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { ChevronLeftIcon, SearchIcon, InfoIcon, MoreVerticalIcon, XIcon } from '@/components/icons';
@@ -167,7 +168,7 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
     setBusy(true);
     try {
       const { data: { session } } = await browserSupabase().auth.getSession();
-      const res = await fetch(`/api/chat/${chatId}/status`, {
+      const res = await apiFetch(`/api/chat/${chatId}/status`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
