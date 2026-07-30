@@ -14,6 +14,12 @@ import { browserSupabase } from '@/lib/supabase/client';
 import { logCallStart, logCallAnswered, logCallEnded } from '@/lib/db/calls';
 import { isBlockedWith } from '@/lib/db/safety';
 import { startRingtone, stopRingtone } from '@/lib/call/ringtone';
+import {
+  hasNativeAudioRoute,
+  nativeStartCallAudio,
+  nativeSetSpeakerphone,
+  nativeStopCallAudio,
+} from '@/lib/call/native-audio';
 import { useT } from '@/lib/i18n/context';
 import {
   PhoneIcon,
@@ -143,13 +149,22 @@ export function CallProvider({ children }: { children: ReactNode }) {
 
   const localVideoRef = useRef<HTMLVideoElement | null>(null);
 
-  // setSinkId lets us pick the audio output device; absent on iOS Safari.
+  // Two ways to route call audio to the loudspeaker:
+  //   - Native Android: the AudioRoute plugin drives the platform AudioManager
+  //     (the WebView supports neither setSinkId nor real loudspeaker routing).
+  //   - Web/desktop: HTMLMediaElement.setSinkId picks the output device.
+  const nativeAudio = hasNativeAudioRoute();
   const speakerSupported =
-    typeof window !== 'undefined' &&
-    typeof (HTMLMediaElement.prototype as unknown as { setSinkId?: unknown }).setSinkId === 'function';
+    nativeAudio ||
+    (typeof window !== 'undefined' &&
+      typeof (HTMLMediaElement.prototype as unknown as { setSinkId?: unknown }).setSinkId === 'function');
 
   // Route every remote audio/video element to the chosen output device.
   const applySpeaker = useCallback(async (on: boolean) => {
+    if (nativeAudio) {
+      await nativeSetSpeakerphone(on);
+      return;
+    }
     if (!speakerSupported) return;
     try {
       const devices = await navigator.mediaDevices.enumerateDevices();
@@ -168,7 +183,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
         } catch {}
       }
     } catch {}
-  }, [speakerSupported]);
+  }, [nativeAudio, speakerSupported]);
 
   const registerMediaEl = useCallback(
     (el: HTMLVideoElement, attach: boolean) => {
@@ -275,6 +290,9 @@ export function CallProvider({ children }: { children: ReactNode }) {
     pendingIceRef.current.clear();
     localStreamRef.current?.getTracks().forEach((tr) => tr.stop());
     localStreamRef.current = null;
+    // Restore the phone's normal audio state (undo MODE_IN_COMMUNICATION /
+    // loudspeaker) now that the call is over.
+    void nativeStopCallAudio();
     if (channelRef.current) {
       void supabase.removeChannel(channelRef.current);
       channelRef.current = null;
@@ -487,6 +505,9 @@ export function CallProvider({ children }: { children: ReactNode }) {
         localStreamRef.current = stream;
         setLocalHasVideo(opts.video);
         if (localVideoRef.current) localVideoRef.current.srcObject = stream;
+        // Enter native voice mode and honor the default speaker-on state.
+        await nativeStartCallAudio();
+        await applySpeaker(true); // speaker defaults on at call start
         iceServersRef.current = await getIceServers();
 
         await joinCall(callId);
@@ -543,6 +564,9 @@ export function CallProvider({ children }: { children: ReactNode }) {
       localStreamRef.current = stream;
       setLocalHasVideo(inv.video);
       if (localVideoRef.current) localVideoRef.current.srcObject = stream;
+      // Enter native voice mode and honor the default speaker-on state.
+      await nativeStartCallAudio();
+      await applySpeaker(true); // speaker defaults on at call start
       iceServersRef.current = await getIceServers();
       await joinCall(inv.callId);
     } catch (e: any) {
