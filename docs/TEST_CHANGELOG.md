@@ -14,6 +14,23 @@ QA / test forms. Newest cycle first.
 
 ---
 
+## Cycle 3 — 2026-07-30
+
+| # | Change | Area | Effect requires | Status |
+|---|--------|------|-----------------|--------|
+| 1 | **Unread chats pinned to the top of the chat list.** Chats with unread messages sort above read ones (most recent first in each group); once a chat is read it drops below the last unread. | Web | Vercel deploy | ✅ Fixed |
+| 2 | **Media auto-loads without a tap.** Transient first-load failures (cold-start auth race) now auto-retry a couple of times, so images/audio stop needing a click to appear. | Web | Vercel deploy | ✅ Fixed |
+| 3 | **Calls survive the screen turning off.** New microphone foreground service + wake lock keep mic access and CPU alive when the screen locks (this was the real "call cuts after ~1 min" cause — the screen was timing out). | **Native (Android)** | **New Codemagic build** | ⏳ Needs rebuild |
+| 4 | **Speaker toggle now uses the modern Android 12+ audio API** (`setCommunicationDevice`), so the loudspeaker actually switches (old API was a no-op on newer Android). | **Native (Android)** | **New Codemagic build** | ⏳ Needs rebuild |
+
+### How to test Cycle 3
+- **Unread order:** Have two chats receive messages → both jump to the top; open/read one → it drops below the still-unread one.
+- **Media auto-load:** Open a chat with images/voice notes → they appear on their own within a second or two (no tapping needed).
+- **Calls screen-off (after new Android build):** Start a call → lock the screen / let it time out → call keeps going.
+- **Speaker (after new Android build):** During a call, tap speaker → audio audibly switches to loudspeaker.
+
+---
+
 ## Cycle 2 — 2026-07-30 (PR #36, merged → commit `55f11c9`)
 
 | # | Change | Area | Effect requires | Status |
@@ -39,11 +56,16 @@ QA / test forms. Newest cycle first.
 
 | Issue | Diagnosis | Owner / next step |
 |-------|-----------|-------------------|
-| **Calls drop after ~1 min** | Not a code bug and NOT missing env — `CLOUDFLARE_TURN_KEY_ID` / `CLOUDFLARE_TURN_API_TOKEN` are set in Vercel. Suspected the stored TURN credentials are rejected by Cloudflare, so `/api/turn` silently falls back to STUN-only (which can't hold a call through mobile NAT). | Verify with a live test call + Vercel logs; if bad, replace the stored credential values. |
-| **Android loudspeaker** | Fixed in code (item 5) but needs a new Android build to ship. | Include in the next Codemagic build. |
-| **iOS loudspeaker** | Not implemented (native plugin is Android-only for now). | Add iOS AVAudioSession routing when iOS testing starts. |
+| **Calls cut when the screen turns off** | ROOT CAUSE FOUND (Cycle 3): when the screen locks, Android suspends background mic access + CPU, killing the call. Fixed with a microphone foreground service + wake lock — needs a new Android build. (TURN turned out to be fine; the credentials are set and calls connect.) | Ships in the next Codemagic build. |
+| **Android loudspeaker** | Fixed in code (Cycle 2 #5 + Cycle 3 #4, now using the modern Android 12+ API) but needs a new Android build to ship. | Include in the next Codemagic build. |
+| **iOS loudspeaker / background calls** | Not implemented (native pieces are Android-only for now). | Add iOS AVAudioSession routing + background audio mode when iOS testing starts. |
 | **AI features (smart replies / translate) fail** | `/api/ai` returns 502 — Anthropic API reports "credit balance is too low". | Top up the Anthropic account credits. |
 
 ## Pending native (Android) changes — batch before the next rebuild
 Rebuild the Android app once to pick up **all** of these together:
-- [ ] `AudioRoute` native plugin (call loudspeaker) — item 5 above.
+- [ ] `AudioRoute` native plugin — call loudspeaker (Cycle 2 #5, Cycle 3 #4).
+- [ ] `CallForegroundService` + wake lock — calls survive screen-off (Cycle 3 #3).
+
+**Play Store note:** the microphone foreground service will require a short
+justification in the Play Console's "Foreground service" declaration at
+submission time.

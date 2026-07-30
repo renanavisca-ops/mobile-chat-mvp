@@ -362,7 +362,19 @@ export default function ChatsPage() {
             ) : (() => {
               const searched = chats.filter((c) => (c.title || '').toLowerCase().includes(search.trim().toLowerCase()));
               const archivedList = searched.filter((c) => c.archived);
-              const visible = showArchived ? archivedList : searched.filter((c) => !c.archived);
+              // Unread chats stay pinned above read ones; within each group the
+              // most recent is first. As a chat is read (unread_count → 0) it
+              // drops below the last still-unread chat.
+              const ts = (c: ChatSummary) => (c.last_message_at ? new Date(c.last_message_at).getTime() : 0);
+              const byUnreadThenRecent = (a: ChatSummary, b: ChatSummary) => {
+                const au = (a.unread_count ?? 0) > 0 ? 1 : 0;
+                const bu = (b.unread_count ?? 0) > 0 ? 1 : 0;
+                if (au !== bu) return bu - au;
+                return ts(b) - ts(a);
+              };
+              const visible = (showArchived ? archivedList : searched.filter((c) => !c.archived))
+                .slice()
+                .sort(byUnreadThenRecent);
               return (
               <ul className="space-y-0.5">
                 {showArchived ? (

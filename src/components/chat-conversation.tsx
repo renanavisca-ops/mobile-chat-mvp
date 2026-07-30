@@ -1137,6 +1137,31 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
     });
   }
 
+  // Auto-retry transient failures so the user doesn't have to tap. The first
+  // resolve can fail on a cold-start auth/session race; retry each failed path
+  // a couple of times a short moment later (by clearing its failed mark, which
+  // re-admits it to the resolver). Bounded per-path so a genuinely unreadable
+  // object settles on the manual tap-to-retry tile instead of spinning.
+  const autoRetryCountRef = useRef<Map<string, number>>(new Map());
+  useEffect(() => {
+    if (failedMedia.size === 0) return;
+    const retriable = Array.from(failedMedia).filter(
+      (p) => (autoRetryCountRef.current.get(p) ?? 0) < 2
+    );
+    if (retriable.length === 0) return;
+    const id = window.setTimeout(() => {
+      for (const p of retriable) {
+        autoRetryCountRef.current.set(p, (autoRetryCountRef.current.get(p) ?? 0) + 1);
+      }
+      setFailedMedia((prev) => {
+        const next = new Set(prev);
+        for (const p of retriable) next.delete(p);
+        return next;
+      });
+    }, 1500);
+    return () => window.clearTimeout(id);
+  }, [failedMedia]);
+
   // -------- Multi-select
   function enterSelect(id: string) {
     setSelectMode(true);
