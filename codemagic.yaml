@@ -96,7 +96,14 @@ workflows:
           cd android
           chmod +x ./gradlew
           ./gradlew bundleRelease \
-            -PversionCode=$(($BUILD_NUMBER + 1))
+            -PversionCode=$(($BUILD_NUMBER + 1)) \
+            -PversionName="1.1.0-phase1"
+      - name: Print AAB identity (versionCode / SHA-256) for the release record
+        script: |
+          AAB=$(find android/app/build/outputs -name "*.aab" | head -1)
+          echo "AAB: $AAB"
+          echo "versionName: 1.1.0-phase1  versionCode: $(($BUILD_NUMBER + 1))  applicationId: app.toky.chat"
+          shasum -a 256 "$AAB" || sha256sum "$AAB"
     artifacts:
       - android/app/build/outputs/**/*.aab
       - android/app/build/outputs/**/*.apk
