@@ -214,6 +214,8 @@ const es: Dictionary = {
     savePending: 'Guardar: disponible en una próxima actualización.',
     cantPlayInline: 'No se pudo reproducir inline.',
     openVideo: 'Abrir video',
+    mediaRetry: 'Toca para reintentar',
+    forwardMediaUnavailable: 'No se pudo cargar el contenido original para reenviar.',
     edited: '(editado)',
     today: 'Hoy',
     yesterday: 'Ayer',

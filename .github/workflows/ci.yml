@@ -18,4 +18,11 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       - run: npm run test
+      # Placeholder public env so Next's static prerender can construct the
+      # Supabase client at build time. This is a throwaway validation build —
+      # the real deploy is done by Vercel with the real env vars — so these
+      # dummy values never reach production.
       - run: npm run build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder-anon-key
