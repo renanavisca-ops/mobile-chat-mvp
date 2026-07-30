@@ -213,6 +213,7 @@ const en = {
     cantPlayInline: "Couldn't play inline.",
     openVideo: 'Open video',
     mediaRetry: 'Tap to retry',
+    forwardMediaUnavailable: "Couldn't load the original media to forward.",
     edited: '(edited)',
     today: 'Today',
     yesterday: 'Yesterday',

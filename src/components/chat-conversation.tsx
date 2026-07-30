@@ -16,9 +16,8 @@ import { EmojiPicker } from '@/components/emoji-picker';
 import { useRequireAuth } from '@/lib/auth/use-require-auth';
 import { listChats, sendMessage, deleteMessage, hideMessageForMe, editMessage, pinMessage, unpinMessage, searchMessages, setChatMuted, getChatMuted, toggleReaction, createPoll, votePoll, setDisappearingMessages, enableChatEncryption, chatMustEncrypt, EncryptionRequiredError } from '@/lib/db/chats';
 import { initKeystore, isUnlocked } from '@/lib/crypto/keystore';
-import { forwardMessageToChats, type ForwardPayload } from '@/lib/db/forward';
 import { uploadChatImage, uploadChatMedia, uploadChatAudio, uploadChatFile, createSignedChatMediaUrl, uploadEncryptedChatMedia, fetchDecryptedMediaUrl } from '@/lib/storage/upload';
-import type { MediaEnc } from '@/lib/crypto/media';
+import { decryptMedia, type MediaEnc } from '@/lib/crypto/media';
 import { useChatRealtime } from '@/lib/realtime/use-chat-realtime';
 import { browserSupabase } from '@/lib/supabase/client';
 import { useOnlineUsers } from '@/components/presence-provider';
@@ -115,18 +114,6 @@ function shortId(id: string) {
 
 function sanitizeFilename(name: string) {
   return name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 120);
-}
-
-function toForwardPayload(body: Payload): ForwardPayload {
-  const out: ForwardPayload = {};
-  if (body.text) out.text = body.text;
-
-  if (Array.isArray(body.imagePaths) && body.imagePaths.length) out.imagePaths = body.imagePaths.filter(Boolean);
-  else if (body.imagePath) out.imagePath = body.imagePath;
-
-  if (body.videoPath) out.videoPath = body.videoPath;
-  if (body.audioPath) out.audioPath = body.audioPath;
-  return out;
 }
 
 export function ChatConversation({ chatId, embedded = false }: { chatId: string; embedded?: boolean }) {
@@ -429,7 +416,7 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [forwardOpen, setForwardOpen] = useState(false);
-  const [forwardBody, setForwardBody] = useState<ForwardPayload | null>(null);
+  const [forwardBody, setForwardBody] = useState<Payload | null>(null);
   const [chats, setChats] = useState<ChatSummary[]>([]);
   const [chatsLoading, setChatsLoading] = useState(false);
 
@@ -917,7 +904,22 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
   async function startRecording() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const recorder = new MediaRecorder(stream);
+      // Don't hardcode webm: many Android devices' MediaRecorder can't produce
+      // it and silently record an empty/undecodable blob, so the sender hears
+      // nothing back. Negotiate the first format the device actually supports
+      // and tag the blob with the recorder's REAL mimeType — that type also
+      // becomes enc.mime, so playback works on both ends.
+      const preferred = [
+        'audio/webm;codecs=opus',
+        'audio/webm',
+        'audio/mp4',
+        'audio/aac',
+        'audio/mpeg',
+        'audio/ogg;codecs=opus',
+      ];
+      const canCheck = typeof MediaRecorder !== 'undefined' && typeof MediaRecorder.isTypeSupported === 'function';
+      const chosen = canCheck ? preferred.find((m) => MediaRecorder.isTypeSupported(m)) : undefined;
+      const recorder = chosen ? new MediaRecorder(stream, { mimeType: chosen }) : new MediaRecorder(stream);
       mediaRecorderRef.current = recorder;
       audioChunksRef.current = [];
       recCanceledRef.current = false;
@@ -937,7 +939,8 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
           audioChunksRef.current = [];
           return; // discarded — nothing to preview
         }
-        const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        const type = recorder.mimeType || chosen || 'audio/webm';
+        const blob = new Blob(audioChunksRef.current, { type });
         setPendingAudio(blob);
       };
 
@@ -1166,15 +1169,106 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
   }
 
   // -------- Forward
+  //
+  // Forwarding must RE-MATERIALIZE media into the destination chat. The stored
+  // object's read access is scoped by storage RLS to the SOURCE chat's members,
+  // and the per-object decryption key lives only inside the source message — so
+  // copying the payload verbatim (the old behavior) handed the new recipient a
+  // path they can't read and, in encrypted chats, no key: it rendered as
+  // "object not found". Instead we fetch + decrypt the source bytes and
+  // re-upload (re-encrypting for the destination chat's mode) to mint a fresh
+  // path + enc for every attachment.
+  async function fetchSourceBlob(path: string, enc?: MediaEnc): Promise<Blob> {
+    const signed = await createSignedChatMediaUrl(path, 300);
+    const res = await fetch(signed);
+    if (!res.ok) throw new Error(t('chat.forwardMediaUnavailable'));
+    if (enc) return decryptMedia(await res.arrayBuffer(), enc);
+    return res.blob();
+  }
+
+  async function reuploadForForward(
+    path: string,
+    srcEnc: MediaEnc | undefined,
+    destChatId: string,
+    destEnc: boolean,
+    kind: 'image' | 'video' | 'audio' | 'file',
+    name?: string,
+  ): Promise<{ path: string; enc?: MediaEnc }> {
+    const blob = await fetchSourceBlob(path, srcEnc);
+    if (destEnc) return uploadEncryptedChatMedia({ chatId: destChatId, file: blob });
+    if (kind === 'file') {
+      const f = new File([blob], name || 'file', { type: blob.type || 'application/octet-stream' });
+      const u = await uploadChatFile(destChatId, f);
+      return { path: u.path };
+    }
+    const u = await uploadChatMedia({ chatId: destChatId, file: blob, kind, name });
+    return { path: u.path };
+  }
+
+  async function buildForwardPayload(body: Payload, destChatId: string): Promise<Payload> {
+    const destEnc = await chatMustEncrypt(destChatId);
+    const out: Payload = {};
+    if (body.text) out.text = body.text;
+    const encMap: Record<string, MediaEnc> = {};
+    const srcEncAt = (p: string) => body.enc?.[p];
+
+    const imgs =
+      Array.isArray(body.imagePaths) && body.imagePaths.length
+        ? body.imagePaths.filter(Boolean)
+        : body.imagePath
+        ? [body.imagePath]
+        : [];
+    if (imgs.length) {
+      const newPaths: string[] = [];
+      for (const p of imgs) {
+        const r = await reuploadForForward(p, srcEncAt(p), destChatId, destEnc, 'image');
+        newPaths.push(r.path);
+        if (r.enc) encMap[r.path] = r.enc;
+      }
+      out.imagePaths = newPaths;
+    }
+    if (body.videoPath) {
+      const r = await reuploadForForward(body.videoPath, srcEncAt(body.videoPath), destChatId, destEnc, 'video');
+      out.videoPath = r.path;
+      if (r.enc) encMap[r.path] = r.enc;
+      if (body.videoTrimStart != null) out.videoTrimStart = body.videoTrimStart;
+      if (body.videoTrimEnd != null) out.videoTrimEnd = body.videoTrimEnd;
+    }
+    if (body.audioPath) {
+      const r = await reuploadForForward(body.audioPath, srcEncAt(body.audioPath), destChatId, destEnc, 'audio');
+      out.audioPath = r.path;
+      if (r.enc) encMap[r.path] = r.enc;
+    }
+    if (body.filePath) {
+      const r = await reuploadForForward(body.filePath, srcEncAt(body.filePath), destChatId, destEnc, 'file', body.fileName);
+      out.filePath = r.path;
+      if (r.enc) encMap[r.path] = r.enc;
+      if (body.fileName) out.fileName = body.fileName;
+      if (body.fileSize) out.fileSize = body.fileSize;
+      if (body.fileMime) out.fileMime = body.fileMime;
+    }
+    if (Object.keys(encMap).length) out.enc = encMap;
+    return out;
+  }
+
   async function confirmForward(destChatIds: string[]) {
-    if (selectMode && selectedIds.size) {
-      const msgs = items.filter((m) => selectedIds.has(m.id) && !m.body.is_deleted);
-      for (const m of msgs) await forwardMessageToChats(destChatIds, toForwardPayload(m.body));
-      exitSelect();
+    const bodies: Payload[] =
+      selectMode && selectedIds.size
+        ? items.filter((m) => selectedIds.has(m.id) && !m.body.is_deleted).map((m) => m.body)
+        : forwardBody
+        ? [forwardBody]
+        : [];
+    if (!bodies.length) {
+      if (selectMode) exitSelect();
       return;
     }
-    if (!forwardBody) return;
-    await forwardMessageToChats(destChatIds, forwardBody);
+    for (const dest of destChatIds) {
+      for (const body of bodies) {
+        const payload = await buildForwardPayload(body, dest);
+        await sendMessage(dest, payload as any);
+      }
+    }
+    if (selectMode) exitSelect();
   }
 
   // -------- Actions Sheet
@@ -1914,7 +2008,7 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
             icon: <ForwardIcon size={18} />,
             onClick: () => {
               if (!actionsMsg) return;
-              setForwardBody(toForwardPayload(actionsMsg.body));
+              setForwardBody(actionsMsg.body);
               setForwardOpen(true);
             },
           },
