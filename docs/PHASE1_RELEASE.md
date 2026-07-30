@@ -1,5 +1,16 @@
 # Phase 1 — Closed-Test Release Validation
 
+> ⛔ **ON HOLD — DO NOT UPLOAD (owner directive, 2026-07-30).**
+> Toky Chat is in its required Google Play closed-testing period for production
+> access. The current closed-test release is **frozen**: do not upload this
+> Phase 1 AAB, do not create a release in the closed track, do not change the
+> installed version, and do not ask testers to update — until the owner
+> explicitly confirms the testing period and production-access process are done.
+> Phase 1 stays on branch `claude/chat-app-android-ios-0pb8r2` (unreleased) and
+> must **not** be merged to `main` (the current native app loads `main`'s web UI
+> remotely). The steps below apply only *after* explicit authorization.
+
+
 This build is delivered as an **in-place update to the existing Google Play
 closed-testing app** (`app.toky.chat`). It is **not** a new app/package/track.
 
