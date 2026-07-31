@@ -310,6 +310,8 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
   function scrollToMessage(messageId: string) {
     setSearchOpen(false);
     setSearchQuery('');
+    // Don't let the auto-pin snap us back to the bottom after jumping.
+    stickBottomRef.current = false;
     const el = document.getElementById(`msg-${messageId}`);
     if (el) {
       el.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -458,13 +460,17 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
   const cameraPhotoRef = useRef<HTMLInputElement | null>(null);
   const cameraVideoRef = useRef<HTMLInputElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const textInputRef = useRef<HTMLInputElement | null>(null);
+  const textInputRef = useRef<HTMLTextAreaElement | null>(null);
 
   const composerRef = useRef<HTMLDivElement | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   // Tracks whether we've already jumped to the newest message for this chat,
   // so opening a chat lands at the bottom but later updates don't yank you down.
   const initialScrollDoneRef = useRef(false);
+  // True while the view should stay pinned to the newest message. Set false when
+  // the user scrolls up; re-pins as media loads so the latest message isn't left
+  // cut off at the bottom of the screen after images finish loading.
+  const stickBottomRef = useRef(true);
 
   // Long-press support
   const longPressTimer = useRef<number | null>(null);
@@ -849,13 +855,16 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
     if (!initialScrollDoneRef.current) {
       el.scrollTop = el.scrollHeight;
       initialScrollDoneRef.current = true;
+      stickBottomRef.current = true;
       return;
     }
-    if (el.scrollHeight - el.scrollTop - el.clientHeight < 150) {
+    // Re-pin to the newest message whenever content grows (new message OR media
+    // finishing loading), as long as the user hasn't scrolled up.
+    if (stickBottomRef.current) {
       el.scrollTop = el.scrollHeight;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items.length, chatReady]);
+  }, [items.length, chatReady, signedUrls]);
 
   // Fire an animated effect when the newest message contains a trigger emoji.
   // Seeds silently on first load so history doesn't replay effects.
@@ -879,14 +888,23 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
     if (el.scrollTop === 0 && hasMore && !loadingMore) {
       loadMore();
     }
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    // Keep pinning to the newest message only while the user is near the bottom.
+    stickBottomRef.current = distanceFromBottom < 120;
     // Show the jump-to-latest button once the user scrolls a screenful up.
-    setShowScrollDown(el.scrollHeight - el.scrollTop - el.clientHeight > 400);
+    setShowScrollDown(distanceFromBottom > 400);
   };
 
   function scrollToBottom() {
     const el = scrollRef.current;
     if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
   }
+
+  // Collapse the composer back to one line once it's cleared (e.g. after send).
+  useEffect(() => {
+    const el = textInputRef.current;
+    if (el && text === '') el.style.height = 'auto';
+  }, [text]);
 
   // Typing detection
   useEffect(() => {
@@ -2446,11 +2464,36 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
                         </div>
                       ) : (
                         <>
-                          {m.body.reply_to && (
-                            <div className="mb-1 text-xs border-l-2 border-blue-500 pl-2 text-slate-400 bg-slate-900/50 rounded py-1 pr-2 mt-1">
-                              {t('chat.replyToMessage')}
-                            </div>
-                          )}
+                          {m.body.reply_to && (() => {
+                            const target = items.find((x) => x.id === m.body.reply_to);
+                            const tb = target?.body;
+                            const preview = !target
+                              ? t('chat.replyToMessage')
+                              : tb?.text
+                              ? tb.text
+                              : tb?.imagePaths?.length || tb?.imagePath
+                              ? `📷 ${t('chatsList.photo')}`
+                              : tb?.audioPath
+                              ? `🎤 ${t('chat.mediaMessage')}`
+                              : tb?.videoPath
+                              ? `🎬 ${t('chat.mediaMessage')}`
+                              : tb?.filePath
+                              ? `📎 ${tb.fileName || t('chat.file')}`
+                              : t('chat.mediaMessage');
+                            return (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (m.body.reply_to) scrollToMessage(m.body.reply_to);
+                                }}
+                                className="mb-1 mt-1 block w-full truncate rounded border-l-2 border-blue-400 bg-slate-900/50 py-1 pl-2 pr-2 text-left text-xs text-slate-300 hover:bg-slate-900/80"
+                                title={t('chat.replyToMessage')}
+                              >
+                                {preview}
+                              </button>
+                            );
+                          })()}
                           {m.body.text ? <div className="text-sm mt-1 whitespace-pre-wrap break-words">{m.body.text}</div> : null}
                           {(() => {
                             const link = m.body.text ? firstUrl(m.body.text) : null;
@@ -2503,9 +2546,16 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
                         </div>
                       ) : null}
 
-                      {imgPaths.length ? (
-                        <div className="mt-2 grid grid-cols-2 gap-2">
-                          {Array.from(new Set(imgPaths)).map((path) => {
+                      {imgPaths.length ? (() => {
+                        const uniqueImgs = Array.from(new Set(imgPaths));
+                        const single = uniqueImgs.length === 1;
+                        // A single image fills the bubble width (object-cover);
+                        // multiples tile in a square grid. Negative margins let
+                        // the media reach the bubble edges instead of sitting in
+                        // a big padded bubble with a small picture inside.
+                        return (
+                        <div className={`-mx-2 mt-1 overflow-hidden rounded-2xl ${single ? '' : 'grid grid-cols-2 gap-1'}`}>
+                          {uniqueImgs.map((path) => {
                             const url = signedUrls[path] || '';
                             if (url) {
                               return (
@@ -2514,11 +2564,20 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
                                   key={path}
                                   src={url}
                                   alt="chat image"
+                                  onLoad={() => {
+                                    if (stickBottomRef.current && scrollRef.current) {
+                                      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+                                    }
+                                  }}
                                   onClick={() => {
                                     if (selectMode) toggleSelect(m.id);
                                     else setLightboxUrl(url);
                                   }}
-                                  className="max-h-80 w-auto cursor-zoom-in rounded-lg border border-slate-900 transition-opacity hover:opacity-90"
+                                  className={
+                                    single
+                                      ? 'max-h-96 w-full cursor-zoom-in object-cover transition-opacity hover:opacity-90'
+                                      : 'aspect-square w-full cursor-zoom-in object-cover transition-opacity hover:opacity-90'
+                                  }
                                 />
                               );
                             }
@@ -2528,7 +2587,7 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
                                   key={path}
                                   type="button"
                                   onClick={() => retryMedia(path)}
-                                  className="flex h-28 w-full flex-col items-center justify-center gap-1 rounded-lg border border-slate-800 bg-slate-900/60 text-xs text-slate-400 hover:bg-slate-800"
+                                  className={`flex ${single ? 'h-56' : 'aspect-square'} w-full flex-col items-center justify-center gap-1 bg-slate-900/60 text-xs text-slate-400 hover:bg-slate-800`}
                                 >
                                   <DownloadIcon size={18} />
                                   <span>{t('chat.mediaRetry')}</span>
@@ -2536,11 +2595,12 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
                               );
                             }
                             return (
-                              <div key={path} className="h-28 w-full animate-pulse rounded-lg border border-slate-900 bg-slate-800" />
+                              <div key={path} className={`${single ? 'h-56' : 'aspect-square'} w-full animate-pulse bg-slate-800`} />
                             );
                           })}
                         </div>
-                      ) : null}
+                        );
+                      })() : null}
 
                       {videoPath ? (
                         <div className="mt-2">
@@ -2862,15 +2922,26 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
                 />
               </div>
 
-              <input
+              <textarea
                 ref={textInputRef}
-                className="min-w-0 flex-1 bg-transparent px-1 py-2.5 text-[15px] text-slate-100 placeholder:text-slate-500 focus:outline-none"
+                rows={1}
+                className="min-w-0 flex-1 resize-none bg-transparent px-1 py-2.5 text-[15px] leading-snug text-slate-100 placeholder:text-slate-500 focus:outline-none max-h-32 overflow-y-auto"
                 value={text}
-                onChange={(e) => setText(e.target.value)}
+                onChange={(e) => {
+                  setText(e.target.value);
+                  // Grow the box with the text, up to the max-height (then scroll).
+                  const el = e.currentTarget;
+                  el.style.height = 'auto';
+                  el.style.height = `${Math.min(el.scrollHeight, 128)}px`;
+                }}
                 placeholder={t('chat.composerPlaceholder')}
                 onFocus={() => setEmojiOpen(false)}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') onSend();
+                  // Enter sends; Shift+Enter inserts a newline.
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    onSend();
+                  }
                 }}
                 disabled={blocked}
               />

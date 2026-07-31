@@ -222,7 +222,7 @@ export async function fetchDecryptedMediaUrl(path: string, enc: MediaEnc): Promi
   return URL.createObjectURL(blob);
 }
 
-const MAX_FILE_BYTES = 25 * 1024 * 1024; // 25MB
+const MAX_FILE_BYTES = 50 * 1024 * 1024; // 50MB — documents (Word/Excel/PPT/PDF)
 
 export type UploadedFile = { path: string; name: string; size: number; mime: string };
 
@@ -231,7 +231,7 @@ export type UploadedFile = { path: string; name: string; size: number; mime: str
  * chats/<chatId>/files/. Returns metadata used to render a file card.
  */
 export async function uploadChatFile(chatId: string, file: File): Promise<UploadedFile> {
-  if (file.size > MAX_FILE_BYTES) throw new Error('Máximo 25MB por archivo.');
+  if (file.size > MAX_FILE_BYTES) throw new Error('Máximo 50MB por archivo.');
 
   const safeName = assertFilenameOk(file.name || 'file');
   const ts = Date.now();

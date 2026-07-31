@@ -5,3 +5,7 @@ node_modules/
 dist/ 
 build/ 
 *.tsbuildinfo 
+
+# Mobile export build artifacts
+/out/
+/.mobile-export-stash/

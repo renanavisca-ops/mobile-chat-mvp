@@ -35,8 +35,8 @@ describe('toky-media-v1 media encryption', () => {
     await expect(decryptMedia(await cipher.arrayBuffer(), { v: 2 })).rejects.toThrow(/metadata/i);
   });
 
-  it('rejects files over the 25 MB single-shot cap', async () => {
-    const big = new Blob([new Uint8Array(26 * 1024 * 1024)]);
+  it('rejects files over the 50 MB single-shot cap', async () => {
+    const big = new Blob([new Uint8Array(51 * 1024 * 1024)]);
     await expect(encryptMedia(big)).rejects.toThrow(/too large/i);
   });
 });
