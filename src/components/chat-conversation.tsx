@@ -25,6 +25,7 @@ import { useLanguage } from '@/lib/i18n/context';
 import { PollComposer } from '@/components/poll-composer';
 import { MessagesSkeleton } from '@/components/skeleton';
 import { ImageLightbox } from '@/components/image-lightbox';
+import { DocumentPreview } from '@/components/document-preview';
 import { tap, impact } from '@/lib/haptics';
 import { LinkPreview, firstUrl } from '@/components/link-preview';
 import { SafetyNumberModal } from '@/components/safety-number-modal';
@@ -419,6 +420,8 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [forwardOpen, setForwardOpen] = useState(false);
   const [forwardBody, setForwardBody] = useState<Payload | null>(null);
+  // Attachment currently open in the document preview sheet (its message body).
+  const [docPreview, setDocPreview] = useState<Payload | null>(null);
   const [chats, setChats] = useState<ChatSummary[]>([]);
   const [chatsLoading, setChatsLoading] = useState(false);
 
@@ -2021,6 +2024,19 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
         onConfirm={confirmForward}
       />
 
+      <DocumentPreview
+        open={!!docPreview}
+        onClose={() => setDocPreview(null)}
+        url={docPreview?.filePath ? signedUrls[docPreview.filePath] : undefined}
+        fileName={docPreview?.fileName}
+        fileSize={docPreview?.fileSize}
+        fileMime={docPreview?.fileMime}
+        onResend={docPreview ? () => {
+          setForwardBody(docPreview);
+          setForwardOpen(true);
+        } : undefined}
+      />
+
       <MessageActionsSheet
         open={actionsOpen}
         onClose={() => setActionsOpen(false)}
@@ -2640,12 +2656,10 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
                       ) : null}
 
                       {m.body.filePath ? (
-                        <a
-                          href={signedUrls[m.body.filePath] || undefined}
-                          target="_blank"
-                          rel="noreferrer"
-                          download={m.body.fileName}
-                          className="mt-2 flex items-center gap-3 rounded-lg border border-slate-800 bg-slate-950/60 p-2 hover:bg-slate-900"
+                        <button
+                          type="button"
+                          onClick={() => { tap(); setDocPreview(m.body); }}
+                          className="mt-2 flex w-full items-center gap-3 rounded-lg border border-slate-800 bg-slate-950/60 p-2 text-left hover:bg-slate-900"
                         >
                           <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-slate-800 text-slate-300">
                             <PaperclipIcon size={18} />
@@ -2657,7 +2671,7 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
                           <span className="shrink-0 text-slate-400">
                             <DownloadIcon size={18} />
                           </span>
-                        </a>
+                        </button>
                       ) : null}
 
                       {m.sender_type !== 'system' && (
