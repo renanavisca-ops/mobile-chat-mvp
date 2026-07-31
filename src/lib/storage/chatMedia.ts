@@ -180,9 +180,18 @@ export async function uploadChatAudio(chatId: string, file: Blob): Promise<{ pat
   return uploadChatMedia({ chatId, file, kind: 'audio', name: `audio_${Date.now()}.webm` });
 }
 
-export async function createSignedChatMediaUrl(path: string, expiresSeconds = 60 * 5): Promise<string> {
+export async function createSignedChatMediaUrl(
+  path: string,
+  expiresSeconds = 60 * 5,
+  // Pass a filename to force `Content-Disposition: attachment` so a top-level
+  // navigation / window.open triggers a real download (used by the document
+  // preview's Download action, which the system browser then handles).
+  opts?: { download?: string | boolean },
+): Promise<string> {
   const supabase = browserSupabase();
-  const { data, error } = await supabase.storage.from('chat-media').createSignedUrl(path, expiresSeconds);
+  const { data, error } = await supabase.storage
+    .from('chat-media')
+    .createSignedUrl(path, expiresSeconds, opts?.download ? { download: opts.download } : undefined);
   if (error) throw error;
   return data.signedUrl;
 }

@@ -2027,7 +2027,17 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
       <DocumentPreview
         open={!!docPreview}
         onClose={() => setDocPreview(null)}
-        url={docPreview?.filePath ? signedUrls[docPreview.filePath] : undefined}
+        srcKey={docPreview?.filePath}
+        load={docPreview?.filePath
+          ? () => fetchSourceBlob(docPreview.filePath!, docPreview.enc?.[docPreview.filePath!])
+          : undefined}
+        httpUrl={docPreview?.filePath && !docPreview.enc?.[docPreview.filePath]
+          ? (opts) => createSignedChatMediaUrl(
+              docPreview.filePath!,
+              300,
+              opts?.download ? { download: docPreview.fileName || true } : undefined,
+            )
+          : undefined}
         fileName={docPreview?.fileName}
         fileSize={docPreview?.fileSize}
         fileMime={docPreview?.fileMime}

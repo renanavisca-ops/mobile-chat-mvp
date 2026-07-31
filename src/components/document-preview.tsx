@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { Capacitor } from '@capacitor/core';
 import { useLanguage } from '@/lib/i18n/context';
 import {
   XIcon,
@@ -29,22 +30,43 @@ function ext(name?: string): string {
   return m ? m[1].toUpperCase() : '';
 }
 
+/** Best-effort MIME from the filename when the message body didn't carry one. */
+function mimeFromName(name?: string): string {
+  const e = ext(name).toLowerCase();
+  const map: Record<string, string> = {
+    pdf: 'application/pdf',
+    png: 'image/png',
+    jpg: 'image/jpeg',
+    jpeg: 'image/jpeg',
+    gif: 'image/gif',
+    webp: 'image/webp',
+    svg: 'image/svg+xml',
+    txt: 'text/plain',
+    csv: 'text/csv',
+  };
+  return map[e] || '';
+}
+
 /**
  * Attachment preview sheet. Opens when a document row in the conversation is
  * tapped. Previews images and PDFs inline; every file type gets Download,
  * Print (when previewable), Resend (forward) and Open-externally actions.
  *
- * Download is done by fetching the bytes and clicking a same-origin object URL:
- * the browser's `download` attribute is IGNORED on cross-origin URLs (the
- * Supabase signed URL), and `target="_blank"` frequently no-ops inside a mobile
- * WebView — so a plain `<a download>` "does nothing". Fetch → blob → object URL
- * works for both the signed URLs of legacy chats and the already-decrypted
- * `blob:` URLs of encrypted chats.
+ * The bytes are resolved through `load()` — the SAME fetch/decrypt path the
+ * forward ("Resend") flow uses — rather than the conversation's pre-resolved
+ * signed-URL map, which can be empty (a transient RLS/auth race) or, in an
+ * encrypted chat, an `octet-stream` blob URL that an <iframe> refuses to render.
+ * We then rebuild a typed same-origin object URL so preview, download, print and
+ * open all work: the browser ignores the `download` attribute on cross-origin
+ * URLs and `target="_blank"` frequently no-ops inside a mobile WebView, so a
+ * same-origin object URL is what makes downloads actually fire.
  */
 export function DocumentPreview({
   open,
   onClose,
-  url,
+  load,
+  httpUrl,
+  srcKey,
   fileName,
   fileSize,
   fileMime,
@@ -52,8 +74,19 @@ export function DocumentPreview({
 }: {
   open: boolean;
   onClose: () => void;
-  /** Resolved signed/blob URL, or undefined while the attachment is still loading. */
-  url?: string;
+  /** Resolve the decrypted attachment bytes. Omitted when there's nothing to load. */
+  load?: () => Promise<Blob>;
+  /**
+   * Resolve a real http(s) signed URL for the file (undefined for encrypted
+   * chats, which have no server-side plaintext). Preferred for Open/Download:
+   * the Capacitor WebView can't save or open a `blob:` URL, but it delegates a
+   * window.open of an http(s) URL to the system browser, which then renders or
+   * downloads it (with `download` forcing an attachment disposition).
+   */
+  httpUrl?: (opts?: { download?: boolean }) => Promise<string>;
+  /** Stable identity of the attachment (its storage path) so re-renders that
+   *  hand us a fresh `load` closure don't retrigger the fetch. */
+  srcKey?: string;
   fileName?: string;
   fileSize?: number;
   fileMime?: string;
@@ -61,16 +94,30 @@ export function DocumentPreview({
   onResend?: () => void;
 }) {
   const { t } = useLanguage();
-  const [busy, setBusy] = useState(false);
+  const loadRef = useRef(load);
+  loadRef.current = load;
+  const [objUrl, setObjUrl] = useState<string | null>(null);
+  const [blob, setBlob] = useState<Blob | null>(null);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const printFrameRef = useRef<HTMLIFrameElement | null>(null);
 
-  const mime = (fileMime || '').toLowerCase();
+  const native = Capacitor.isNativePlatform();
   const name = fileName || t('chat.file');
+  const mime = (fileMime || mimeFromName(fileName) || '').toLowerCase();
   const isImage = mime.startsWith('image/');
-  const isPdf = mime === 'application/pdf' || /\.pdf$/i.test(fileName || '');
-  const previewable = isImage || isPdf;
+  const isPdf = mime === 'application/pdf';
+  // The Android System WebView has no built-in PDF renderer, so an <iframe> of a
+  // PDF is blank there — only render it inline on the web, and lean on Open
+  // (system browser) natively.
+  const canInlinePdf = isPdf && !native;
+  const previewable = isImage || canInlinePdf;
+  // We only need to fetch (and decrypt) the bytes when we'll actually show them
+  // inline, or when there's no http URL to hand off to (encrypted chats). A
+  // Word/Excel doc on native, say, needs neither — skip the (up-to-50MB) fetch.
+  const needsBytes = isImage || canInlinePdf || !httpUrl;
 
+  // Lock body scroll + close on Escape while open.
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -85,43 +132,74 @@ export function DocumentPreview({
     };
   }, [open, onClose]);
 
-  // Reset transient state whenever a different attachment opens.
+  // Resolve the bytes whenever the sheet opens for a new attachment. Rebuild a
+  // typed object URL so <iframe>/<img> render (encrypted chats hand back an
+  // untyped blob) and so downloads have a same-origin URL to click.
   useEffect(() => {
-    if (open) setError(null);
-  }, [open, url]);
+    if (!open || !loadRef.current || !needsBytes) return;
+    let cancelled = false;
+    let created: string | null = null;
+    setError(null);
+    setBlob(null);
+    setObjUrl(null);
+    setLoading(true);
+    (async () => {
+      try {
+        const raw = await loadRef.current!();
+        if (cancelled) return;
+        const type = fileMime || mimeFromName(fileName) || raw.type || 'application/octet-stream';
+        const typed = raw.type === type ? raw : new Blob([raw], { type });
+        created = URL.createObjectURL(typed);
+        setBlob(typed);
+        setObjUrl(created);
+      } catch {
+        if (!cancelled) setError(t('chat.previewFailed'));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+      if (created) {
+        try { URL.revokeObjectURL(created); } catch {}
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, srcKey]);
 
   if (!open) return null;
 
   async function handleDownload() {
-    if (!url) return;
-    setError(null);
-    setBusy(true);
-    try {
-      const res = await fetch(url);
-      if (!res.ok) throw new Error('fetch failed');
-      const blob = await res.blob();
-      const objUrl = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = objUrl;
-      a.download = name;
-      a.rel = 'noreferrer';
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      // Give the download a beat to start before revoking the URL.
-      setTimeout(() => {
-        try { URL.revokeObjectURL(objUrl); } catch {}
-      }, 4000);
-    } catch {
-      setError(t('chat.downloadFailed'));
-    } finally {
-      setBusy(false);
+    // Prefer a real signed URL with an attachment disposition: the system
+    // browser (incl. the one the Capacitor WebView hands off to) saves it. Only
+    // encrypted chats — which have no server plaintext — fall back to the
+    // same-origin blob click, which works on the web but not inside a WebView.
+    if (httpUrl) {
+      try {
+        const u = await httpUrl({ download: true });
+        window.open(u, '_blank', 'noopener,noreferrer');
+        return;
+      } catch {
+        setError(t('chat.downloadFailed'));
+        return;
+      }
     }
+    if (!blob) return;
+    const dl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = dl;
+    a.download = name;
+    a.rel = 'noreferrer';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => {
+      try { URL.revokeObjectURL(dl); } catch {}
+    }, 4000);
   }
 
   function handlePrint() {
-    if (!url) return;
-    // Print the rendered preview via a hidden iframe so we never navigate away.
+    if (!objUrl) return;
     const frame = printFrameRef.current;
     if (!frame) return;
     frame.onload = () => {
@@ -129,16 +207,31 @@ export function DocumentPreview({
         frame.contentWindow?.focus();
         frame.contentWindow?.print();
       } catch {
-        window.open(url, '_blank', 'noopener,noreferrer');
+        window.open(objUrl, '_blank', 'noopener,noreferrer');
       }
     };
-    frame.src = url;
+    frame.src = objUrl;
   }
 
-  function handleOpenExternal() {
-    if (!url) return;
-    window.open(url, '_blank', 'noopener,noreferrer');
+  async function handleOpenExternal() {
+    // http(s) URL opens in the system browser (renders PDFs/Office previews);
+    // blob object URL is the web/encrypted fallback.
+    if (httpUrl) {
+      try {
+        const u = await httpUrl();
+        window.open(u, '_blank', 'noopener,noreferrer');
+        return;
+      } catch {
+        /* fall through to blob */
+      }
+    }
+    if (objUrl) window.open(objUrl, '_blank', 'noopener,noreferrer');
   }
+
+  const ready = !!objUrl && !!blob;
+  // Open/Download work as soon as we can produce a URL — an http URL needs no
+  // byte fetch, so they light up even while the inline preview is still loading.
+  const canOpen = ready || !!httpUrl;
 
   return (
     <div
@@ -169,23 +262,27 @@ export function DocumentPreview({
 
       {/* Preview body */}
       <div className="flex flex-1 items-center justify-center overflow-auto p-4">
-        {!url ? (
+        {loading ? (
           <div className="h-40 w-full max-w-md animate-pulse rounded-2xl bg-white/10" />
-        ) : isImage ? (
+        ) : error ? (
+          <div className="flex max-w-sm flex-col items-center gap-3 text-center">
+            <span className="grid h-20 w-20 place-items-center rounded-3xl bg-white/10 text-white/70">
+              <FileIcon size={40} />
+            </span>
+            <p className="text-sm text-red-300">{error}</p>
+          </div>
+        ) : ready && isImage ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={url}
-            alt={name}
-            className="max-h-full max-w-full rounded-xl object-contain"
-          />
-        ) : isPdf ? (
-          <iframe
-            src={url}
-            title={name}
-            className="h-full w-full rounded-xl bg-white"
-          />
+          <img src={objUrl!} alt={name} className="max-h-full max-w-full rounded-xl object-contain" />
+        ) : ready && canInlinePdf ? (
+          <iframe src={objUrl!} title={name} className="h-full w-full rounded-xl bg-white" />
         ) : (
-          <div className="flex max-w-sm flex-col items-center gap-4 text-center">
+          <button
+            type="button"
+            onClick={canOpen ? handleOpenExternal : undefined}
+            disabled={!canOpen}
+            className="flex max-w-sm flex-col items-center gap-4 text-center disabled:cursor-default"
+          >
             <span className="grid h-24 w-24 place-items-center rounded-3xl bg-white/10 text-white/80">
               <FileIcon size={44} />
             </span>
@@ -194,28 +291,29 @@ export function DocumentPreview({
                 {ext(fileName) ? `${ext(fileName)} · ` : ''}
                 {fmtBytes(fileSize)}
               </p>
-              <p className="mt-1 text-xs text-white/50">{t('chat.noInlinePreview')}</p>
+              <p className="mt-1 text-xs text-white/50">
+                {canOpen ? t('chat.tapToOpen') : t('chat.noInlinePreview')}
+              </p>
             </div>
-          </div>
+          </button>
         )}
       </div>
-
-      {error ? (
-        <p className="px-4 pb-1 text-center text-xs text-red-300">{error}</p>
-      ) : null}
 
       {/* Action bar */}
       <div className="grid grid-cols-4 gap-1 border-t border-white/10 px-2 py-2 pb-safe">
         <ActionButton
           label={t('chat.download')}
-          disabled={!url || busy}
+          disabled={!canOpen}
           onClick={handleDownload}
           icon={<DownloadIcon size={22} />}
         />
         <ActionButton
           label={t('chat.print')}
-          disabled={!url || !previewable}
-          onClick={handlePrint}
+          // On the web we print the inline preview; natively (no WebView print)
+          // we hand off to the system browser, which can print — so enable it
+          // whenever we can open the file.
+          disabled={native ? !canOpen : (!ready || !previewable)}
+          onClick={native ? handleOpenExternal : handlePrint}
           icon={<PrinterIcon size={22} />}
         />
         <ActionButton
@@ -229,7 +327,7 @@ export function DocumentPreview({
         />
         <ActionButton
           label={t('chat.openExternal')}
-          disabled={!url}
+          disabled={!canOpen}
           onClick={handleOpenExternal}
           icon={<ExternalLinkIcon size={22} />}
         />
