@@ -220,6 +220,7 @@ const en = {
     previewFailed: "Couldn't load the file. Try again.",
     noInlinePreview: 'No preview available. Download or open to view.',
     tapToOpen: 'Tap to open',
+    savedToDevice: 'Saved to your files.',
     mediaRetry: 'Tap to retry',
     forwardMediaUnavailable: "Couldn't load the original media to forward.",
     edited: '(edited)',

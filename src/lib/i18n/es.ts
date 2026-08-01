@@ -222,6 +222,7 @@ const es: Dictionary = {
     previewFailed: 'No se pudo cargar el archivo. Inténtalo de nuevo.',
     noInlinePreview: 'Sin vista previa. Descarga o abre para verlo.',
     tapToOpen: 'Toca para abrir',
+    savedToDevice: 'Guardado en tus archivos.',
     mediaRetry: 'Toca para reintentar',
     forwardMediaUnavailable: 'No se pudo cargar el contenido original para reenviar.',
     edited: '(editado)',

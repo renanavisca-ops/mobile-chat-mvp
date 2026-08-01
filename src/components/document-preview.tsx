@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { useLanguage } from '@/lib/i18n/context';
+import { canNativeFiles, shareNativeFile, saveNativeFile } from '@/lib/native-files';
 import {
   XIcon,
   DownloadIcon,
@@ -100,9 +101,13 @@ export function DocumentPreview({
   const [blob, setBlob] = useState<Blob | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const printFrameRef = useRef<HTMLIFrameElement | null>(null);
 
   const native = Capacitor.isNativePlatform();
+  // On native we save/share the actual bytes through the OS, so we always need
+  // the (decrypted) blob — even for a Word/Excel doc we won't preview inline.
+  const nativeFiles = canNativeFiles();
   const name = fileName || t('chat.file');
   const mime = (fileMime || mimeFromName(fileName) || '').toLowerCase();
   const isImage = mime.startsWith('image/');
@@ -115,7 +120,7 @@ export function DocumentPreview({
   // We only need to fetch (and decrypt) the bytes when we'll actually show them
   // inline, or when there's no http URL to hand off to (encrypted chats). A
   // Word/Excel doc on native, say, needs neither — skip the (up-to-50MB) fetch.
-  const needsBytes = isImage || canInlinePdf || !httpUrl;
+  const needsBytes = isImage || canInlinePdf || !httpUrl || nativeFiles;
 
   // Lock body scroll + close on Escape while open.
   useEffect(() => {
@@ -140,6 +145,7 @@ export function DocumentPreview({
     let cancelled = false;
     let created: string | null = null;
     setError(null);
+    setNotice(null);
     setBlob(null);
     setObjUrl(null);
     setLoading(true);
@@ -170,10 +176,19 @@ export function DocumentPreview({
   if (!open) return null;
 
   async function handleDownload() {
-    // Prefer a real signed URL with an attachment disposition: the system
-    // browser (incl. the one the Capacitor WebView hands off to) saves it. Only
-    // encrypted chats — which have no server plaintext — fall back to the
-    // same-origin blob click, which works on the web but not inside a WebView.
+    // Native: write the decrypted bytes to the device's Documents.
+    if (nativeFiles && blob) {
+      setError(null);
+      try {
+        await saveNativeFile(blob, name);
+        setNotice(t('chat.savedToDevice'));
+      } catch {
+        setError(t('chat.downloadFailed'));
+      }
+      return;
+    }
+    // Web, non-encrypted: a real signed URL with an attachment disposition, which
+    // the browser downloads.
     if (httpUrl) {
       try {
         const u = await httpUrl({ download: true });
@@ -184,6 +199,7 @@ export function DocumentPreview({
         return;
       }
     }
+    // Web, encrypted: same-origin blob click.
     if (!blob) return;
     const dl = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -213,9 +229,23 @@ export function DocumentPreview({
     frame.src = objUrl;
   }
 
+  async function handleShareNative() {
+    if (!blob) return;
+    setError(null);
+    try {
+      await shareNativeFile(blob, name, name);
+    } catch {
+      // A user-cancelled share sheet throws too — don't surface that as an error.
+    }
+  }
+
   async function handleOpenExternal() {
-    // http(s) URL opens in the system browser (renders PDFs/Office previews);
-    // blob object URL is the web/encrypted fallback.
+    // Native: hand the decrypted file to the OS share sheet (view/print/save).
+    if (nativeFiles) {
+      await handleShareNative();
+      return;
+    }
+    // Web, non-encrypted: open the signed URL (renders PDFs/Office previews).
     if (httpUrl) {
       try {
         const u = await httpUrl();
@@ -298,6 +328,12 @@ export function DocumentPreview({
           </button>
         )}
       </div>
+
+      {notice ? (
+        <p className="px-4 pb-1 text-center text-xs text-emerald-300">{notice}</p>
+      ) : error && !loading ? (
+        <p className="px-4 pb-1 text-center text-xs text-red-300">{error}</p>
+      ) : null}
 
       {/* Action bar */}
       <div className="grid grid-cols-4 gap-1 border-t border-white/10 px-2 py-2 pb-safe">
