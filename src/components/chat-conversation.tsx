@@ -335,6 +335,28 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
   const [replyingTo, setReplyingTo] = useState<MessageRow | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
 
+  // -------- Draft persistence
+  // Keep an unsent message around when you leave the chat, per conversation, so
+  // it's still there when you come back (mirrors WhatsApp). Restored on chat
+  // switch; saved on every keystroke; cleared on send (setText('') empties it).
+  const draftKey = `toky:draft:${chatId}`;
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(`toky:draft:${chatId}`);
+      setText(saved || '');
+    } catch {}
+    // Only when the conversation changes — not on every text edit.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chatId]);
+  useEffect(() => {
+    // Don't treat an in-progress message edit as a draft.
+    if (editingId) return;
+    try {
+      if (text) localStorage.setItem(draftKey, text);
+      else localStorage.removeItem(draftKey);
+    } catch {}
+  }, [text, editingId, draftKey]);
+
   // Local previews
   const [previewImages, setPreviewImages] = useState<string[]>([]);
   const [previewVideo, setPreviewVideo] = useState<string>('');
