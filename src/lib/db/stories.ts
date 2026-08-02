@@ -67,19 +67,12 @@ export async function listStoryGroups(): Promise<StoryGroup[]> {
   if (!me.user) return [];
   const myId = me.user.id;
 
-  // Only show my own status plus statuses from people in my contacts — not every
-  // user on the platform.
-  const { data: contactRows } = await supabase
-    .from('contacts')
-    .select('contact_id')
-    .eq('owner_id', myId);
-  const contactIds = (contactRows ?? []).map((r) => r.contact_id).filter(Boolean);
-  const allowedAuthors = Array.from(new Set([myId, ...contactIds]));
-
+  // Visibility is enforced by RLS: my own status, plus authors who are my
+  // contact OR who I share a chat with, minus anyone who hid their status from
+  // me. So we can simply select — the database returns only what I may see.
   const { data: stories, error } = await supabase
     .from('stories')
     .select('id, user_id, media_path, text_content, background, created_at, expires_at')
-    .in('user_id', allowedAuthors)
     .order('created_at', { ascending: true });
   if (error) throw error;
 
@@ -155,4 +148,89 @@ export async function deleteStory(storyId: string): Promise<void> {
   const supabase = browserSupabase();
   const { error } = await supabase.from('stories').delete().eq('id', storyId);
   if (error) throw error;
+}
+
+// -------- Status privacy: hide your status from specific people
+
+export type StatusAudiencePerson = {
+  user_id: string;
+  username: string | null;
+  display_name: string | null;
+  avatar_url: string | null;
+  hidden: boolean;
+};
+
+/**
+ * The people who could see my status — my contacts plus everyone I share a chat
+ * with — each flagged with whether I've currently hidden my status from them.
+ * Powers the "who can't see my status" settings screen.
+ */
+export async function listStatusAudience(): Promise<StatusAudiencePerson[]> {
+  const supabase = browserSupabase();
+  const { data: me } = await supabase.auth.getUser();
+  if (!me.user) return [];
+  const myId = me.user.id;
+
+  const [contactsRes, membershipsRes, hiddenRes] = await Promise.all([
+    supabase.from('contacts').select('contact_id').eq('owner_id', myId),
+    // chats I'm in → the other members of those chats
+    supabase.from('chat_members').select('chat_id').eq('user_id', myId),
+    (supabase as any).from('status_hidden_from').select('hidden_id').eq('owner_id', myId),
+  ]);
+
+  const chatIds = (membershipsRes.data ?? []).map((r) => r.chat_id).filter(Boolean);
+  let chatPartnerIds: string[] = [];
+  if (chatIds.length > 0) {
+    const { data: others } = await supabase
+      .from('chat_members')
+      .select('user_id')
+      .in('chat_id', chatIds)
+      .neq('user_id', myId);
+    chatPartnerIds = (others ?? []).map((r) => r.user_id).filter(Boolean);
+  }
+
+  const ids = Array.from(
+    new Set([...(contactsRes.data ?? []).map((r) => r.contact_id), ...chatPartnerIds].filter(Boolean)),
+  ).filter((id) => id !== myId);
+  if (ids.length === 0) return [];
+
+  const { data: profiles } = await supabase
+    .from('profiles')
+    .select('id, username, display_name, avatar_url')
+    .in('id', ids);
+
+  const hidden = new Set(((hiddenRes.data as { hidden_id: string }[] | null) ?? []).map((r) => r.hidden_id));
+
+  return (profiles ?? [])
+    .map((p) => ({
+      user_id: p.id,
+      username: p.username,
+      display_name: p.display_name,
+      avatar_url: p.avatar_url,
+      hidden: hidden.has(p.id),
+    }))
+    .sort((a, b) =>
+      (a.display_name || a.username || '').localeCompare(b.display_name || b.username || ''),
+    );
+}
+
+/** Hide (or unhide) my status from a specific person. */
+export async function setStatusHidden(userId: string, hidden: boolean): Promise<void> {
+  const supabase = browserSupabase();
+  const { data: me } = await supabase.auth.getUser();
+  if (!me.user) throw new Error('Not authenticated');
+
+  if (hidden) {
+    const { error } = await (supabase as any)
+      .from('status_hidden_from')
+      .upsert({ owner_id: me.user.id, hidden_id: userId }, { onConflict: 'owner_id,hidden_id' });
+    if (error) throw error;
+  } else {
+    const { error } = await (supabase as any)
+      .from('status_hidden_from')
+      .delete()
+      .eq('owner_id', me.user.id)
+      .eq('hidden_id', userId);
+    if (error) throw error;
+  }
 }

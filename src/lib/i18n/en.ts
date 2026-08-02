@@ -448,6 +448,13 @@ const en = {
     note: "This trims what viewers see — it doesn't shrink the uploaded file.",
     trimmedTo: 'Trimmed to {{seconds}}s',
   },
+  statusHide: {
+    title: "Who can't see my status",
+    desc: "People you turn on here won't see your status.",
+    empty: 'No contacts or chats yet.',
+    cantSee: "Can't see my status",
+    hiddenCount: '{{n}} hidden',
+  },
   imageEditor: {
     title: 'Edit photo',
     rotate: 'Rotate',
@@ -604,6 +611,8 @@ const en = {
     showOnlineStatusDesc: "If you turn this off, others won't see when you're online.",
     readReceipts: 'Send read receipts',
     readReceiptsDesc: "If you turn this off, others won't see when you've read their messages. You'll still see the delivered check.",
+    statusPrivacy: 'Status privacy',
+    statusPrivacyDesc: "Choose who can't see your status.",
     currentPassword: 'Current password (optional)',
     newPassword: 'New password',
     confirmPassword: 'Confirm new password',

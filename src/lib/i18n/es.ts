@@ -450,6 +450,13 @@ const es: Dictionary = {
     note: 'Esto recorta lo que ven los demás; no reduce el tamaño del archivo subido.',
     trimmedTo: 'Recortado a {{seconds}}s',
   },
+  statusHide: {
+    title: 'Quién no puede ver mi estado',
+    desc: 'Las personas que actives aquí no verán tu estado.',
+    empty: 'Aún no tienes contactos ni chats.',
+    cantSee: 'No puede ver mi estado',
+    hiddenCount: '{{n}} ocultos',
+  },
   imageEditor: {
     title: 'Editar foto',
     rotate: 'Girar',
@@ -606,6 +613,8 @@ const es: Dictionary = {
     showOnlineStatusDesc: 'Si lo desactivas, los demás no verán cuándo estás conectado.',
     readReceipts: 'Enviar confirmaciones de lectura',
     readReceiptsDesc: 'Si lo desactivas, los demás no verán cuándo has leído sus mensajes. Tú seguirás viendo la confirmación de entrega.',
+    statusPrivacy: 'Privacidad del estado',
+    statusPrivacyDesc: 'Elige quién no puede ver tu estado.',
     currentPassword: 'Contraseña actual (opcional)',
     newPassword: 'Nueva contraseña',
     confirmPassword: 'Confirmar nueva contraseña',
