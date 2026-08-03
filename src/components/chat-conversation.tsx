@@ -104,9 +104,18 @@ function formatLastSeen(iso: string, lang: string): string {
   const d = new Date(iso);
   const now = new Date();
   const sameDay = d.toDateString() === now.toDateString();
-  return sameDay
-    ? d.toLocaleTimeString(lang, { hour: '2-digit', minute: '2-digit' })
-    : d.toLocaleDateString(lang, { day: '2-digit', month: 'short' });
+  if (sameDay) {
+    return d.toLocaleTimeString(lang, { hour: '2-digit', minute: '2-digit' });
+  }
+  // Short date: weekday + day + month (e.g. "Mon, 12 Aug"); include the year
+  // only when it's a different year (e.g. "Mon, 12 Aug 2025").
+  const sameYear = d.getFullYear() === now.getFullYear();
+  return d.toLocaleDateString(lang, {
+    weekday: 'short',
+    day: '2-digit',
+    month: 'short',
+    ...(sameYear ? {} : { year: 'numeric' }),
+  });
 }
 
 function shortId(id: string) {
