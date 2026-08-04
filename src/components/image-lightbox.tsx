@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { XIcon, DownloadIcon } from '@/components/icons';
+import { XIcon, DownloadIcon, ExternalLinkIcon } from '@/components/icons';
+import { canNativeFiles, shareNativeFile } from '@/lib/native-files';
 
 /**
  * Full-screen image viewer with pinch-to-zoom, drag-to-pan and double-tap zoom.
@@ -152,6 +153,32 @@ export function ImageLightbox({
     }
   }
 
+  async function share() {
+    try {
+      const res = await fetch(url);
+      const blob = await res.blob();
+      const name = `image.${((blob.type.split('/')[1] || 'jpg').split(';')[0]) || 'jpg'}`;
+      if (canNativeFiles()) {
+        await shareNativeFile(blob, name);
+        return;
+      }
+      const file = new File([blob], name, { type: blob.type || 'image/jpeg' });
+      const nav = navigator as Navigator & { canShare?: (d?: any) => boolean };
+      if (nav.canShare?.({ files: [file] }) && typeof navigator.share === 'function') {
+        await navigator.share({ files: [file] });
+        return;
+      }
+      const u = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = u;
+      a.download = name;
+      a.click();
+      setTimeout(() => { try { URL.revokeObjectURL(u); } catch {} }, 4000);
+    } catch {
+      /* user cancelled or fetch failed — no-op */
+    }
+  }
+
   const zoomed = scale > 1;
 
   return (
@@ -166,6 +193,14 @@ export function ImageLightbox({
       aria-modal="true"
     >
       <div className="absolute right-3 top-3 z-10 flex gap-2 pt-safe">
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); share(); }}
+          className="grid h-11 w-11 place-items-center rounded-full bg-white/10 text-white backdrop-blur hover:bg-white/20"
+          aria-label="Share image"
+        >
+          <ExternalLinkIcon size={20} />
+        </button>
         <a
           href={url}
           download

@@ -238,6 +238,7 @@ const es: Dictionary = {
     actionEdit: 'Editar',
     actionReply: 'Responder',
     actionForward: 'Reenviar',
+    actionShare: 'Compartir en…',
     actionCopy: 'Copiar',
     actionSave: 'Guardar',
     actionStar: 'Destacar',
