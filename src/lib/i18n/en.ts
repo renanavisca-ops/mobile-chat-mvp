@@ -236,6 +236,7 @@ const en = {
     actionEdit: 'Edit',
     actionReply: 'Reply',
     actionForward: 'Forward',
+    actionShare: 'Share to…',
     actionCopy: 'Copy',
     actionSave: 'Save',
     actionStar: 'Star',

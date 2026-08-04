@@ -38,7 +38,8 @@ import { useCall } from '@/lib/call/call-provider';
 import { VideoTrimmer, TrimmedVideo } from '@/components/video-trimmer';
 import { suggestReplies, translateText } from '@/lib/ai';
 import { avatarBg, initials } from '@/lib/ui/avatar';
-import { PhoneIcon, VideoIcon, PlusIcon, SmileIcon, MicIcon, PencilIcon, ReplyIcon, ForwardIcon, CopyIcon, DownloadIcon, EyeOffIcon, TrashIcon, PinIcon, FlagIcon, PaperclipIcon, SparklesIcon, GlobeIcon, SendIcon, CheckIcon } from '@/components/icons';
+import { PhoneIcon, VideoIcon, PlusIcon, SmileIcon, MicIcon, PencilIcon, ReplyIcon, ForwardIcon, CopyIcon, DownloadIcon, EyeOffIcon, TrashIcon, PinIcon, FlagIcon, PaperclipIcon, SparklesIcon, GlobeIcon, SendIcon, CheckIcon, ExternalLinkIcon } from '@/components/icons';
+import { canNativeFiles, shareNativeFile } from '@/lib/native-files';
 import type { ChatSummary, MessageRow } from '@/lib/db/types';
 
 type Payload = {
@@ -1263,6 +1264,50 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
     return res.blob();
   }
 
+  // The primary shareable attachment of a message (document, image, video or
+  // audio), if any.
+  function primaryMediaPath(body: Payload): string | undefined {
+    return body.filePath || body.imagePath || body.imagePaths?.[0] || body.videoPath || body.audioPath;
+  }
+  function shareFileName(body: Payload, blob: Blob): string {
+    if (body.fileName) return body.fileName;
+    const ext = ((blob.type.split('/')[1] || 'bin').split(';')[0]) || 'bin';
+    const base = body.filePath ? 'file' : body.videoPath ? 'video' : body.audioPath ? 'audio' : 'image';
+    return `${base}.${ext}`;
+  }
+
+  // Share a message's attachment out to another app. In the native app the
+  // decrypted bytes go through the OS share sheet (@capacitor/share); on the web
+  // we use the Web Share API when available, else fall back to a download.
+  async function shareMessageMedia(body: Payload) {
+    const path = primaryMediaPath(body);
+    if (!path) return;
+    try {
+      const blob = await fetchSourceBlob(path, body.enc?.[path]);
+      const name = shareFileName(body, blob);
+      if (canNativeFiles()) {
+        await shareNativeFile(blob, name);
+        return;
+      }
+      const file = new File([blob], name, { type: blob.type || 'application/octet-stream' });
+      const nav = navigator as Navigator & { canShare?: (d?: any) => boolean };
+      if (nav.canShare?.({ files: [file] }) && typeof navigator.share === 'function') {
+        await navigator.share({ files: [file] });
+        return;
+      }
+      // Fallback: hand the file to the browser as a download.
+      const u = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = u;
+      a.download = name;
+      a.click();
+      setTimeout(() => { try { URL.revokeObjectURL(u); } catch {} }, 4000);
+    } catch (e: any) {
+      // A user-cancelled share sheet rejects too — don't surface that as an error.
+      if (e?.name !== 'AbortError') setErr(sendErrorMessage(e));
+    }
+  }
+
   async function reuploadForForward(
     path: string,
     srcEnc: MediaEnc | undefined,
@@ -2112,6 +2157,18 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
               setForwardOpen(true);
             },
           },
+          ...(actionsMsg && primaryMediaPath(actionsMsg.body)
+            ? [{
+                key: 'share',
+                label: t('chat.actionShare'),
+                icon: <ExternalLinkIcon size={18} />,
+                onClick: () => {
+                  const body = actionsMsg?.body;
+                  setActionsOpen(false);
+                  if (body) shareMessageMedia(body);
+                },
+              }]
+            : []),
           {
             key: 'copy',
             label: t('chat.actionCopy'),
