@@ -86,6 +86,8 @@ export type Story = {
   background: string | null;
   created_at: string;
   expires_at: string;
+  /** Whether the current viewer has already seen this story. */
+  seen?: boolean;
 };
 
 /** A user's stories grouped for the rings strip. */

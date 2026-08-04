@@ -95,7 +95,7 @@ export async function listStoryGroups(): Promise<StoryGroup[]> {
   const byUser = new Map<string, Story[]>();
   for (const s of rows) {
     const arr = byUser.get(s.user_id) ?? [];
-    arr.push(s);
+    arr.push({ ...s, seen: viewedIds.has(s.id) });
     byUser.set(s.user_id, arr);
   }
 

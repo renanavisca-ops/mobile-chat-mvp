@@ -8,6 +8,13 @@ import type { StoryGroup } from '@/lib/db/types';
 
 const DURATION = 5000;
 
+/** Index of the first not-yet-seen story in a group (0 if all are seen). */
+function firstUnseen(g: StoryGroup | undefined): number {
+  if (!g) return 0;
+  const i = g.stories.findIndex((s) => !s.seen);
+  return i >= 0 ? i : 0;
+}
+
 export function StoryViewer({
   groups: groupsProp,
   startIndex,
@@ -28,7 +35,9 @@ export function StoryViewer({
   // the bar only once, on close.
   const [groups] = useState(groupsProp);
   const [groupIndex, setGroupIndex] = useState(startIndex);
-  const [storyIndex, setStoryIndex] = useState(0);
+  // Resume where the viewer left off: open at the first unseen story, not the
+  // start of the group.
+  const [storyIndex, setStoryIndex] = useState(() => firstUnseen(groupsProp[startIndex]));
   const [mediaUrl, setMediaUrl] = useState<string | null>(null);
   const [viewCount, setViewCount] = useState<number | null>(null);
   // Only start the auto-advance countdown once the story's content is actually
@@ -45,24 +54,31 @@ export function StoryViewer({
   const group = groups[groupIndex];
   const story = group?.stories[storyIndex];
 
-  // Refresh the bar exactly once, when the viewer unmounts, so seen/unseen rings
-  // update to reflect everything viewed this session.
+  // Refresh the bar exactly once, when the viewer unmounts — but only AFTER the
+  // "mark seen" writes have settled, otherwise the reloaded rings read stale
+  // story_views and show just-watched stories as still unseen.
   const onChangedRef = useRef(onChanged);
   onChangedRef.current = onChanged;
+  const pendingViews = useRef<Promise<unknown>[]>([]);
   useEffect(() => {
-    return () => onChangedRef.current();
+    // Same stable array for the component's life; we push into it as stories are
+    // viewed, then await them all at unmount.
+    const pending = pendingViews.current;
+    return () => {
+      Promise.allSettled(pending).then(() => onChangedRef.current());
+    };
   }, []);
 
   const goNextGroup = useCallback(() => {
-    setStoryIndex(0);
-    setGroupIndex((gi) => {
-      if (gi + 1 >= groups.length) {
-        onClose();
-        return gi;
-      }
-      return gi + 1;
-    });
-  }, [groups.length, onClose]);
+    const nextGi = groupIndex + 1;
+    if (nextGi >= groups.length) {
+      onClose();
+      return;
+    }
+    setGroupIndex(nextGi);
+    // Each person's stories resume at their first unseen one too.
+    setStoryIndex(firstUnseen(groups[nextGi]));
+  }, [groupIndex, groups, onClose]);
 
   const next = useCallback(() => {
     if (!group) return;
@@ -97,8 +113,9 @@ export function StoryViewer({
     setLoaded(!story.media_path);
 
     // Persist the view, but DON'T refresh the bar now — that would re-sort the
-    // live list mid-view. The bar is refreshed once when the viewer closes.
-    markStoryViewed(story.id).catch(() => {});
+    // live list mid-view. The bar is refreshed once when the viewer closes,
+    // after these writes settle (tracked so the rings read fresh state).
+    pendingViews.current.push(markStoryViewed(story.id).catch(() => {}));
 
     if (story.media_path) {
       createSignedStoryUrl(story.media_path).then((u) => alive && setMediaUrl(u)).catch(() => {});
