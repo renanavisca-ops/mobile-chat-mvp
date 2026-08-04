@@ -80,7 +80,10 @@ export function StoriesBar() {
   const t = useT();
   const [groups, setGroups] = useState<StoryGroup[]>([]);
   const [composerOpen, setComposerOpen] = useState(false);
-  const [viewerStart, setViewerStart] = useState<number | null>(null);
+  // Track the OPEN group by user_id (stable), not by index: a background reload
+  // re-sorts `groups`, so an index would point at the wrong group (or none),
+  // making a tap open nothing or the wrong status.
+  const [viewerUserId, setViewerUserId] = useState<string | null>(null);
 
   const load = useCallback(() => {
     listStoryGroups()
@@ -102,6 +105,8 @@ export function StoriesBar() {
 
   const myGroup = groups.find((g) => g.isMe) ?? null;
   const others = groups.filter((g) => !g.isMe);
+  // Resolve the open group's current position from the live list at render time.
+  const viewerIndex = viewerUserId ? groups.findIndex((g) => g.user_id === viewerUserId) : -1;
 
   return (
     <div className="mb-2 border-b border-slate-900 pb-3">
@@ -112,7 +117,7 @@ export function StoriesBar() {
             <>
               <button
                 type="button"
-                onClick={() => setViewerStart(groups.indexOf(myGroup))}
+                onClick={() => setViewerUserId(myGroup.user_id)}
                 aria-label={t('stories.you')}
                 className={`grid h-16 w-16 place-items-center rounded-full p-[2px] ${
                   myGroup.allViewed ? 'bg-slate-700' : 'bg-gradient-to-tr from-indigo-500 via-fuchsia-500 to-amber-400'
@@ -150,18 +155,18 @@ export function StoriesBar() {
             key={g.user_id}
             group={g}
             label={g.display_name || g.username || '—'}
-            onClick={() => setViewerStart(groups.indexOf(g))}
+            onClick={() => setViewerUserId(g.user_id)}
           />
         ))}
       </div>
 
       <StoryComposer open={composerOpen} onClose={() => setComposerOpen(false)} onPosted={load} />
 
-      {viewerStart !== null && groups[viewerStart] && (
+      {viewerIndex >= 0 && (
         <StoryViewer
           groups={groups}
-          startIndex={viewerStart}
-          onClose={() => setViewerStart(null)}
+          startIndex={viewerIndex}
+          onClose={() => setViewerUserId(null)}
           onChanged={load}
         />
       )}
