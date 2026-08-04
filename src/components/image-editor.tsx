@@ -9,6 +9,8 @@ type Mode = 'view' | 'crop' | 'draw';
 type Rect = { x: number; y: number; w: number; h: number };
 type Stroke = { color: string; size: number; points: { x: number; y: number }[] };
 type Corner = 'nw' | 'ne' | 'sw' | 'se';
+type Edge = 'n' | 'e' | 's' | 'w';
+type Handle = Corner | Edge;
 
 const FILTERS: { key: FilterKey; css: string }[] = [
   { key: 'none', css: 'none' },
@@ -78,7 +80,7 @@ export function ImageEditor({
   const drawingStroke = useRef<Stroke | null>(null);
   // Active crop drag: which handle (or move), the fixed anchor corner, and the
   // crop at gesture start.
-  const cropDrag = useRef<{ type: Corner | 'move'; anchor: { x: number; y: number }; start: Rect; sx: number; sy: number } | null>(null);
+  const cropDrag = useRef<{ type: Handle | 'move'; anchor: { x: number; y: number }; start: Rect; sx: number; sy: number } | null>(null);
 
   // Load the image whenever a new file comes in.
   useEffect(() => {
@@ -205,19 +207,21 @@ export function ImageEditor({
       y: (e.clientY - rect.top) * (canvas.height / rect.height),
     };
   }
-  function startCropDrag(e: React.PointerEvent, type: Corner | 'move') {
+  function startCropDrag(e: React.PointerEvent, type: Handle | 'move') {
     e.stopPropagation();
     if (!crop) return;
     const p = overlayPoint(e);
+    // For a ratio-locked corner drag we resize around the opposite corner.
     const anchorFor: Record<Corner, { x: number; y: number }> = {
       nw: { x: crop.x + crop.w, y: crop.y + crop.h },
       ne: { x: crop.x, y: crop.y + crop.h },
       sw: { x: crop.x + crop.w, y: crop.y },
       se: { x: crop.x, y: crop.y },
     };
+    const isCorner = type === 'nw' || type === 'ne' || type === 'sw' || type === 'se';
     cropDrag.current = {
       type,
-      anchor: type === 'move' ? { x: 0, y: 0 } : anchorFor[type],
+      anchor: isCorner ? anchorFor[type as Corner] : { x: 0, y: 0 },
       start: crop,
       sx: p.x,
       sy: p.y,
@@ -239,26 +243,43 @@ export function ImageEditor({
     }
     const px = Math.max(0, Math.min(p.x, cw));
     const py = Math.max(0, Math.min(p.y, ch));
-    let x2 = px;
-    let y2 = py;
-    let w = Math.abs(x2 - d.anchor.x);
-    let h = Math.abs(y2 - d.anchor.y);
-    if (aspect) {
+    const isCorner = d.type === 'nw' || d.type === 'ne' || d.type === 'sw' || d.type === 'se';
+
+    // Ratio-locked corner drag: keep the aspect around the opposite corner.
+    if (aspect && isCorner) {
+      let x2 = px;
+      let y2 = py;
+      let w = Math.abs(x2 - d.anchor.x);
+      let h = Math.abs(y2 - d.anchor.y);
       if (w / h > aspect) h = w / aspect;
       else w = h * aspect;
       x2 = d.anchor.x + Math.sign(px - d.anchor.x || 1) * w;
       y2 = d.anchor.y + Math.sign(py - d.anchor.y || 1) * h;
+      const nx = Math.min(d.anchor.x, x2);
+      const ny = Math.min(d.anchor.y, y2);
+      const nw = Math.max(MIN_CROP, Math.abs(x2 - d.anchor.x));
+      const nh = Math.max(MIN_CROP, Math.abs(y2 - d.anchor.y));
+      setCrop({
+        x: Math.max(0, Math.min(nx, cw - nw)),
+        y: Math.max(0, Math.min(ny, ch - nh)),
+        w: nw,
+        h: nh,
+      });
+      return;
     }
-    const nx = Math.min(d.anchor.x, x2);
-    const ny = Math.min(d.anchor.y, y2);
-    const nw = Math.max(MIN_CROP, Math.abs(x2 - d.anchor.x));
-    const nh = Math.max(MIN_CROP, Math.abs(y2 - d.anchor.y));
-    setCrop({
-      x: Math.max(0, Math.min(nx, cw - nw)),
-      y: Math.max(0, Math.min(ny, ch - nh)),
-      w: nw,
-      h: nh,
-    });
+
+    // Free resize: move only the edges named by the handle (corners move two).
+    const s = d.start;
+    let left = s.x;
+    let top = s.y;
+    let right = s.x + s.w;
+    let bottom = s.y + s.h;
+    const T = d.type;
+    if (T.includes('w')) left = Math.min(px, right - MIN_CROP);
+    if (T.includes('e')) right = Math.max(px, left + MIN_CROP);
+    if (T.includes('n')) top = Math.min(py, bottom - MIN_CROP);
+    if (T.includes('s')) bottom = Math.max(py, top + MIN_CROP);
+    setCrop({ x: left, y: top, w: right - left, h: bottom - top });
   }
   function onOverlayUp() {
     cropDrag.current = null;
@@ -342,6 +363,24 @@ export function ImageEditor({
                     ))}
                   </div>
                 </div>
+
+                {/* Edge handles — drag one side. Only in Free mode, where they
+                    don't fight the locked ratio (corners keep the ratio). */}
+                {aspect === null && (['n', 'e', 's', 'w'] as Edge[]).map((edge) => {
+                  const left = edge === 'w' ? crop.x : edge === 'e' ? crop.x + crop.w : crop.x + crop.w / 2;
+                  const top = edge === 'n' ? crop.y : edge === 's' ? crop.y + crop.h : crop.y + crop.h / 2;
+                  const horizontal = edge === 'n' || edge === 's';
+                  return (
+                    <div
+                      key={edge}
+                      className={`absolute -translate-x-1/2 -translate-y-1/2 touch-none rounded-full border-2 border-white bg-indigo-500 shadow ${
+                        horizontal ? 'h-2.5 w-7' : 'h-7 w-2.5'
+                      }`}
+                      style={{ left: pct(left, cw), top: pct(top, ch), cursor: horizontal ? 'ns-resize' : 'ew-resize' }}
+                      onPointerDown={(e) => startCropDrag(e, edge)}
+                    />
+                  );
+                })}
 
                 {/* Corner handles. */}
                 {(['nw', 'ne', 'sw', 'se'] as Corner[]).map((c) => {
