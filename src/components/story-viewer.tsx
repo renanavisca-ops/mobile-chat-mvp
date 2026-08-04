@@ -9,7 +9,7 @@ import type { StoryGroup } from '@/lib/db/types';
 const DURATION = 5000;
 
 export function StoryViewer({
-  groups,
+  groups: groupsProp,
   startIndex,
   onClose,
   onChanged,
@@ -21,6 +21,12 @@ export function StoryViewer({
 }) {
   const t = useT();
   const { lang } = useLanguage();
+  // Freeze the group list for the lifetime of the viewer. Marking stories viewed
+  // reorders the live list (seen groups sink), which would shift the indices out
+  // from under us mid-view — causing the wrong story to show, the close button to
+  // miss, and every group to look "seen". We navigate the snapshot and refresh
+  // the bar only once, on close.
+  const [groups] = useState(groupsProp);
   const [groupIndex, setGroupIndex] = useState(startIndex);
   const [storyIndex, setStoryIndex] = useState(0);
   const [mediaUrl, setMediaUrl] = useState<string | null>(null);
@@ -38,6 +44,14 @@ export function StoryViewer({
 
   const group = groups[groupIndex];
   const story = group?.stories[storyIndex];
+
+  // Refresh the bar exactly once, when the viewer unmounts, so seen/unseen rings
+  // update to reflect everything viewed this session.
+  const onChangedRef = useRef(onChanged);
+  onChangedRef.current = onChanged;
+  useEffect(() => {
+    return () => onChangedRef.current();
+  }, []);
 
   const goNextGroup = useCallback(() => {
     setStoryIndex(0);
@@ -82,7 +96,9 @@ export function StoryViewer({
     // Text stories have nothing to download, so they're "loaded" right away.
     setLoaded(!story.media_path);
 
-    markStoryViewed(story.id).then(onChanged).catch(() => {});
+    // Persist the view, but DON'T refresh the bar now — that would re-sort the
+    // live list mid-view. The bar is refreshed once when the viewer closes.
+    markStoryViewed(story.id).catch(() => {});
 
     if (story.media_path) {
       createSignedStoryUrl(story.media_path).then((u) => alive && setMediaUrl(u)).catch(() => {});
@@ -168,16 +184,12 @@ export function StoryViewer({
     if (timerRef.current) window.clearTimeout(timerRef.current);
     try {
       await deleteStory(story.id);
-      onChanged();
-      // If that was the group's only story, leave; else re-clamp.
-      if (group.stories.length <= 1) {
-        onClose();
-      } else {
-        setStoryIndex((si) => Math.max(0, Math.min(si, group.stories.length - 2)));
-      }
     } catch {
-      onClose();
+      // fall through — close either way; the bar refresh on unmount reconciles.
     }
+    // Close after delete; the frozen snapshot still holds the removed story, so
+    // re-clamping in place would show a stale item. The unmount effect refreshes.
+    onClose();
   }
 
   if (!group || !story) return null;
