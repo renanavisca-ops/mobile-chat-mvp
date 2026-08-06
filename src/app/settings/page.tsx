@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { PageShell } from '@/components/page-shell';
 import { browserSupabase } from '@/lib/supabase/client';
 import { clearLocalIdentity } from '@/lib/auth/local-identity';
+import { clearCache } from '@/lib/cache';
 import { validatePassword } from '@/lib/password';
 import { isMfaEnabled, enrollTotp, verifyEnroll, disableTotp, generateRecoveryCodes } from '@/lib/auth/mfa';
 import { WALLPAPERS, CUSTOM_WALLPAPER_ID, getWallpaperId, setWallpaperId as saveWallpaperId, uploadCustomWallpaper, getCustomWallpaperUrl } from '@/lib/wallpaper';
@@ -321,6 +322,7 @@ export default function SettingsPage() {
       // sign out and return to the login screen.
       await unsubscribeFromPush().catch(() => {});
       clearLocalIdentity();
+      clearCache();
       try {
         localStorage.removeItem('toky_consent_v1');
       } catch {
@@ -479,6 +481,7 @@ export default function SettingsPage() {
     // Wipe this account's local device/keys so the next user to sign in on this
     // browser doesn't inherit them.
     clearLocalIdentity();
+    clearCache();
     // Send the user back to the front page, not the (now signed-out) settings.
     window.location.href = '/login';
   }

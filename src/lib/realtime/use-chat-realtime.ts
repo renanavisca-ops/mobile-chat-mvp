@@ -3,11 +3,27 @@
 import { useEffect, useState, useCallback } from 'react';
 import type { RealtimePostgresChangesPayload, REALTIME_SUBSCRIBE_STATES } from '@supabase/supabase-js';
 import { browserSupabase } from '@/lib/supabase/client';
-import { listMessages, markMessagesAsRead, listReactions, listPollVotes, listHiddenMessages, decryptRow } from '@/lib/db/chats';
+import { listMessages, listMessagesSince, markMessagesAsRead, listReactions, listPollVotes, listHiddenMessages, decryptRow } from '@/lib/db/chats';
 import type { MessageRow, MessageReaction, PollVote, HiddenMessage } from '@/lib/db/types';
 import { useNotifications } from '@/lib/hooks/useNotifications';
+import { memGet, memSet } from '@/lib/cache';
 
 const PAGE_SIZE = 50;
+const CACHE_CAP = 200;
+
+// Merge fetched rows onto existing ones: de-dupe by id and drop our optimistic
+// `local-` echoes once the real row (same plaintext) has arrived, then sort.
+function mergeMessages(prev: MessageRow[], rows: MessageRow[]): MessageRow[] {
+  const map = new Map<string, MessageRow>();
+  for (const m of prev) map.set(m.id, m);
+  for (const r of rows) map.set(r.id, r);
+  const realCiphertexts = new Set(rows.map((r) => r.ciphertext ?? ''));
+  const merged = Array.from(map.values()).filter(
+    (m) => !(String(m.id).startsWith('local-') && realCiphertexts.has(m.ciphertext ?? ''))
+  );
+  merged.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+  return merged;
+}
 
 export function useChatRealtime(chatId: string) {
   const [messages, setMessages] = useState<MessageRow[]>([]);
@@ -38,26 +54,46 @@ export function useChatRealtime(chatId: string) {
     };
   }, [chatId]);
 
-  // carga inicial
+  // carga inicial — paint cached history instantly, then only pull what's new.
   useEffect(() => {
     let alive = true;
-    setLoading(true);
+    const cached = memGet<MessageRow[]>(`msgs:${chatId}`);
 
-    listMessages(chatId, PAGE_SIZE, 0)
-      .then((rows) => {
-        if (!alive) return;
-        setMessages(rows);
-        setHasMore(rows.length === PAGE_SIZE);
-        setLoading(false);
-        // Marcar leídos
-        markMessagesAsRead(chatId).catch(console.error);
-      })
-      .catch(() => setLoading(false));
+    if (cached && cached.length) {
+      // Instant paint from cache; fetch just the messages since the last one.
+      setMessages(cached);
+      setLoading(false);
+      setHasMore(true);
+      listMessagesSince(chatId, cached[cached.length - 1].created_at)
+        .then((rows) => {
+          if (!alive || rows.length === 0) return;
+          setMessages((prev) => mergeMessages(prev, rows));
+          markMessagesAsRead(chatId).catch(console.error);
+        })
+        .catch(() => {});
+    } else {
+      setLoading(true);
+      listMessages(chatId, PAGE_SIZE, 0)
+        .then((rows) => {
+          if (!alive) return;
+          setMessages(rows);
+          setHasMore(rows.length === PAGE_SIZE);
+          setLoading(false);
+          markMessagesAsRead(chatId).catch(console.error);
+        })
+        .catch(() => setLoading(false));
+    }
 
     return () => {
       alive = false;
     };
   }, [chatId]);
+
+  // Keep the in-memory cache warm so re-opening this chat (this session) is
+  // instant. Memory only — decrypted E2EE history is never written to disk.
+  useEffect(() => {
+    if (messages.length) memSet(`msgs:${chatId}`, messages.slice(-CACHE_CAP));
+  }, [messages, chatId]);
 
   // Catch up after the realtime socket may have missed events (phone sleep,
   // network blip, tab backgrounded). Re-pulls the latest page and merges,
@@ -65,17 +101,7 @@ export function useChatRealtime(chatId: string) {
   const refetch = useCallback(async () => {
     try {
       const rows = await listMessages(chatId, PAGE_SIZE, 0);
-      setMessages((prev) => {
-        const map = new Map<string, MessageRow>();
-        for (const m of prev) map.set(m.id, m);
-        for (const r of rows) map.set(r.id, r);
-        const realCiphertexts = new Set(rows.map((r) => r.ciphertext ?? ''));
-        const merged = Array.from(map.values()).filter(
-          (m) => !(String(m.id).startsWith('local-') && realCiphertexts.has(m.ciphertext ?? ''))
-        );
-        merged.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-        return merged;
-      });
+      setMessages((prev) => mergeMessages(prev, rows));
       listReactions(chatId).then(setReactions).catch(() => {});
       listPollVotes(chatId).then(setPollVotes).catch(() => {});
       listHiddenMessages(chatId)

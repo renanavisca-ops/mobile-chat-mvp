@@ -382,6 +382,29 @@ export async function listMessages(
   return decryptRows(chatId, visible);
 }
 
+/**
+ * Fetch only messages created AFTER `sinceIso` (ascending). Used to "catch up"
+ * a cached conversation without re-downloading the whole history — the caller
+ * merges these onto its cached rows.
+ */
+export async function listMessagesSince(chatId: string, sinceIso: string): Promise<MessageRow[]> {
+  const supabase = browserSupabase();
+  const { data, error } = await supabase
+    .from('messages')
+    .select(
+      'id, chat_id, sender_device_id, ciphertext, nonce, message_type, created_at, read, content, sender_type, sender_id, delivery_status, edited_at, expires_at'
+    )
+    .eq('chat_id', chatId)
+    .gt('created_at', sinceIso)
+    .order('created_at', { ascending: true })
+    .limit(200);
+  if (error) throw error;
+  const now = Date.now();
+  const rows = (data ?? []) as unknown as MessageRow[];
+  const visible = rows.filter((m) => !m.expires_at || new Date(m.expires_at).getTime() > now);
+  return decryptRows(chatId, visible);
+}
+
 export type MessagePayload = {
   text?: string;
   imagePath?: string;
