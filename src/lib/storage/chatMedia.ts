@@ -180,6 +180,10 @@ export async function uploadChatAudio(chatId: string, file: Blob): Promise<{ pat
   return uploadChatMedia({ chatId, file, kind: 'audio', name: `audio_${Date.now()}.webm` });
 }
 
+// Reuse a freshly-signed URL for a path instead of re-signing on every chat
+// reopen. Cached in memory only, and expired well before the signature does.
+const signedUrlCache = new Map<string, { url: string; expiresAt: number }>();
+
 export async function createSignedChatMediaUrl(
   path: string,
   expiresSeconds = 60 * 5,
@@ -188,11 +192,21 @@ export async function createSignedChatMediaUrl(
   // preview's Download action, which the system browser then handles).
   opts?: { download?: string | boolean },
 ): Promise<string> {
+  // Only cache plain (inline) URLs — download-disposition URLs are one-off.
+  const cacheable = !opts?.download;
+  if (cacheable) {
+    const hit = signedUrlCache.get(path);
+    if (hit && hit.expiresAt > Date.now()) return hit.url;
+  }
   const supabase = browserSupabase();
   const { data, error } = await supabase.storage
     .from('chat-media')
     .createSignedUrl(path, expiresSeconds, opts?.download ? { download: opts.download } : undefined);
   if (error) throw error;
+  if (cacheable) {
+    // Expire our cache entry a minute before the signature to avoid races.
+    signedUrlCache.set(path, { url: data.signedUrl, expiresAt: Date.now() + (expiresSeconds - 60) * 1000 });
+  }
   return data.signedUrl;
 }
 

@@ -13,6 +13,7 @@ import { useRequireAuth } from '@/lib/auth/use-require-auth';
 import { ensureIdentity } from '@/lib/crypto/keystore';
 import { browserSupabase } from '@/lib/supabase/client';
 import { listChats, markIncomingDelivered, setChatArchived } from '@/lib/db/chats';
+import { getCached, setCached } from '@/lib/cache';
 import { tap, impact } from '@/lib/haptics';
 import { useIsOnline } from '@/components/presence-provider';
 import { useLanguage } from '@/lib/i18n/context';
@@ -143,8 +144,24 @@ export default function ChatsPage() {
   }, [menuOpen]);
 
   const reloadChats = () => {
-    listChats().then(setChats).catch((e) => setErr(e?.message ?? String(e)));
+    listChats()
+      .then((rows) => {
+        setChats(rows);
+        if (user) setCached(`chats:${user.id}`, rows);
+      })
+      .catch((e) => setErr(e?.message ?? String(e)));
   };
+
+  // Paint the last-known chat list instantly from cache, then refresh in the
+  // background (below). Skips the skeleton on repeat/cold visits.
+  useEffect(() => {
+    if (!user) return;
+    const cached = getCached<ChatSummary[]>(`chats:${user.id}`);
+    if (cached && cached.length) {
+      setChats(cached);
+      setChatsLoaded(true);
+    }
+  }, [user]);
 
   function startRowPress(c: ChatSummary) {
     if (rowPressTimer.current) window.clearTimeout(rowPressTimer.current);
@@ -195,14 +212,24 @@ export default function ChatsPage() {
     // and briefly render the empty state before the real list arrives.
     if (loading || !user || !profile) return;
 
+    let reloadTimer: number | null = null;
     const load = () => {
       listChats()
-        .then(setChats)
+        .then((rows) => {
+          setChats(rows);
+          setCached(`chats:${user.id}`, rows);
+        })
         .catch((e) => setErr(e?.message ?? String(e)))
         .finally(() => setChatsLoaded(true));
       // Acknowledge delivery of any incoming messages while the app is open,
       // even for chats the user hasn't opened yet (RLS scopes this to my chats).
       void markIncomingDelivered().catch(() => {});
+    };
+    // Coalesce bursts: a flurry of incoming messages triggers ONE refresh, not
+    // one heavy listChats() per message.
+    const scheduleReload = () => {
+      if (reloadTimer) window.clearTimeout(reloadTimer);
+      reloadTimer = window.setTimeout(load, 400);
     };
     load();
 
@@ -222,15 +249,15 @@ export default function ChatsPage() {
             if (newRow.assigned_to === user.id) {
               setUnreadCount((prev) => prev + 1);
               audioRef.current?.play().catch(() => {});
-              load();
+              scheduleReload();
             }
             return;
           }
           if (profile.role === 'admin') {
-            if (newRow.store_id === profile.store_id) load();
+            if (newRow.store_id === profile.store_id) scheduleReload();
             return;
           }
-          load();
+          scheduleReload();
         }
       )
       .subscribe();
@@ -238,11 +265,12 @@ export default function ChatsPage() {
     const messagesChannel = supabase
       .channel('public:messages')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, () => {
-        load();
+        scheduleReload();
       })
       .subscribe();
 
     return () => {
+      if (reloadTimer) window.clearTimeout(reloadTimer);
       void browserSupabase().removeChannel(channel);
       void browserSupabase().removeChannel(messagesChannel);
     };

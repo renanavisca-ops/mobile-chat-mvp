@@ -10,21 +10,42 @@ import type { ProfileRow } from '@/types/chat';
  * profile — `profiles.username` has a not-blank + unique constraint, so a
  * null-username insert would fail and leave the account without a profile.
  */
+// Dedupe profile loads: several components mount useSession at once (chats page,
+// conversation, presence…), each of which used to fire its own profile query.
+// A short-lived memory cache + in-flight sharing collapses those to one request.
+const PROFILE_TTL = 30_000;
+let profileCache: { userId: string; profile: ProfileRow | null; at: number } | null = null;
+const profileInflight = new Map<string, Promise<ProfileRow | null>>();
+
 async function loadProfile(userId: string): Promise<ProfileRow | null> {
-  const supabase = browserSupabase();
-
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', userId)
-    .maybeSingle();
-
-  if (error) {
-    console.error('Error loading profile:', error);
-    return null;
+  if (profileCache && profileCache.userId === userId && Date.now() - profileCache.at < PROFILE_TTL) {
+    return profileCache.profile;
   }
+  const inflight = profileInflight.get(userId);
+  if (inflight) return inflight;
 
-  return (data as ProfileRow | null) ?? null;
+  const promise = (async () => {
+    const supabase = browserSupabase();
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .maybeSingle();
+    if (error) {
+      console.error('Error loading profile:', error);
+      return null;
+    }
+    const profile = (data as ProfileRow | null) ?? null;
+    profileCache = { userId, profile, at: Date.now() };
+    return profile;
+  })();
+
+  profileInflight.set(userId, promise);
+  try {
+    return await promise;
+  } finally {
+    profileInflight.delete(userId);
+  }
 }
 
 export function useSession() {
