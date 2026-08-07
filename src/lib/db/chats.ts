@@ -74,16 +74,26 @@ export async function listChats(): Promise<ChatSummary[]> {
 
   const chatIds = chatList.map((c) => c.id);
 
-  // Members (for direct-chat titles) + last messages, in parallel
+  // Members (for direct-chat titles) + latest message PER chat, in parallel.
+  // The latest-per-chat RPC returns exactly one row per chat, so a conversation
+  // is never hidden just because its last message fell outside a global row cap.
   const [membersRes, msgsRes] = await Promise.all([
     supabase.from('chat_members').select('chat_id, user_id, archived').in('chat_id', chatIds),
-    supabase
+    (supabase as any).rpc('chat_latest_messages', { p_chat_ids: chatIds }),
+  ]);
+  // Defensive fallback if the RPC isn't available (e.g. an env without the
+  // migration): fetch a capped preview so the list still renders.
+  let latestRows: Array<{ chat_id: string; content: string | null; ciphertext: string | null; created_at: string }> =
+    (msgsRes.data as any) ?? [];
+  if (msgsRes.error) {
+    const fb = await supabase
       .from('messages')
-      .select('id, chat_id, content, ciphertext, created_at, sender_id, read')
+      .select('chat_id, content, ciphertext, created_at')
       .in('chat_id', chatIds)
       .order('created_at', { ascending: false })
-      .limit(300),
-  ]);
+      .limit(500);
+    latestRows = fb.data ?? [];
+  }
   // Graceful fallback if the archive migration hasn't been applied yet: refetch
   // without the `archived` column so the chat list still loads (all unarchived).
   let members: { chat_id: string; user_id: string; archived?: boolean }[] = membersRes.data ?? [];
@@ -130,7 +140,7 @@ export async function listChats(): Promise<ChatSummary[]> {
     string,
     { created_at: string; content: string | null; kind: 'text' | 'photo' | 'video' | 'audio' | 'gif' | 'poll' | 'file' | 'deleted' | null }
   >();
-  for (const m of msgsRes.data ?? []) {
+  for (const m of latestRows) {
     if (latestByChat.has(m.chat_id)) continue;
     let content = m.content || '';
     let kind: 'text' | 'photo' | 'video' | 'audio' | 'gif' | 'poll' | 'file' | 'deleted' | null = content ? 'text' : null;
