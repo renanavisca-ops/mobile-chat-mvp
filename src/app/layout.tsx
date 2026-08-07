@@ -25,6 +25,7 @@ import { LanguageProvider } from '@/lib/i18n/context';
 import { ThemeProvider } from '@/lib/theme';
 import { CallProvider } from '@/lib/call/call-provider';
 import { NotificationRouter } from '@/components/notification-router';
+import { ServiceWorkerRegister } from '@/components/sw-register';
 
 export const metadata: Metadata = {
   title: 'Toky Chat',
@@ -63,6 +64,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="min-h-screen">
         <ThemeProvider>
           <LanguageProvider>
+            <ServiceWorkerRegister />
             <ConsentGate />
             <NotificationRouter />
             <CallProvider>

@@ -1,12 +1,98 @@
-// Minimal service worker: shows a notification for incoming web push events
-// and focuses/opens the app on click. No caching/offline behavior — that's a
-// separate concern from push delivery.
+// Service worker: (1) app-shell caching so the app opens instantly instead of
+// re-downloading its whole bundle over the network on every launch, and
+// (2) web-push notification handling.
 
-// Take over as soon as a new version is deployed, instead of waiting for every
-// tab to close. Without this the browser keeps running the OLD service worker
-// (whose click handler reloaded the page and hung up in-progress calls).
+const SHELL_CACHE = 'toky-shell-v1';
+
 self.addEventListener('install', () => self.skipWaiting());
-self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim()));
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    (async () => {
+      // Drop stale shell caches from previous versions. Leave other caches
+      // (e.g. the decrypted-media cache "toky-media-v1") untouched.
+      const keys = await caches.keys();
+      await Promise.all(
+        keys.filter((k) => k.startsWith('toky-shell-') && k !== SHELL_CACHE).map((k) => caches.delete(k)),
+      );
+      await self.clients.claim();
+    })(),
+  );
+});
+
+// Immutable, content-hashed build assets — safe to serve from cache forever.
+function isStaticAsset(url) {
+  return (
+    url.pathname.startsWith('/_next/static/') ||
+    url.pathname.startsWith('/icons/') ||
+    url.pathname.startsWith('/fonts/') ||
+    /\.(?:js|css|woff2?|ttf|otf|png|jpe?g|gif|svg|webp|ico)$/.test(url.pathname)
+  );
+}
+
+async function cacheFirst(request) {
+  const cache = await caches.open(SHELL_CACHE);
+  const hit = await cache.match(request);
+  if (hit) return hit;
+  const res = await fetch(request);
+  if (res && res.status === 200) cache.put(request, res.clone());
+  return res;
+}
+
+// For page navigations: try the network briefly (so a fresh deploy is picked
+// up), but fall back to the cached shell fast on a slow/no connection.
+async function navigate(event) {
+  const request = event.request;
+  const cache = await caches.open(SHELL_CACHE);
+  const network = fetch(request)
+    .then((res) => {
+      if (res && res.status === 200) cache.put(request, res.clone());
+      return res;
+    })
+    .catch(() => null);
+
+  const timeout = new Promise((resolve) => setTimeout(() => resolve(null), 2500));
+  const raced = await Promise.race([network, timeout]);
+  if (raced) return raced;
+
+  // Network slow/failed — serve the cached shell if we have it, keeping the
+  // real network request alive so the cache updates for next time.
+  event.waitUntil(network);
+  const cached = await cache.match(request);
+  return cached || (await network) || Response.error();
+}
+
+self.addEventListener('fetch', (event) => {
+  const request = event.request;
+  if (request.method !== 'GET') return;
+
+  let url;
+  try {
+    url = new URL(request.url);
+  } catch {
+    return;
+  }
+
+  // Only ever touch our own origin — never Supabase, storage, or other hosts.
+  if (url.origin !== self.location.origin) return;
+  // Never cache API/auth/data routes.
+  if (url.pathname.startsWith('/api/')) return;
+  // Don't cache the service worker itself or the web manifest.
+  if (url.pathname === '/sw.js') return;
+
+  if (isStaticAsset(url)) {
+    event.respondWith(cacheFirst(request).catch(() => fetch(request)));
+    return;
+  }
+  if (request.mode === 'navigate') {
+    event.respondWith(navigate(event).catch(() => fetch(request)));
+    return;
+  }
+  // Everything else falls through to the network.
+});
+
+// ---------------------------------------------------------------------------
+// Web push (unchanged behavior)
 
 self.addEventListener('push', (event) => {
   let data = { title: 'Toky Chat', body: 'New message', url: '/chats' };
@@ -23,7 +109,7 @@ self.addEventListener('push', (event) => {
       badge: '/icons/icon-192.png',
       // Carry the type through so the click handler can treat calls specially.
       data: { url: data.url || '/chats', type: data.type || 'message' },
-    })
+    }),
   );
 });
 
@@ -54,6 +140,6 @@ self.addEventListener('notificationclick', (event) => {
 
       // No app tab open: open one at the target (nothing to tear down).
       if (self.clients.openWindow) await self.clients.openWindow(target);
-    })()
+    })(),
   );
 });
