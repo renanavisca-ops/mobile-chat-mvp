@@ -370,7 +370,7 @@ export default function ChatsPage() {
 
             {err ? <p className="text-sm text-red-300">{err}</p> : null}
 
-            {loading || !chatsLoaded ? (
+            {(loading || !chatsLoaded) && chats.length === 0 ? (
               <ChatListSkeleton rows={8} />
             ) : chats.length === 0 ? (
               <div className="mt-10 flex flex-col items-center px-6 text-center">

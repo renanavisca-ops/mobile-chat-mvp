@@ -2385,7 +2385,7 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
       <input ref={cameraVideoRef} type="file" hidden accept="video/*" capture="environment" onChange={onCameraVideoChange} />
       <input ref={fileInputRef} type="file" hidden onChange={onFileChange} />
 
-      {loading ? (
+      {loading && messages.length === 0 ? (
         <MessagesSkeleton />
       ) : (
         <div className="relative flex min-h-0 flex-1 flex-col gap-2 px-3 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
