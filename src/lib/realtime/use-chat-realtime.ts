@@ -6,10 +6,12 @@ import { browserSupabase } from '@/lib/supabase/client';
 import { listMessages, listMessagesSince, markMessagesAsRead, listReactions, listPollVotes, listHiddenMessages, decryptRow } from '@/lib/db/chats';
 import type { MessageRow, MessageReaction, PollVote, HiddenMessage } from '@/lib/db/types';
 import { useNotifications } from '@/lib/hooks/useNotifications';
-import { memGet, memSet } from '@/lib/cache';
+import { getCached, setCached } from '@/lib/cache';
 
 const PAGE_SIZE = 50;
-const CACHE_CAP = 200;
+// Persisted per-chat cache size. Kept modest so localStorage doesn't bloat
+// across many chats; older history still loads on demand via "load more".
+const CACHE_CAP = 60;
 
 // Merge fetched rows onto existing ones: de-dupe by id and drop our optimistic
 // `local-` echoes once the real row (same plaintext) has arrived, then sort.
@@ -26,8 +28,12 @@ function mergeMessages(prev: MessageRow[], rows: MessageRow[]): MessageRow[] {
 }
 
 export function useChatRealtime(chatId: string) {
-  const [messages, setMessages] = useState<MessageRow[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Seed synchronously from the persisted cache so the conversation paints
+  // instantly on open (even a cold app start) instead of flashing a skeleton.
+  const [messages, setMessages] = useState<MessageRow[]>(
+    () => getCached<MessageRow[]>(`msgs:${chatId}`) ?? []
+  );
+  const [loading, setLoading] = useState(() => !(getCached<MessageRow[]>(`msgs:${chatId}`)?.length));
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
 
@@ -57,7 +63,7 @@ export function useChatRealtime(chatId: string) {
   // carga inicial — paint cached history instantly, then only pull what's new.
   useEffect(() => {
     let alive = true;
-    const cached = memGet<MessageRow[]>(`msgs:${chatId}`);
+    const cached = getCached<MessageRow[]>(`msgs:${chatId}`);
 
     if (cached && cached.length) {
       // Instant paint from cache; fetch just the messages since the last one.
@@ -89,10 +95,13 @@ export function useChatRealtime(chatId: string) {
     };
   }, [chatId]);
 
-  // Keep the in-memory cache warm so re-opening this chat (this session) is
-  // instant. Memory only — decrypted E2EE history is never written to disk.
+  // Persist the tail of the conversation so re-opening the chat — even after a
+  // full app restart — paints instantly and then pulls only what's new. Drops
+  // un-acked optimistic echoes so we never cache a message that didn't send.
   useEffect(() => {
-    if (messages.length) memSet(`msgs:${chatId}`, messages.slice(-CACHE_CAP));
+    if (!messages.length) return;
+    const persistable = messages.filter((m) => !String(m.id).startsWith('local-')).slice(-CACHE_CAP);
+    if (persistable.length) setCached(`msgs:${chatId}`, persistable);
   }, [messages, chatId]);
 
   // Catch up after the realtime socket may have missed events (phone sleep,
