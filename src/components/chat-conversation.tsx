@@ -1637,9 +1637,25 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
     }
     e.target.value = '';
 
+    // Copy the picked files into memory RIGHT AWAY. On some Android WebViews the
+    // File points at a content:// reference whose read permission is revoked
+    // shortly after the picker returns — later reads (preview, encrypt, upload)
+    // then fail with "The requested file could not be read…". Reading the bytes
+    // now, into a stable in-memory File, sidesteps that for preview + send.
+    const inMemory: File[] = [];
+    for (const f of picked) {
+      try {
+        const buf = await f.arrayBuffer();
+        inMemory.push(new File([buf], f.name || `image_${Date.now()}.jpg`, { type: f.type || 'image/jpeg' }));
+      } catch {
+        setErr(t('chat.imageReadFailed'));
+      }
+    }
+    if (inMemory.length === 0) return;
+
     // Downscale/compress so previews render fast, uploads are small, and large
-    // phone photos aren't rejected. Falls back to the original on any failure.
-    const compressed = await Promise.all(picked.map((f) => compressImage(f)));
+    // phone photos aren't rejected. Falls back to the in-memory copy on failure.
+    const compressed = await Promise.all(inMemory.map((f) => compressImage(f)));
 
     for (const f of compressed) {
       if (f.size > maxSize) {

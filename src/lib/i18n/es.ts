@@ -207,6 +207,7 @@ const es: Dictionary = {
     micError: 'No se pudo acceder al micrófono: {{error}}',
     onlyJpgPngWebp: 'Solo JPG, PNG o WEBP.',
     maxImageSize: 'Máximo 5MB por imagen.',
+    imageReadFailed: 'No se pudo leer esa imagen — vuelve a seleccionarla.',
     invalidFilename: 'Nombre de archivo inválido.',
     maxVideoSize: 'Máximo 200MB por video.',
     fileFeaturePending: 'Archivos: disponible en una próxima actualización.',

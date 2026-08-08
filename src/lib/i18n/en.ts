@@ -205,6 +205,7 @@ const en = {
     micError: 'Could not access the microphone: {{error}}',
     onlyJpgPngWebp: 'Only JPG, PNG or WEBP.',
     maxImageSize: 'Maximum 5MB per image.',
+    imageReadFailed: "Couldn't read that image — please pick it again.",
     invalidFilename: 'Invalid file name.',
     maxVideoSize: 'Maximum 200MB per video.',
     fileFeaturePending: 'File: coming in a future update.',
