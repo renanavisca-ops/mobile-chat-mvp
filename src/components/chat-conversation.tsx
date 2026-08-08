@@ -40,6 +40,7 @@ import { suggestReplies, translateText } from '@/lib/ai';
 import { avatarBg, initials } from '@/lib/ui/avatar';
 import { PhoneIcon, VideoIcon, PlusIcon, SmileIcon, MicIcon, PencilIcon, ReplyIcon, ForwardIcon, CopyIcon, DownloadIcon, EyeOffIcon, TrashIcon, PinIcon, FlagIcon, PaperclipIcon, SparklesIcon, GlobeIcon, SendIcon, CheckIcon, ExternalLinkIcon } from '@/components/icons';
 import { canNativeFiles, shareNativeFile } from '@/lib/native-files';
+import { compressImage } from '@/lib/image-compress';
 import type { ChatSummary, MessageRow } from '@/lib/db/types';
 
 type Payload = {
@@ -1626,34 +1627,37 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
 
     const picked = files.slice(0, MAX_FILES);
 
+    // Validate the picked types up front (the compressed output is always JPEG).
     for (const f of picked) {
       if (!allowed.has(f.type)) {
         setErr(t('chat.onlyJpgPngWebp'));
         e.target.value = '';
         return;
       }
+    }
+    e.target.value = '';
+
+    // Downscale/compress so previews render fast, uploads are small, and large
+    // phone photos aren't rejected. Falls back to the original on any failure.
+    const compressed = await Promise.all(picked.map((f) => compressImage(f)));
+
+    for (const f of compressed) {
       if (f.size > maxSize) {
         setErr(t('chat.maxImageSize'));
-        e.target.value = '';
-        return;
-      }
-      const safeName = sanitizeFilename(f.name);
-      if (!safeName || safeName.length < 3) {
-        setErr(t('chat.invalidFilename'));
-        e.target.value = '';
         return;
       }
     }
 
     if (pendingVideo) clearPendingVideo();
 
-    const normalized = picked.map((f) => new File([f], sanitizeFilename(f.name), { type: f.type }));
+    const normalized = compressed.map((f) => {
+      const safe = sanitizeFilename(f.name) || `image_${Date.now()}.jpg`;
+      return new File([f], safe, { type: f.type });
+    });
     const urls = normalized.map((f) => URL.createObjectURL(f));
 
     setPendingImages((prev) => [...prev, ...normalized].slice(0, MAX_FILES));
     setPreviewImages((prev) => [...prev, ...urls].slice(0, MAX_FILES));
-
-    e.target.value = '';
   }
 
   // -------- Input change: video (library)
