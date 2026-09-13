@@ -13,7 +13,7 @@ const BLUE = '#2f66ff';
 const GREEN = '#12a150';
 const DARK = '#020617';
 // The brand promise: connection, not "messaging & calls".
-const TAGLINE = 'Stay close to the ones you love';
+const TAGLINE = 'Cerca de quienes amas';
 
 // Keep text well inside the frame — Play can overlay UI near the edges.
 const svg = `
@@ -34,8 +34,9 @@ const svg = `
 
   <!-- logo tile -->
   <rect x="104" y="150" width="200" height="200" rx="52" fill="url(#g)"/>
-  <text x="204" y="306" fill="#ffffff" font-family="Helvetica,Arial,sans-serif"
-        font-size="150" font-weight="800" text-anchor="middle">T</text>
+  <text x="204" y="250" fill="#ffffff" font-family="Helvetica,Arial,sans-serif"
+        font-size="150" font-weight="800" text-anchor="middle"
+        dominant-baseline="central">T</text>
 
   <!-- wordmark + tagline -->
   <text x="348" y="242" fill="#ffffff" font-family="Helvetica,Arial,sans-serif"
