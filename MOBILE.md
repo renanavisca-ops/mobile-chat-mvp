@@ -109,6 +109,16 @@ browser-based — no Mac needed).
   client stores an FCM token in the `device_tokens` table; the server
   (`src/lib/fcm.ts`) delivers to it from `/api/push/send` and `/api/push/call`
   alongside the existing Web Push. Needs the Firebase config below to go live.
+- ✅ **Native attachment files** — `@capacitor/filesystem` + `@capacitor/share`
+  (`src/lib/native-files.ts`). Because every chat is end-to-end encrypted, an
+  attachment's plaintext only exists in-app after decryption; the WebView can't
+  save or open an in-memory (`blob:`) file. The document preview writes the
+  decrypted bytes to the device and either keeps them (Download → Documents) or
+  hands them to the OS share sheet (Open/Print/Share). No extra native config or
+  permission — `cap sync` links the plugins and Share auto-wires a FileProvider.
+  **Requires a new native build:** the currently installed test app predates
+  these plugins, so the buttons only work once testers update to a build made
+  after this change.
 
 ## Setting up native push (Firebase / FCM)
 

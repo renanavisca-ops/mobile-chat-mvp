@@ -8,8 +8,15 @@ import type { StoryGroup } from '@/lib/db/types';
 
 const DURATION = 5000;
 
+/** Index of the first not-yet-seen story in a group (0 if all are seen). */
+function firstUnseen(g: StoryGroup | undefined): number {
+  if (!g) return 0;
+  const i = g.stories.findIndex((s) => !s.seen);
+  return i >= 0 ? i : 0;
+}
+
 export function StoryViewer({
-  groups,
+  groups: groupsProp,
   startIndex,
   onClose,
   onChanged,
@@ -21,8 +28,16 @@ export function StoryViewer({
 }) {
   const t = useT();
   const { lang } = useLanguage();
+  // Freeze the group list for the lifetime of the viewer. Marking stories viewed
+  // reorders the live list (seen groups sink), which would shift the indices out
+  // from under us mid-view — causing the wrong story to show, the close button to
+  // miss, and every group to look "seen". We navigate the snapshot and refresh
+  // the bar only once, on close.
+  const [groups] = useState(groupsProp);
   const [groupIndex, setGroupIndex] = useState(startIndex);
-  const [storyIndex, setStoryIndex] = useState(0);
+  // Resume where the viewer left off: open at the first unseen story, not the
+  // start of the group.
+  const [storyIndex, setStoryIndex] = useState(() => firstUnseen(groupsProp[startIndex]));
   const [mediaUrl, setMediaUrl] = useState<string | null>(null);
   const [viewCount, setViewCount] = useState<number | null>(null);
   // Only start the auto-advance countdown once the story's content is actually
@@ -39,16 +54,31 @@ export function StoryViewer({
   const group = groups[groupIndex];
   const story = group?.stories[storyIndex];
 
+  // Refresh the bar exactly once, when the viewer unmounts — but only AFTER the
+  // "mark seen" writes have settled, otherwise the reloaded rings read stale
+  // story_views and show just-watched stories as still unseen.
+  const onChangedRef = useRef(onChanged);
+  onChangedRef.current = onChanged;
+  const pendingViews = useRef<Promise<unknown>[]>([]);
+  useEffect(() => {
+    // Same stable array for the component's life; we push into it as stories are
+    // viewed, then await them all at unmount.
+    const pending = pendingViews.current;
+    return () => {
+      Promise.allSettled(pending).then(() => onChangedRef.current());
+    };
+  }, []);
+
   const goNextGroup = useCallback(() => {
-    setStoryIndex(0);
-    setGroupIndex((gi) => {
-      if (gi + 1 >= groups.length) {
-        onClose();
-        return gi;
-      }
-      return gi + 1;
-    });
-  }, [groups.length, onClose]);
+    const nextGi = groupIndex + 1;
+    if (nextGi >= groups.length) {
+      onClose();
+      return;
+    }
+    setGroupIndex(nextGi);
+    // Each person's stories resume at their first unseen one too.
+    setStoryIndex(firstUnseen(groups[nextGi]));
+  }, [groupIndex, groups, onClose]);
 
   const next = useCallback(() => {
     if (!group) return;
@@ -82,7 +112,10 @@ export function StoryViewer({
     // Text stories have nothing to download, so they're "loaded" right away.
     setLoaded(!story.media_path);
 
-    markStoryViewed(story.id).then(onChanged).catch(() => {});
+    // Persist the view, but DON'T refresh the bar now — that would re-sort the
+    // live list mid-view. The bar is refreshed once when the viewer closes,
+    // after these writes settle (tracked so the rings read fresh state).
+    pendingViews.current.push(markStoryViewed(story.id).catch(() => {}));
 
     if (story.media_path) {
       createSignedStoryUrl(story.media_path).then((u) => alive && setMediaUrl(u)).catch(() => {});
@@ -168,16 +201,12 @@ export function StoryViewer({
     if (timerRef.current) window.clearTimeout(timerRef.current);
     try {
       await deleteStory(story.id);
-      onChanged();
-      // If that was the group's only story, leave; else re-clamp.
-      if (group.stories.length <= 1) {
-        onClose();
-      } else {
-        setStoryIndex((si) => Math.max(0, Math.min(si, group.stories.length - 2)));
-      }
     } catch {
-      onClose();
+      // fall through — close either way; the bar refresh on unmount reconciles.
     }
+    // Close after delete; the frozen snapshot still holds the removed story, so
+    // re-clamping in place would show a stale item. The unmount effect refreshes.
+    onClose();
   }
 
   if (!group || !story) return null;

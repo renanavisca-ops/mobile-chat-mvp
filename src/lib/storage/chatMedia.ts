@@ -2,6 +2,7 @@
 
 import { browserSupabase } from '@/lib/supabase/client';
 import { encryptMedia, decryptMedia, type MediaEnc } from '@/lib/crypto/media';
+import { getCachedMedia, putCachedMedia } from '@/lib/storage/media-cache';
 
 const IMAGE_MIME = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const IMAGE_EXT = new Set(['jpg', 'jpeg', 'png', 'webp']);
@@ -180,10 +181,33 @@ export async function uploadChatAudio(chatId: string, file: Blob): Promise<{ pat
   return uploadChatMedia({ chatId, file, kind: 'audio', name: `audio_${Date.now()}.webm` });
 }
 
-export async function createSignedChatMediaUrl(path: string, expiresSeconds = 60 * 5): Promise<string> {
+// Reuse a freshly-signed URL for a path instead of re-signing on every chat
+// reopen. Cached in memory only, and expired well before the signature does.
+const signedUrlCache = new Map<string, { url: string; expiresAt: number }>();
+
+export async function createSignedChatMediaUrl(
+  path: string,
+  expiresSeconds = 60 * 5,
+  // Pass a filename to force `Content-Disposition: attachment` so a top-level
+  // navigation / window.open triggers a real download (used by the document
+  // preview's Download action, which the system browser then handles).
+  opts?: { download?: string | boolean },
+): Promise<string> {
+  // Only cache plain (inline) URLs — download-disposition URLs are one-off.
+  const cacheable = !opts?.download;
+  if (cacheable) {
+    const hit = signedUrlCache.get(path);
+    if (hit && hit.expiresAt > Date.now()) return hit.url;
+  }
   const supabase = browserSupabase();
-  const { data, error } = await supabase.storage.from('chat-media').createSignedUrl(path, expiresSeconds);
+  const { data, error } = await supabase.storage
+    .from('chat-media')
+    .createSignedUrl(path, expiresSeconds, opts?.download ? { download: opts.download } : undefined);
   if (error) throw error;
+  if (cacheable) {
+    // Expire our cache entry a minute before the signature to avoid races.
+    signedUrlCache.set(path, { url: data.signedUrl, expiresAt: Date.now() + (expiresSeconds - 60) * 1000 });
+  }
   return data.signedUrl;
 }
 
@@ -205,6 +229,9 @@ export async function uploadEncryptedChatMedia(input: {
     upsert: false,
   });
   if (error) throw error;
+  // Seed the on-device cache with the plaintext we already have, so the sender
+  // doesn't re-download + re-decrypt their own attachment on the next open.
+  void putCachedMedia(path, file);
   return { path, enc };
 }
 
@@ -214,15 +241,22 @@ export async function uploadEncryptedChatMedia(input: {
  * URL.revokeObjectURL(...) it when done.
  */
 export async function fetchDecryptedMediaUrl(path: string, enc: MediaEnc): Promise<string> {
+  // Serve previously-decrypted bytes from the on-device cache — no re-download,
+  // no re-decrypt — so images don't reload every time a chat is opened.
+  const cached = await getCachedMedia(path);
+  if (cached) return URL.createObjectURL(cached);
+
   const signed = await createSignedChatMediaUrl(path, 300);
   const res = await fetch(signed);
   if (!res.ok) throw new Error('Could not fetch encrypted media.');
   const bytes = await res.arrayBuffer();
   const blob = await decryptMedia(bytes, enc);
+  // Persist for next time (immutable path → safe to cache indefinitely).
+  void putCachedMedia(path, blob);
   return URL.createObjectURL(blob);
 }
 
-const MAX_FILE_BYTES = 25 * 1024 * 1024; // 25MB
+const MAX_FILE_BYTES = 50 * 1024 * 1024; // 50MB — documents (Word/Excel/PPT/PDF)
 
 export type UploadedFile = { path: string; name: string; size: number; mime: string };
 
@@ -231,7 +265,7 @@ export type UploadedFile = { path: string; name: string; size: number; mime: str
  * chats/<chatId>/files/. Returns metadata used to render a file card.
  */
 export async function uploadChatFile(chatId: string, file: File): Promise<UploadedFile> {
-  if (file.size > MAX_FILE_BYTES) throw new Error('Máximo 25MB por archivo.');
+  if (file.size > MAX_FILE_BYTES) throw new Error('Máximo 50MB por archivo.');
 
   const safeName = assertFilenameOk(file.name || 'file');
   const ts = Date.now();

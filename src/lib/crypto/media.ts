@@ -14,8 +14,9 @@
 
 import { bytesToB64, b64ToBytes } from './e2ee';
 
-/** Memory-safe cap for single-shot encryption (25 MB). */
-export const MAX_ENC_MEDIA_BYTES = 25 * 1024 * 1024;
+/** Memory-safe cap for single-shot encryption (50 MB). Larger files would need
+ *  a reviewed chunked (v2) scheme to avoid holding the whole file in memory. */
+export const MAX_ENC_MEDIA_BYTES = 50 * 1024 * 1024;
 
 /** Per-object encryption metadata carried inside the sealed message payload. */
 export type MediaEnc = {

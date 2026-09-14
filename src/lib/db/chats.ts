@@ -74,16 +74,26 @@ export async function listChats(): Promise<ChatSummary[]> {
 
   const chatIds = chatList.map((c) => c.id);
 
-  // Members (for direct-chat titles) + last messages, in parallel
+  // Members (for direct-chat titles) + latest message PER chat, in parallel.
+  // The latest-per-chat RPC returns exactly one row per chat, so a conversation
+  // is never hidden just because its last message fell outside a global row cap.
   const [membersRes, msgsRes] = await Promise.all([
     supabase.from('chat_members').select('chat_id, user_id, archived').in('chat_id', chatIds),
-    supabase
+    (supabase as any).rpc('chat_latest_messages', { p_chat_ids: chatIds }),
+  ]);
+  // Defensive fallback if the RPC isn't available (e.g. an env without the
+  // migration): fetch a capped preview so the list still renders.
+  let latestRows: Array<{ chat_id: string; content: string | null; ciphertext: string | null; created_at: string }> =
+    (msgsRes.data as any) ?? [];
+  if (msgsRes.error) {
+    const fb = await supabase
       .from('messages')
-      .select('id, chat_id, content, ciphertext, created_at, sender_id, read')
+      .select('chat_id, content, ciphertext, created_at')
       .in('chat_id', chatIds)
       .order('created_at', { ascending: false })
-      .limit(300),
-  ]);
+      .limit(500);
+    latestRows = fb.data ?? [];
+  }
   // Graceful fallback if the archive migration hasn't been applied yet: refetch
   // without the `archived` column so the chat list still loads (all unarchived).
   let members: { chat_id: string; user_id: string; archived?: boolean }[] = membersRes.data ?? [];
@@ -130,7 +140,7 @@ export async function listChats(): Promise<ChatSummary[]> {
     string,
     { created_at: string; content: string | null; kind: 'text' | 'photo' | 'video' | 'audio' | 'gif' | 'poll' | 'file' | 'deleted' | null }
   >();
-  for (const m of msgsRes.data ?? []) {
+  for (const m of latestRows) {
     if (latestByChat.has(m.chat_id)) continue;
     let content = m.content || '';
     let kind: 'text' | 'photo' | 'video' | 'audio' | 'gif' | 'poll' | 'file' | 'deleted' | null = content ? 'text' : null;
@@ -379,6 +389,29 @@ export async function listMessages(
   const now = Date.now();
   const rows = (data ?? []) as unknown as MessageRow[];
   const visible = rows.filter((m) => !m.expires_at || new Date(m.expires_at).getTime() > now).reverse();
+  return decryptRows(chatId, visible);
+}
+
+/**
+ * Fetch only messages created AFTER `sinceIso` (ascending). Used to "catch up"
+ * a cached conversation without re-downloading the whole history — the caller
+ * merges these onto its cached rows.
+ */
+export async function listMessagesSince(chatId: string, sinceIso: string): Promise<MessageRow[]> {
+  const supabase = browserSupabase();
+  const { data, error } = await supabase
+    .from('messages')
+    .select(
+      'id, chat_id, sender_device_id, ciphertext, nonce, message_type, created_at, read, content, sender_type, sender_id, delivery_status, edited_at, expires_at'
+    )
+    .eq('chat_id', chatId)
+    .gt('created_at', sinceIso)
+    .order('created_at', { ascending: true })
+    .limit(200);
+  if (error) throw error;
+  const now = Date.now();
+  const rows = (data ?? []) as unknown as MessageRow[];
+  const visible = rows.filter((m) => !m.expires_at || new Date(m.expires_at).getTime() > now);
   return decryptRows(chatId, visible);
 }
 

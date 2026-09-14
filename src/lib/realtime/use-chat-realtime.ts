@@ -3,15 +3,37 @@
 import { useEffect, useState, useCallback } from 'react';
 import type { RealtimePostgresChangesPayload, REALTIME_SUBSCRIBE_STATES } from '@supabase/supabase-js';
 import { browserSupabase } from '@/lib/supabase/client';
-import { listMessages, markMessagesAsRead, listReactions, listPollVotes, listHiddenMessages, decryptRow } from '@/lib/db/chats';
+import { listMessages, listMessagesSince, markMessagesAsRead, listReactions, listPollVotes, listHiddenMessages, decryptRow } from '@/lib/db/chats';
 import type { MessageRow, MessageReaction, PollVote, HiddenMessage } from '@/lib/db/types';
 import { useNotifications } from '@/lib/hooks/useNotifications';
+import { getCached, setCached } from '@/lib/cache';
 
 const PAGE_SIZE = 50;
+// Persisted per-chat cache size. Kept modest so localStorage doesn't bloat
+// across many chats; older history still loads on demand via "load more".
+const CACHE_CAP = 60;
+
+// Merge fetched rows onto existing ones: de-dupe by id and drop our optimistic
+// `local-` echoes once the real row (same plaintext) has arrived, then sort.
+function mergeMessages(prev: MessageRow[], rows: MessageRow[]): MessageRow[] {
+  const map = new Map<string, MessageRow>();
+  for (const m of prev) map.set(m.id, m);
+  for (const r of rows) map.set(r.id, r);
+  const realCiphertexts = new Set(rows.map((r) => r.ciphertext ?? ''));
+  const merged = Array.from(map.values()).filter(
+    (m) => !(String(m.id).startsWith('local-') && realCiphertexts.has(m.ciphertext ?? ''))
+  );
+  merged.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+  return merged;
+}
 
 export function useChatRealtime(chatId: string) {
-  const [messages, setMessages] = useState<MessageRow[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Seed synchronously from the persisted cache so the conversation paints
+  // instantly on open (even a cold app start) instead of flashing a skeleton.
+  const [messages, setMessages] = useState<MessageRow[]>(
+    () => getCached<MessageRow[]>(`msgs:${chatId}`) ?? []
+  );
+  const [loading, setLoading] = useState(() => !(getCached<MessageRow[]>(`msgs:${chatId}`)?.length));
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
 
@@ -38,26 +60,49 @@ export function useChatRealtime(chatId: string) {
     };
   }, [chatId]);
 
-  // carga inicial
+  // carga inicial — paint cached history instantly, then only pull what's new.
   useEffect(() => {
     let alive = true;
-    setLoading(true);
+    const cached = getCached<MessageRow[]>(`msgs:${chatId}`);
 
-    listMessages(chatId, PAGE_SIZE, 0)
-      .then((rows) => {
-        if (!alive) return;
-        setMessages(rows);
-        setHasMore(rows.length === PAGE_SIZE);
-        setLoading(false);
-        // Marcar leídos
-        markMessagesAsRead(chatId).catch(console.error);
-      })
-      .catch(() => setLoading(false));
+    if (cached && cached.length) {
+      // Instant paint from cache; fetch just the messages since the last one.
+      setMessages(cached);
+      setLoading(false);
+      setHasMore(true);
+      listMessagesSince(chatId, cached[cached.length - 1].created_at)
+        .then((rows) => {
+          if (!alive || rows.length === 0) return;
+          setMessages((prev) => mergeMessages(prev, rows));
+          markMessagesAsRead(chatId).catch(console.error);
+        })
+        .catch(() => {});
+    } else {
+      setLoading(true);
+      listMessages(chatId, PAGE_SIZE, 0)
+        .then((rows) => {
+          if (!alive) return;
+          setMessages(rows);
+          setHasMore(rows.length === PAGE_SIZE);
+          setLoading(false);
+          markMessagesAsRead(chatId).catch(console.error);
+        })
+        .catch(() => setLoading(false));
+    }
 
     return () => {
       alive = false;
     };
   }, [chatId]);
+
+  // Persist the tail of the conversation so re-opening the chat — even after a
+  // full app restart — paints instantly and then pulls only what's new. Drops
+  // un-acked optimistic echoes so we never cache a message that didn't send.
+  useEffect(() => {
+    if (!messages.length) return;
+    const persistable = messages.filter((m) => !String(m.id).startsWith('local-')).slice(-CACHE_CAP);
+    if (persistable.length) setCached(`msgs:${chatId}`, persistable);
+  }, [messages, chatId]);
 
   // Catch up after the realtime socket may have missed events (phone sleep,
   // network blip, tab backgrounded). Re-pulls the latest page and merges,
@@ -65,17 +110,7 @@ export function useChatRealtime(chatId: string) {
   const refetch = useCallback(async () => {
     try {
       const rows = await listMessages(chatId, PAGE_SIZE, 0);
-      setMessages((prev) => {
-        const map = new Map<string, MessageRow>();
-        for (const m of prev) map.set(m.id, m);
-        for (const r of rows) map.set(r.id, r);
-        const realCiphertexts = new Set(rows.map((r) => r.ciphertext ?? ''));
-        const merged = Array.from(map.values()).filter(
-          (m) => !(String(m.id).startsWith('local-') && realCiphertexts.has(m.ciphertext ?? ''))
-        );
-        merged.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-        return merged;
-      });
+      setMessages((prev) => mergeMessages(prev, rows));
       listReactions(chatId).then(setReactions).catch(() => {});
       listPollVotes(chatId).then(setPollVotes).catch(() => {});
       listHiddenMessages(chatId)

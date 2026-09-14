@@ -6,6 +6,8 @@ import Link from 'next/link';
 import { PageShell } from '@/components/page-shell';
 import { browserSupabase } from '@/lib/supabase/client';
 import { clearLocalIdentity } from '@/lib/auth/local-identity';
+import { clearCache } from '@/lib/cache';
+import { clearMediaCache } from '@/lib/storage/media-cache';
 import { validatePassword } from '@/lib/password';
 import { isMfaEnabled, enrollTotp, verifyEnroll, disableTotp, generateRecoveryCodes } from '@/lib/auth/mfa';
 import { WALLPAPERS, CUSTOM_WALLPAPER_ID, getWallpaperId, setWallpaperId as saveWallpaperId, uploadCustomWallpaper, getCustomWallpaperUrl } from '@/lib/wallpaper';
@@ -13,6 +15,7 @@ import { uploadAvatar } from '@/lib/db/avatar';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import { subscribeToPush, unsubscribeFromPush, isPushSubscribed, pushSupported } from '@/lib/push';
 import { isNativeApp } from '@/lib/native-push';
+import { StatusPrivacyModal } from '@/components/status-privacy-modal';
 import {
   initKeystore,
   isUnlocked,
@@ -51,6 +54,7 @@ export default function SettingsPage() {
   const [showOnline, setShowOnline] = useState<boolean>(true);
   const [readReceipts, setReadReceipts] = useState<boolean>(true);
   const [savingPrivacy, setSavingPrivacy] = useState(false);
+  const [statusPrivacyOpen, setStatusPrivacyOpen] = useState(false);
 
   // Password change state
   const [newPassword, setNewPassword] = useState('');
@@ -320,6 +324,8 @@ export default function SettingsPage() {
       // sign out and return to the login screen.
       await unsubscribeFromPush().catch(() => {});
       clearLocalIdentity();
+      clearCache();
+      await clearMediaCache().catch(() => {});
       try {
         localStorage.removeItem('toky_consent_v1');
       } catch {
@@ -478,6 +484,8 @@ export default function SettingsPage() {
     // Wipe this account's local device/keys so the next user to sign in on this
     // browser doesn't inherit them.
     clearLocalIdentity();
+    clearCache();
+    await clearMediaCache().catch(() => {});
     // Send the user back to the front page, not the (now signed-out) settings.
     window.location.href = '/login';
   }
@@ -904,6 +912,17 @@ export default function SettingsPage() {
                 />
               </button>
             </div>
+            <button
+              type="button"
+              onClick={() => setStatusPrivacyOpen(true)}
+              className="flex w-full items-center justify-between gap-3 rounded-xl border border-slate-900 bg-slate-950/50 p-4 text-left shadow-sm hover:bg-slate-900/60"
+            >
+              <div>
+                <div className="text-sm font-medium text-slate-200">{t('settings.statusPrivacy')}</div>
+                <div className="mt-1 text-xs text-slate-400">{t('settings.statusPrivacyDesc')}</div>
+              </div>
+              <span className="shrink-0 text-slate-500">›</span>
+            </button>
           </section>
 
           <section className="space-y-3">
@@ -1314,6 +1333,8 @@ export default function SettingsPage() {
           </div>
         </div>
       )}
+
+      <StatusPrivacyModal open={statusPrivacyOpen} onClose={() => setStatusPrivacyOpen(false)} />
     </PageShell>
   );
 }

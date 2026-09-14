@@ -29,16 +29,18 @@ const iconSvg = `
     <stop offset="0" stop-color="${BLUE}"/><stop offset="1" stop-color="${GREEN}"/>
   </linearGradient></defs>
   <rect width="1024" height="1024" fill="url(#g)"/>
-  <text x="512" y="560" fill="#fff" font-family="Helvetica,Arial,sans-serif"
-        font-size="620" font-weight="800" text-anchor="middle">T</text>
+  <text x="512" y="512" fill="#fff" font-family="Helvetica,Arial,sans-serif"
+        font-size="620" font-weight="800" text-anchor="middle"
+        dominant-baseline="central">T</text>
 </svg>`;
 
 // Transparent foreground (T only) for Android adaptive icons; sized inside the
 // central safe zone so launcher masks never clip it.
 const foregroundSvg = `
 <svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
-  <text x="512" y="640" fill="#fff" font-family="Helvetica,Arial,sans-serif"
-        font-size="400" font-weight="800" text-anchor="middle">T</text>
+  <text x="512" y="512" fill="#fff" font-family="Helvetica,Arial,sans-serif"
+        font-size="400" font-weight="800" text-anchor="middle"
+        dominant-baseline="central">T</text>
 </svg>`;
 
 const backgroundSvg = `
@@ -57,8 +59,9 @@ const splashSvg = (bg) => `
   </linearGradient></defs>
   <rect width="2732" height="2732" fill="${bg}"/>
   <rect x="1116" y="1116" width="500" height="500" rx="110" fill="url(#g)"/>
-  <text x="1366" y="1430" fill="#fff" font-family="Helvetica,Arial,sans-serif"
-        font-size="300" font-weight="800" text-anchor="middle">T</text>
+  <text x="1366" y="1366" fill="#fff" font-family="Helvetica,Arial,sans-serif"
+        font-size="300" font-weight="800" text-anchor="middle"
+        dominant-baseline="central">T</text>
 </svg>`;
 
 const png = (svg) => sharp(Buffer.from(svg)).png();
