@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { XIcon, DownloadIcon, ExternalLinkIcon } from '@/components/icons';
-import { canNativeFiles, shareNativeFile, saveNativeFile } from '@/lib/native-files';
+import { canNativeFiles, shareNativeFile, saveMediaToGallery } from '@/lib/native-files';
 import { useT } from '@/lib/i18n/context';
 
 /**
@@ -201,8 +201,8 @@ export function ImageLightbox({
       const blob = await res.blob();
       const name = imageName(blob);
       if (canNativeFiles()) {
-        await saveNativeFile(blob, name);
-        flash(t('chat.savedToDevice'));
+        await saveMediaToGallery(blob, name);
+        flash(t('chat.savedToGallery'));
         return;
       }
       const u = URL.createObjectURL(blob);

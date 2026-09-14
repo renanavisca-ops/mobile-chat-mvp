@@ -19,6 +19,7 @@
 import { Capacitor } from '@capacitor/core';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
+import { Media } from '@capacitor-community/media';
 
 export function canNativeFiles(): boolean {
   return Capacitor.isNativePlatform();
@@ -68,7 +69,7 @@ export async function shareNativeFile(blob: Blob, filename: string, dialogTitle?
 
 /**
  * Persist the decrypted file to the device's Documents so it survives after the
- * app closes. Powers Download. Returns the saved file's URI for a confirmation.
+ * app closes. Powers Download for documents. Returns the saved file's URI.
  */
 export async function saveNativeFile(blob: Blob, filename: string): Promise<string> {
   const data = await blobToBase64(blob);
@@ -79,4 +80,22 @@ export async function saveNativeFile(blob: Blob, filename: string): Promise<stri
     recursive: true,
   });
   return uri;
+}
+
+/**
+ * Save a decrypted photo or video to the device's photo gallery (Android
+ * MediaStore / iOS Photos) so it shows up in the camera roll — not just in the
+ * Files app. Documents keep using saveNativeFile (Documents dir); this is only
+ * for image/* and video/* attachments. We first materialize the bytes to a
+ * cache file, then hand its URI to the Media plugin, which inserts it into the
+ * gallery with the right permissions per OS/version.
+ */
+export async function saveMediaToGallery(blob: Blob, filename: string): Promise<void> {
+  const uri = await writeToCache(blob, filename);
+  const isVideo = (blob.type || '').toLowerCase().startsWith('video/');
+  if (isVideo) {
+    await Media.saveVideo({ path: uri, fileName: safeName(filename) });
+  } else {
+    await Media.savePhoto({ path: uri, fileName: safeName(filename) });
+  }
 }

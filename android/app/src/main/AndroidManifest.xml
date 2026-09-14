@@ -68,6 +68,16 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
+    <!-- Save photos/videos to the gallery (@capacitor-community/media). Writing to
+         MediaStore needs WRITE_EXTERNAL_STORAGE only up to Android 9; the READ_MEDIA_*
+         permissions are the Android 13+ replacements for READ_EXTERNAL_STORAGE. -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="29" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+
     <!-- Camera/mic are used for calls but not required to install the app -->
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-feature android:name="android.hardware.microphone" android:required="false" />
