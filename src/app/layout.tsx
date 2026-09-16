@@ -26,6 +26,7 @@ import { ThemeProvider } from '@/lib/theme';
 import { CallProvider } from '@/lib/call/call-provider';
 import { NotificationRouter } from '@/components/notification-router';
 import { NativeAuthLinks } from '@/components/native-auth-links';
+import { PasswordRecoveryRouter } from '@/components/password-recovery-router';
 import { ServiceWorkerRegister } from '@/components/sw-register';
 
 export const metadata: Metadata = {
@@ -69,6 +70,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <ConsentGate />
             <NotificationRouter />
             <NativeAuthLinks />
+            <PasswordRecoveryRouter />
             <CallProvider>
               <PresenceProvider>{children}</PresenceProvider>
             </CallProvider>
