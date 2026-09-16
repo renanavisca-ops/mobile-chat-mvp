@@ -85,6 +85,8 @@ const en = {
     email: 'Email',
     password: 'Password',
     forgotPassword: 'Forgot your password?',
+    showPassword: 'Show password',
+    hidePassword: 'Hide password',
     sendResetLink: 'Send recovery link',
     sending: 'Sending...',
     backToSignIn: 'Back to sign in',
