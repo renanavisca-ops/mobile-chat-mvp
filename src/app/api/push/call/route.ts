@@ -63,7 +63,7 @@ export async function POST(req: Request) {
 
     const title = callerName;
     const text = video ? '📹 Incoming video call' : '📞 Incoming voice call';
-    const url = chatId ? `/chats/${chatId}` : '/chats';
+    const url = chatId ? `/chats/view?c=${chatId}` : '/chats';
 
     let webSent = 0;
     if (hasWeb) {

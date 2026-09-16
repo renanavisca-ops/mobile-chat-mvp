@@ -7,7 +7,7 @@ import { useEffect, useState, useRef } from 'react';
 import { BottomNav } from '@/components/page-shell';
 import { StoriesBar } from '@/components/stories-bar';
 import { ChatConversation } from '@/components/chat-conversation';
-import { PlusIcon, SearchIcon, UsersIcon, UserPlusIcon, HashIcon, ChatBubbleIcon } from '@/components/icons';
+import { PlusIcon, SearchIcon, UsersIcon, UserPlusIcon, HashIcon, ChatBubbleIcon, SpeakerIcon } from '@/components/icons';
 import { ChatListSkeleton } from '@/components/skeleton';
 import { useRequireAuth } from '@/lib/auth/use-require-auth';
 import { ensureIdentity } from '@/lib/crypto/keystore';
@@ -204,7 +204,7 @@ export default function ChatsPage() {
   // full-page conversation.
   function openChat(id: string) {
     if (isWide()) setSelectedId(id);
-    else router.push(`/chats/${id}`);
+    else router.push(`/chats/view?c=${id}`);
   }
 
   useEffect(() => {
@@ -344,6 +344,9 @@ export default function ChatsPage() {
                       </Link>
                       <Link href="/groups/new" onClick={() => setMenuOpen(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-200 hover:bg-slate-900">
                         <UsersIcon size={18} /> {t('nav.newGroup')}
+                      </Link>
+                      <Link href="/broadcast" onClick={() => setMenuOpen(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-200 hover:bg-slate-900">
+                        <SpeakerIcon size={18} /> {t('broadcast.title')}
                       </Link>
                       <Link href="/channels" onClick={() => setMenuOpen(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-200 hover:bg-slate-900">
                         <HashIcon size={18} /> {t('nav.channels')}

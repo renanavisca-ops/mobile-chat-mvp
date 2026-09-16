@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { PageShell } from '@/components/page-shell';
 import { useRequireAuth } from '@/lib/auth/use-require-auth';
 import { listPublicChannels, createChannel, joinChannel, type ChannelSummary } from '@/lib/db/chats';
@@ -12,6 +14,7 @@ import { useT } from '@/lib/i18n/context';
 export default function ChannelsPage() {
   const { loading: authLoading } = useRequireAuth();
   const t = useT();
+  const router = useRouter();
 
   const [channels, setChannels] = useState<ChannelSummary[]>([]);
   const [q, setQ] = useState('');
@@ -50,7 +53,7 @@ export default function ChannelsPage() {
     setErr('');
     try {
       await joinChannel(c.id);
-      window.location.href = `/chats/${c.id}`;
+      router.push(`/chats/view?c=${c.id}`);
     } catch (e: any) {
       setErr(e?.message ?? String(e));
       setBusyId(null);
@@ -64,7 +67,7 @@ export default function ChannelsPage() {
     setErr('');
     try {
       const id = await createChannel(title, newDesc.trim() || undefined);
-      window.location.href = `/chats/${id}`;
+      router.push(`/chats/view?c=${id}`);
     } catch (e: any) {
       setErr(e?.message ?? String(e));
       setCreating(false);
@@ -123,12 +126,11 @@ export default function ChannelsPage() {
                   ) : null}
                 </div>
                 {c.joined ? (
-                  <a
-                    href={`/chats/${c.id}`}
+                  <Link href={`/chats/view?c=${c.id}`}
                     className="shrink-0 rounded-lg border border-slate-800 bg-slate-900 px-3 py-1.5 text-xs text-slate-200 hover:bg-slate-800"
                   >
                     {t('channels.open')}
-                  </a>
+                  </Link>
                 ) : (
                   <button
                     type="button"

@@ -11,6 +11,7 @@ import {
   ForwardIcon,
   ExternalLinkIcon,
   FileIcon,
+  GlobeIcon,
 } from '@/components/icons';
 
 function fmtBytes(bytes?: number): string {
@@ -29,6 +30,17 @@ function ext(name?: string): string {
   if (!name) return '';
   const m = name.match(/\.([a-z0-9]+)$/i);
   return m ? m[1].toUpperCase() : '';
+}
+
+/**
+ * A public web viewer that renders common document formats (PDF, Word, Excel,
+ * PowerPoint, etc.) in the browser — so a recipient without a matching app
+ * installed can still read the file. Google's viewer fetches the (signed) URL
+ * server-side, so it only works for a real http(s) URL, never a blob:/encrypted
+ * attachment. Opened in the system browser via window.open.
+ */
+function webViewerUrl(httpUrl: string): string {
+  return `https://docs.google.com/viewer?embedded=false&url=${encodeURIComponent(httpUrl)}`;
 }
 
 /** Best-effort MIME from the filename when the message body didn't carry one. */
@@ -239,6 +251,20 @@ export function DocumentPreview({
     }
   }
 
+  // Open the file in a public web document viewer (works for anyone, even with
+  // no matching app installed). Only available for non-encrypted files, which
+  // have a real signed URL the viewer can fetch.
+  async function handleWebViewer() {
+    if (!httpUrl) return;
+    setError(null);
+    try {
+      const u = await httpUrl();
+      window.open(webViewerUrl(u), '_blank', 'noopener,noreferrer');
+    } catch {
+      setError(t('chat.previewFailed'));
+    }
+  }
+
   async function handleOpenExternal() {
     // Native: hand the decrypted file to the OS share sheet (view/print/save).
     if (nativeFiles) {
@@ -307,25 +333,39 @@ export function DocumentPreview({
         ) : ready && canInlinePdf ? (
           <iframe src={objUrl!} title={name} className="h-full w-full rounded-xl bg-white" />
         ) : (
-          <button
-            type="button"
-            onClick={canOpen ? handleOpenExternal : undefined}
-            disabled={!canOpen}
-            className="flex max-w-sm flex-col items-center gap-4 text-center disabled:cursor-default"
-          >
-            <span className="grid h-24 w-24 place-items-center rounded-3xl bg-white/10 text-white/80">
-              <FileIcon size={44} />
-            </span>
-            <div>
-              <p className="text-sm font-medium text-white/90">
-                {ext(fileName) ? `${ext(fileName)} · ` : ''}
-                {fmtBytes(fileSize)}
-              </p>
-              <p className="mt-1 text-xs text-white/50">
-                {canOpen ? t('chat.tapToOpen') : t('chat.noInlinePreview')}
-              </p>
-            </div>
-          </button>
+          <div className="flex max-w-sm flex-col items-center gap-4 text-center">
+            <button
+              type="button"
+              onClick={canOpen ? handleOpenExternal : undefined}
+              disabled={!canOpen}
+              className="flex flex-col items-center gap-4 disabled:cursor-default"
+            >
+              <span className="grid h-24 w-24 place-items-center rounded-3xl bg-white/10 text-white/80">
+                <FileIcon size={44} />
+              </span>
+              <div>
+                <p className="text-sm font-medium text-white/90">
+                  {ext(fileName) ? `${ext(fileName)} · ` : ''}
+                  {fmtBytes(fileSize)}
+                </p>
+                <p className="mt-1 text-xs text-white/50">
+                  {canOpen ? t('chat.tapToOpen') : t('chat.noInlinePreview')}
+                </p>
+              </div>
+            </button>
+            {/* Fallback for anyone without a matching app: read it in a web
+                viewer. Only for non-encrypted files (they have a signed URL). */}
+            {httpUrl ? (
+              <button
+                type="button"
+                onClick={handleWebViewer}
+                className="inline-flex items-center gap-2 rounded-full border border-white/20 px-4 py-2 text-xs font-medium text-white/90 hover:bg-white/10"
+              >
+                <GlobeIcon size={16} />
+                {t('chat.openWebViewer')}
+              </button>
+            ) : null}
+          </div>
         )}
       </div>
 

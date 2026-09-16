@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { PageShell } from '@/components/page-shell';
 import { useRequireAuth } from '@/lib/auth/use-require-auth';
 import { browserSupabase } from '@/lib/supabase/client';
@@ -17,6 +18,7 @@ import type { ProfileLite } from '@/lib/db/types';
 export default function ContactsPage() {
   const { loading } = useRequireAuth();
   const t = useT();
+  const router = useRouter();
   const supabase = browserSupabase();
 
   const [contacts, setContacts] = useState<ProfileLite[]>([]);
@@ -96,7 +98,7 @@ export default function ContactsPage() {
       if (!data.user) throw new Error('Not authenticated');
 
       const chatId = await createDirectChatWith(userId);
-      window.location.href = `/chats/${chatId}`;
+      router.push(`/chats/view?c=${chatId}`);
     } catch (e: any) {
       setErr(e?.message ?? String(e));
     }

@@ -1,3 +1,4 @@
+import { apiFetch } from '@/lib/api/client';
 import { browserSupabase } from '@/lib/supabase/client';
 
 /**
@@ -87,7 +88,7 @@ async function authHeader(): Promise<Record<string, string>> {
 
 /** Generate a fresh set of one-time recovery codes (shown once). */
 export async function generateRecoveryCodes(): Promise<string[]> {
-  const res = await fetch('/api/mfa/recovery/generate', { method: 'POST', headers: await authHeader() });
+  const res = await apiFetch('/api/mfa/recovery/generate', { method: 'POST', headers: await authHeader() });
   if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Failed');
   const data = await res.json();
   return data.codes as string[];
@@ -96,7 +97,7 @@ export async function generateRecoveryCodes(): Promise<string[]> {
 /** Use a recovery code (lost authenticator): removes TOTP so the session is
  *  fully authenticated. 2FA ends up off. */
 export async function consumeRecoveryCode(code: string): Promise<void> {
-  const res = await fetch('/api/mfa/recovery/consume', {
+  const res = await apiFetch('/api/mfa/recovery/consume', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...(await authHeader()) },
     body: JSON.stringify({ code }),

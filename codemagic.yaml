@@ -9,11 +9,16 @@
 #   - iOS code signing: distribution certificate + App Store provisioning
 #     profile for bundle id `app.toky.chat` (Automatic signing is easiest).
 #   - Android keystore: upload one and expose it as `keystore_reference`.
+#   - Variable group `toky_build` : NEXT_PUBLIC_SUPABASE_URL,
+#     NEXT_PUBLIC_SUPABASE_ANON_KEY, NEXT_PUBLIC_API_BASE_URL
+#     (=https://mobile-chat-mvp.vercel.app). Required by BOTH platforms — the
+#     bundled UI is compiled at build time and these are inlined into it.
 #   - Variable group `toky_ios`  : APP_STORE_APPLE_ID (numeric App ID).
 #   - Variable group `toky_android` (only if publishing): GCLOUD_SERVICE_ACCOUNT.
 #
-# The native shells load the hosted app, so builds do NOT need a Next.js build
-# step — only `cap sync` to copy the loader + plugins into the native projects.
+# The app UI is now BUNDLED into the native app (Phase 1), so every build runs a
+# static Next.js export (`scripts/build-mobile.mjs`) before `cap sync` copies the
+# bundled UI + plugins into the native projects.
 
 workflows:
   ios:
@@ -24,6 +29,7 @@ workflows:
       app_store_connect: CodemagicKey # name of your App Store Connect API key
     environment:
       groups:
+        - toky_build
         - toky_ios
       ios_signing:
         distribution_type: app_store
@@ -36,7 +42,11 @@ workflows:
         script: npm ci
       - name: Run unit tests (E2EE fail-closed, media & key-migration invariants)
         script: npm test
-      - name: Capacitor sync (copies loader + plugins into ios/)
+      - name: Build bundled web UI (static export -> mobile/www)
+        # Requires NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY and
+        # NEXT_PUBLIC_API_BASE_URL to be set in the Codemagic environment.
+        script: node scripts/build-mobile.mjs --no-sync
+      - name: Capacitor sync (copies bundled UI + plugins into ios/)
         script: npx cap sync ios
       - name: Install CocoaPods
         script: cd ios/App && pod install
@@ -66,10 +76,14 @@ workflows:
     instance_type: mac_mini_m2
     max_build_duration: 60
     environment:
-      # Note: the `toky_android` variable group (GCLOUD_SERVICE_ACCOUNT) and the
+      # `toky_build` provides the NEXT_PUBLIC_* vars the static export inlines
+      # into the bundled UI (without them the export fails: "supabaseUrl is
+      # required"). The `toky_android` group (GCLOUD_SERVICE_ACCOUNT) and the
       # google_play auto-publishing block are omitted for now — the first
       # releases are uploaded to Play by hand. Add them back to auto-publish
       # once a Google Play service account is configured.
+      groups:
+        - toky_build
       android_signing:
         - keystore_reference
       node: 20
@@ -78,17 +92,34 @@ workflows:
         script: npm ci
       - name: Run unit tests (E2EE fail-closed, media & key-migration invariants)
         script: npm test
-      - name: Capacitor sync (copies loader + plugins into android/)
+      - name: Build bundled web UI (static export -> mobile/www)
+        # Requires NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY and
+        # NEXT_PUBLIC_API_BASE_URL to be set in the Codemagic environment.
+        script: node scripts/build-mobile.mjs --no-sync
+      - name: Capacitor sync (copies bundled UI + plugins into android/)
         script: npx cap sync android
       - name: Set version code
         script: |
-          echo "Using CI build number $BUILD_NUMBER as versionCode"
+          # Play's currently active versionCode is 8, so the upload must be >= 9.
+          # Use the CI build number but never below a floor above the live value,
+          # then export it for the build + print steps.
+          VC=$(( BUILD_NUMBER + 1 ))
+          if [ "$VC" -lt 9 ]; then VC=9; fi
+          echo "Using versionCode $VC (BUILD_NUMBER=$BUILD_NUMBER)"
+          echo "VERSION_CODE=$VC" >> "$CM_ENV"
       - name: Build release AAB
         script: |
           cd android
           chmod +x ./gradlew
           ./gradlew bundleRelease \
-            -PversionCode=$(($BUILD_NUMBER + 1))
+            -PversionCode=$VERSION_CODE \
+            -PversionName="1.1.0-phase1"
+      - name: Print AAB identity (versionCode / SHA-256) for the release record
+        script: |
+          AAB=$(find android/app/build/outputs -name "*.aab" | head -1)
+          echo "AAB: $AAB"
+          echo "versionName: 1.1.0-phase1  versionCode: $VERSION_CODE  applicationId: app.toky.chat"
+          shasum -a 256 "$AAB" || sha256sum "$AAB"
     artifacts:
       - android/app/build/outputs/**/*.aab
       - android/app/build/outputs/**/*.apk

@@ -6,6 +6,7 @@ dist/
 build/ 
 *.tsbuildinfo 
 
-# Mobile export build artifacts
+# Generated mobile export / bundling artifacts (produced by scripts/build-mobile.mjs)
 /out/
 /.mobile-export-stash/
+/mobile/www/

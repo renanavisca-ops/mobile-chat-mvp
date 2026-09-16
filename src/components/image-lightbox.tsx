@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { XIcon, DownloadIcon, ExternalLinkIcon } from '@/components/icons';
-import { canNativeFiles, shareNativeFile } from '@/lib/native-files';
+import { canNativeFiles, shareNativeFile, saveMediaToGallery } from '@/lib/native-files';
+import { useT } from '@/lib/i18n/context';
 
 /**
  * Full-screen image viewer with pinch-to-zoom, drag-to-pan and double-tap zoom.
@@ -23,10 +24,22 @@ export function ImageLightbox({
   alt?: string;
   onClose: () => void;
 }) {
+  const t = useT();
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [scale, setScale] = useState(1);
   const [tx, setTx] = useState(0);
   const [ty, setTy] = useState(0);
+  const [toast, setToast] = useState<string | null>(null);
+
+  function flash(msg: string) {
+    setToast(msg);
+    window.setTimeout(() => setToast((cur) => (cur === msg ? null : cur)), 2200);
+  }
+
+  function imageName(blob: Blob): string {
+    const sub = ((blob.type.split('/')[1] || 'jpg').split(';')[0]) || 'jpg';
+    return `toky-${Date.now()}.${sub}`;
+  }
 
   // Live gesture bookkeeping (refs so pointer handlers see fresh values).
   const pointers = useRef<Map<number, { x: number; y: number }>>(new Map());
@@ -157,7 +170,7 @@ export function ImageLightbox({
     try {
       const res = await fetch(url);
       const blob = await res.blob();
-      const name = `image.${((blob.type.split('/')[1] || 'jpg').split(';')[0]) || 'jpg'}`;
+      const name = imageName(blob);
       if (canNativeFiles()) {
         await shareNativeFile(blob, name);
         return;
@@ -176,6 +189,33 @@ export function ImageLightbox({
       setTimeout(() => { try { URL.revokeObjectURL(u); } catch {} }, 4000);
     } catch {
       /* user cancelled or fetch failed — no-op */
+    }
+  }
+
+  // Save the image to the device. The Capacitor WebView ignores `<a download>`
+  // and can't persist a blob: URL, so on native we write the bytes through
+  // @capacitor/filesystem; on the web we keep the anchor-download behaviour.
+  async function download() {
+    try {
+      const res = await fetch(url);
+      const blob = await res.blob();
+      const name = imageName(blob);
+      if (canNativeFiles()) {
+        await saveMediaToGallery(blob, name);
+        flash(t('chat.savedToGallery'));
+        return;
+      }
+      const u = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = u;
+      a.download = name;
+      a.rel = 'noreferrer';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => { try { URL.revokeObjectURL(u); } catch {} }, 4000);
+    } catch {
+      flash(t('chat.downloadFailed'));
     }
   }
 
@@ -201,17 +241,14 @@ export function ImageLightbox({
         >
           <ExternalLinkIcon size={20} />
         </button>
-        <a
-          href={url}
-          download
-          target="_blank"
-          rel="noreferrer"
-          onClick={(e) => e.stopPropagation()}
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); download(); }}
           className="grid h-11 w-11 place-items-center rounded-full bg-white/10 text-white backdrop-blur hover:bg-white/20"
           aria-label="Download image"
         >
           <DownloadIcon size={20} />
-        </a>
+        </button>
         <button
           type="button"
           onClick={onClose}
@@ -221,6 +258,12 @@ export function ImageLightbox({
           <XIcon size={22} />
         </button>
       </div>
+
+      {toast ? (
+        <div className="pointer-events-none absolute bottom-8 left-1/2 z-20 -translate-x-1/2 rounded-full bg-black/70 px-4 py-2 text-xs font-medium text-white backdrop-blur">
+          {toast}
+        </div>
+      ) : null}
 
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img

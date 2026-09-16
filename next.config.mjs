@@ -1,7 +1,26 @@
 import { withSentryConfig } from '@sentry/nextjs';
 
+// MOBILE_EXPORT=1 switches the build into a static export (`out/`) for bundling
+// inside the Capacitor Android/iOS app. The normal (unset) build is unchanged:
+// a full Next.js server build with API routes, deployed to Vercel.
+//
+// In export mode we also drop the Sentry wrapper — its tunnel route
+// (`/monitoring`) is a server route handler that can't exist in a static
+// export. The hosted web build keeps Sentry exactly as before.
+const isMobileExport = process.env.MOBILE_EXPORT === '1';
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  ...(isMobileExport
+    ? {
+        output: 'export',
+        // No Next.js image optimization server exists in a bundled app.
+        images: { unoptimized: true },
+        // Emit `route/index.html` so directory-style paths resolve to a file
+        // when the WebView performs a hard load of a sub-route.
+        trailingSlash: true,
+      }
+    : {}),
   // Enables src/instrumentation.ts so Sentry initialises for the server/edge
   // runtimes (stable in Next 15; flagged in Next 14).
   experimental: {
@@ -29,11 +48,12 @@ const nextConfig = {
   },
 };
 
-// Only wrap with Sentry's build plugin when a DSN is configured, so
-// unconfigured builds (local dev, forks) are completely unaffected. Source-map
-// upload additionally requires SENTRY_ORG / SENTRY_PROJECT / SENTRY_AUTH_TOKEN;
-// without them the plugin simply skips the upload step.
-export default process.env.NEXT_PUBLIC_SENTRY_DSN
+// Only wrap with Sentry's build plugin when a DSN is configured AND this isn't a
+// static mobile export, so unconfigured builds (local dev, forks) and the mobile
+// export are completely unaffected. Source-map upload additionally requires
+// SENTRY_ORG / SENTRY_PROJECT / SENTRY_AUTH_TOKEN; without them the plugin simply
+// skips the upload step.
+export default process.env.NEXT_PUBLIC_SENTRY_DSN && !isMobileExport
   ? withSentryConfig(nextConfig, {
       org: process.env.SENTRY_ORG,
       project: process.env.SENTRY_PROJECT,

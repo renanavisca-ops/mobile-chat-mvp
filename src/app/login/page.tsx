@@ -1,5 +1,6 @@
 'use client';
 
+import { authRedirectUrl } from '@/lib/auth/redirect';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { browserSupabase } from '@/lib/supabase/client';
@@ -39,7 +40,7 @@ export default function LoginPage() {
     setBusy(true);
     try {
       const supabase = browserSupabase();
-      const emailRedirectTo = typeof window !== 'undefined' ? `${window.location.origin}/auth/callback` : undefined;
+      const emailRedirectTo = authRedirectUrl('/auth/callback');
       const { error } = await supabase.auth.resend({ type: 'signup', email: e, options: { emailRedirectTo } });
       if (error) throw error;
       setStatus(`✅ ${t('auth.statusConfirmResent')}`);
@@ -64,10 +65,7 @@ export default function LoginPage() {
       const { error } = await supabase.auth.resetPasswordForEmail(
   email.trim().toLowerCase(),
   {
-    redirectTo:
-      typeof window !== 'undefined'
-        ? `${window.location.origin}/reset-password`
-        : undefined,
+    redirectTo: authRedirectUrl('/reset-password'),
   }
 );
 
@@ -102,10 +100,7 @@ export default function LoginPage() {
           );
         }
 
-        const emailRedirectTo =
-          typeof window !== 'undefined'
-            ? `${window.location.origin}/auth/callback`
-            : undefined;
+        const emailRedirectTo = authRedirectUrl('/auth/callback');
 
         const { data, error } = await supabase.auth.signUp({
           email: e,
