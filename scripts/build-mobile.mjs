@@ -26,8 +26,10 @@ const stashDir = path.join(root, '.mobile-export-stash');
 const outDir = path.join(root, 'out');
 const wwwDir = path.join(root, 'mobile', 'www');
 
-// Server-only route dirs that cannot be statically exported.
-const EXCLUDE = ['src/app/api', 'src/app/chats/[chatId]', 'src/app/public-chat/[token]'];
+// Server-only paths that cannot be statically exported (route handlers, the
+// dynamic segments, and the CORS middleware — middleware isn't supported by
+// `output: 'export'`). They're only used by the hosted Vercel build.
+const EXCLUDE = ['src/app/api', 'src/app/chats/[chatId]', 'src/app/public-chat/[token]', 'src/middleware.ts'];
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://mobile-chat-mvp.vercel.app';
 const doSync = !process.argv.includes('--no-sync');
