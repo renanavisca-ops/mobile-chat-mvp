@@ -87,6 +87,8 @@ const es: Dictionary = {
     email: 'Email',
     password: 'Contraseña',
     forgotPassword: '¿Olvidaste tu contraseña?',
+    showPassword: 'Mostrar contraseña',
+    hidePassword: 'Ocultar contraseña',
     sendResetLink: 'Enviar enlace de recuperación',
     sending: 'Enviando...',
     backToSignIn: 'Volver al inicio de sesión',

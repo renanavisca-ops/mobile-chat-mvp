@@ -5,12 +5,14 @@ import { useRouter } from 'next/navigation';
 import { PageShell } from '@/components/page-shell';
 import { browserSupabase } from '@/lib/supabase/client';
 import { useT } from '@/lib/i18n/context';
+import { EyeIcon, EyeOffIcon } from '@/components/icons';
 
 export default function ResetPasswordPage() {
   const router = useRouter();
   const t = useT();
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<{ type: 'success' | 'error' | null; message: string }>({
     type: null,
@@ -64,20 +66,31 @@ export default function ResetPasswordPage() {
           <form onSubmit={handleResetPassword} className="space-y-4">
             <div className="space-y-2">
               <label className="block text-sm text-slate-300 ml-1">{t('resetPassword.newPassword')}</label>
-              <input
-                type="password"
-                className="w-full rounded-xl border border-slate-800 bg-slate-900 px-3.5 py-2.5 text-slate-100 focus:outline-none focus:border-blue-500/60 focus:ring-2 focus:ring-blue-500/20 transition-all"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="••••••••"
-                required
-              />
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  className="w-full rounded-xl border border-slate-800 bg-slate-900 px-3.5 py-2.5 pr-11 text-slate-100 focus:outline-none focus:border-blue-500/60 focus:ring-2 focus:ring-blue-500/20 transition-all"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="••••••••"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  aria-label={showPassword ? t('auth.hidePassword') : t('auth.showPassword')}
+                  aria-pressed={showPassword}
+                  className="absolute inset-y-0 right-0 flex items-center px-3 text-slate-400 hover:text-slate-200"
+                >
+                  {showPassword ? <EyeOffIcon size={20} /> : <EyeIcon size={20} />}
+                </button>
+              </div>
             </div>
 
             <div className="space-y-2">
               <label className="block text-sm text-slate-300 ml-1">{t('resetPassword.confirmPassword')}</label>
               <input
-                type="password"
+                type={showPassword ? 'text' : 'password'}
                 className="w-full rounded-xl border border-slate-800 bg-slate-900 px-3.5 py-2.5 text-slate-100 focus:outline-none focus:border-blue-500/60 focus:ring-2 focus:ring-blue-500/20 transition-all"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
