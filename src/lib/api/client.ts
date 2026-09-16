@@ -16,9 +16,27 @@
  * URL — so nothing sensitive is exposed via `NEXT_PUBLIC_*`.
  */
 
-const RAW_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || '';
-/** Normalized base with any trailing slash removed. Empty = same-origin. */
-export const API_BASE = RAW_BASE.replace(/\/+$/, '');
+import { Capacitor } from '@capacitor/core';
+
+/** The hosted origin that serves the app's `/api/*` routes. */
+const HOSTED_ORIGIN = 'https://mobile-chat-mvp.vercel.app';
+
+function isNative(): boolean {
+  try {
+    return Capacitor.isNativePlatform();
+  } catch {
+    return false;
+  }
+}
+
+const RAW_BASE = (process.env.NEXT_PUBLIC_API_BASE_URL || '').trim();
+/**
+ * Normalized base with any trailing slash removed. On native we ALWAYS use the
+ * hosted origin (there is no local backend), regardless of the build env — this
+ * makes the bundled app resilient to a missing/mis-typed NEXT_PUBLIC_API_BASE_URL.
+ * On the web it stays same-origin (empty) so calls are relative, exactly as before.
+ */
+export const API_BASE = isNative() ? HOSTED_ORIGIN : RAW_BASE.replace(/\/+$/, '');
 
 /** Resolve an app API path to an absolute (or same-origin) URL. */
 export function apiUrl(path: string): string {
