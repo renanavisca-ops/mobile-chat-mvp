@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { browserSupabase } from '@/lib/supabase/client';
 import { reconcileLocalIdentity } from '@/lib/auth/local-identity';
 import { validatePassword, passwordStrength } from '@/lib/password';
+import { EyeIcon, EyeOffIcon } from '@/components/icons';
 import { pendingMfa, verifyLoginCode, consumeRecoveryCode } from '@/lib/auth/mfa';
 import { useT } from '@/lib/i18n/context';
 
@@ -18,6 +19,7 @@ export default function LoginPage() {
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState('');
@@ -354,14 +356,25 @@ export default function LoginPage() {
                   </button>
                 )}
               </div>
-              <input
-                className="w-full rounded-xl border border-slate-800 bg-slate-900 px-3.5 py-2.5 text-slate-100 focus:outline-none focus:border-blue-500/60 focus:ring-2 focus:ring-blue-500/20 transition-all placeholder:text-slate-600"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
-                placeholder="••••••••"
-                type="password"
-              />
+              <div className="relative">
+                <input
+                  className="w-full rounded-xl border border-slate-800 bg-slate-900 px-3.5 py-2.5 pr-11 text-slate-100 focus:outline-none focus:border-blue-500/60 focus:ring-2 focus:ring-blue-500/20 transition-all placeholder:text-slate-600"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
+                  placeholder="••••••••"
+                  type={showPassword ? 'text' : 'password'}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  aria-label={showPassword ? t('auth.hidePassword') : t('auth.showPassword')}
+                  aria-pressed={showPassword}
+                  className="absolute inset-y-0 right-0 flex items-center px-3 text-slate-400 hover:text-slate-200"
+                >
+                  {showPassword ? <EyeOffIcon size={20} /> : <EyeIcon size={20} />}
+                </button>
+              </div>
               {mode === 'signup' && password.length > 0 && (
                 <div className="flex items-center gap-2 px-1">
                   <div className="flex h-1 flex-1 gap-1">
