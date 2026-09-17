@@ -59,12 +59,29 @@ async function writeToCache(blob: Blob, filename: string): Promise<string> {
 }
 
 /**
- * Hand the decrypted file to the native share sheet. Powers Open / Print /
- * Share — the sheet lets the user view it in a real app, print, or save it.
+ * Hand the decrypted file to the native share sheet. Powers the explicit
+ * "Reenviar/Share" action — the sheet lets the user send it to another app.
  */
 export async function shareNativeFile(blob: Blob, filename: string, dialogTitle?: string): Promise<void> {
   const uri = await writeToCache(blob, filename);
   await Share.share({ title: filename, files: [uri], dialogTitle });
+}
+
+/**
+ * OPEN (view) the decrypted file in a real viewer app via the OS "open with"
+ * action (Android ACTION_VIEW), NOT the share sheet — so tapping "Abrir" opens
+ * the document (PDF viewer, Word, Excel…) instead of offering to send it.
+ *
+ * Uses @capacitor-community/file-opener, loaded dynamically so the web build and
+ * any already-installed app WITHOUT the native plugin (an older .aab that hasn't
+ * been rebuilt with it yet) simply reject here — the caller catches that and
+ * falls back to a web viewer / a "download first" hint. Once the app is rebuilt
+ * with the plugin (next .aab), this opens files natively.
+ */
+export async function openNativeFile(blob: Blob, filename: string, mime?: string): Promise<void> {
+  const { FileOpener } = await import('@capacitor-community/file-opener');
+  const uri = await writeToCache(blob, filename);
+  await FileOpener.open({ filePath: uri, contentType: mime || undefined });
 }
 
 /**

@@ -227,6 +227,7 @@ const es: Dictionary = {
     tapToOpen: 'Toca para abrir',
     openWebViewer: 'Ver en la web',
     savedToDevice: 'Guardado en tus archivos.',
+    openNeedsDownload: 'Para abrir este archivo, descárgalo primero.',
     savedToGallery: 'Guardado en tu galería.',
     mediaRetry: 'Toca para reintentar',
     forwardMediaUnavailable: 'No se pudo cargar el contenido original para reenviar.',

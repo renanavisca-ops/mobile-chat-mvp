@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { useLanguage } from '@/lib/i18n/context';
-import { canNativeFiles, shareNativeFile, saveNativeFile } from '@/lib/native-files';
+import { canNativeFiles, openNativeFile, saveNativeFile } from '@/lib/native-files';
 import { PdfCanvas } from '@/components/pdf-canvas';
 import {
   XIcon,
@@ -42,6 +42,22 @@ function ext(name?: string): string {
  */
 function webViewerUrl(httpUrl: string): string {
   return `https://docs.google.com/viewer?embedded=false&url=${encodeURIComponent(httpUrl)}`;
+}
+
+/** True for Microsoft Office documents, which get the Office Online viewer. */
+function isOfficeDoc(mime: string, name?: string): boolean {
+  const e = ext(name).toLowerCase();
+  if (['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'].includes(e)) return true;
+  return /officedocument|msword|ms-excel|ms-powerpoint/.test(mime);
+}
+
+/**
+ * Microsoft's Office Online viewer renders Word/Excel/PowerPoint in the browser
+ * (no local app needed). Like Google's viewer it fetches the (signed) URL
+ * server-side, so it only works for a real http(s) URL, never an encrypted blob.
+ */
+function officeViewerUrl(httpUrl: string): string {
+  return `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(httpUrl)}`;
 }
 
 /** Best-effort MIME from the filename when the message body didn't carry one. */
@@ -243,16 +259,6 @@ export function DocumentPreview({
     frame.src = objUrl;
   }
 
-  async function handleShareNative() {
-    if (!blob) return;
-    setError(null);
-    try {
-      await shareNativeFile(blob, name, name);
-    } catch {
-      // A user-cancelled share sheet throws too — don't surface that as an error.
-    }
-  }
-
   // Open the file in a public web document viewer (works for anyone, even with
   // no matching app installed). Only available for non-encrypted files, which
   // have a real signed URL the viewer can fetch.
@@ -261,29 +267,53 @@ export function DocumentPreview({
     setError(null);
     try {
       const u = await httpUrl();
-      window.open(webViewerUrl(u), '_blank', 'noopener,noreferrer');
+      const target = isOfficeDoc(mime, fileName) ? officeViewerUrl(u) : webViewerUrl(u);
+      window.open(target, '_blank', 'noopener,noreferrer');
     } catch {
       setError(t('chat.previewFailed'));
     }
   }
 
+  // "Abrir": VIEW/open the document — never the OS share sheet, and without
+  // downloading it. The user downloads only via the explicit Download action.
   async function handleOpenExternal() {
-    // Native: hand the decrypted file to the OS share sheet (view/print/save).
-    if (nativeFiles) {
-      await handleShareNative();
-      return;
+    setError(null);
+    setNotice(null);
+
+    // Native: open in a real viewer app via the OS "open with" (ACTION_VIEW),
+    // not the share sheet. Needs the file-opener native plugin (present once the
+    // app is rebuilt with it); if it's missing this rejects and we fall through.
+    if (nativeFiles && blob) {
+      try {
+        await openNativeFile(blob, name, mime);
+        return;
+      } catch {
+        /* no native opener yet, or no app to view it — fall through */
+      }
     }
-    // Web, non-encrypted: open the signed URL (renders PDFs/Office previews).
+
+    // Non-encrypted files have a real URL: view them in the browser / a web
+    // document viewer (Office Online for Office docs), with no download.
     if (httpUrl) {
       try {
         const u = await httpUrl();
-        window.open(u, '_blank', 'noopener,noreferrer');
+        const target = isOfficeDoc(mime, fileName)
+          ? officeViewerUrl(u)
+          : isImage || isPdf
+            ? u // the browser renders images and PDFs directly
+            : webViewerUrl(u);
+        window.open(target, '_blank', 'noopener,noreferrer');
         return;
       } catch {
-        /* fall through to blob */
+        /* fall through */
       }
     }
-    if (objUrl) window.open(objUrl, '_blank', 'noopener,noreferrer');
+
+    // Encrypted file we can't view externally (no URL, no native opener). If it
+    // already shows inline (image/PDF) there's nothing else to do; otherwise ask
+    // the user to download it so they can open it in another app.
+    if (ready && previewable) return;
+    setNotice(t('chat.openNeedsDownload'));
   }
 
   const ready = !!objUrl && !!blob;
