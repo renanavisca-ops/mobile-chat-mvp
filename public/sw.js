@@ -2,7 +2,11 @@
 // re-downloading its whole bundle over the network on every launch, and
 // (2) web-push notification handling.
 
-const SHELL_CACHE = 'toky-shell-v1';
+// Bump this whenever installed clients must drop their cached app shell (e.g.
+// after a deploy that changed behavior and users are stuck on old JS). Changing
+// the value ships a new service worker, whose `activate` deletes every previous
+// `toky-shell-*` cache — forcing a fresh fetch of the HTML and hashed chunks.
+const SHELL_CACHE = 'toky-shell-v2';
 
 self.addEventListener('install', () => self.skipWaiting());
 
@@ -51,7 +55,10 @@ async function navigate(event) {
     })
     .catch(() => null);
 
-  const timeout = new Promise((resolve) => setTimeout(() => resolve(null), 2500));
+  // Give the network a generous window to win so a fresh deploy is actually
+  // picked up on reopen; only fall back to the cached shell when the connection
+  // is genuinely slow/offline (below), so users don't get stuck on stale JS.
+  const timeout = new Promise((resolve) => setTimeout(() => resolve(null), 6000));
   const raced = await Promise.race([network, timeout]);
   if (raced) return raced;
 
