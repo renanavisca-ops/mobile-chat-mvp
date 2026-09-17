@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { useLanguage } from '@/lib/i18n/context';
 import { canNativeFiles, shareNativeFile, saveNativeFile } from '@/lib/native-files';
+import { PdfCanvas } from '@/components/pdf-canvas';
 import {
   XIcon,
   DownloadIcon,
@@ -124,10 +125,11 @@ export function DocumentPreview({
   const mime = (fileMime || mimeFromName(fileName) || '').toLowerCase();
   const isImage = mime.startsWith('image/');
   const isPdf = mime === 'application/pdf';
-  // The Android System WebView has no built-in PDF renderer, so an <iframe> of a
-  // PDF is blank there — only render it inline on the web, and lean on Open
-  // (system browser) natively.
-  const canInlinePdf = isPdf && !native;
+  // PDFs render inline via PDF.js (canvas), which works in the Android System
+  // WebView too — so this is enabled on native as well, not just the web. (A raw
+  // <iframe> of a PDF is blank in that WebView, which is why tapping a PDF used
+  // to fall through to the share sheet instead of previewing.)
+  const canInlinePdf = isPdf;
   const previewable = isImage || canInlinePdf;
   // We only need to fetch (and decrypt) the bytes when we'll actually show them
   // inline, or when there's no http URL to hand off to (encrypted chats). A
@@ -331,7 +333,7 @@ export function DocumentPreview({
           // eslint-disable-next-line @next/next/no-img-element
           <img src={objUrl!} alt={name} className="max-h-full max-w-full rounded-xl object-contain" />
         ) : ready && canInlinePdf ? (
-          <iframe src={objUrl!} title={name} className="h-full w-full rounded-xl bg-white" />
+          <PdfCanvas blob={blob!} fileName={name} />
         ) : (
           <div className="flex max-w-sm flex-col items-center gap-4 text-center">
             <button
