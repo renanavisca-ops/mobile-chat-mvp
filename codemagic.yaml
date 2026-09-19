@@ -100,11 +100,12 @@ workflows:
         script: npx cap sync android
       - name: Set version code
         script: |
-          # Play's currently active versionCode is 8, so the upload must be >= 9.
-          # Use the CI build number but never below a floor above the live value,
-          # then export it for the build + print steps.
+          # A previous build (phase1) already reached versionCode 11 on Play, so
+          # the next upload must be strictly higher. Use the CI build number but
+          # never below a floor above the live value, then export it for the
+          # build + print steps.
           VC=$(( BUILD_NUMBER + 1 ))
-          if [ "$VC" -lt 9 ]; then VC=9; fi
+          if [ "$VC" -lt 12 ]; then VC=12; fi
           echo "Using versionCode $VC (BUILD_NUMBER=$BUILD_NUMBER)"
           echo "VERSION_CODE=$VC" >> "$CM_ENV"
       - name: Build release AAB
@@ -113,12 +114,12 @@ workflows:
           chmod +x ./gradlew
           ./gradlew bundleRelease \
             -PversionCode=$VERSION_CODE \
-            -PversionName="1.1.0-phase1"
+            -PversionName="1.2.0"
       - name: Print AAB identity (versionCode / SHA-256) for the release record
         script: |
           AAB=$(find android/app/build/outputs -name "*.aab" | head -1)
           echo "AAB: $AAB"
-          echo "versionName: 1.1.0-phase1  versionCode: $VERSION_CODE  applicationId: app.toky.chat"
+          echo "versionName: 1.2.0  versionCode: $VERSION_CODE  applicationId: app.toky.chat"
           shasum -a 256 "$AAB" || sha256sum "$AAB"
     artifacts:
       - android/app/build/outputs/**/*.aab
