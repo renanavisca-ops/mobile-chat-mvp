@@ -107,6 +107,14 @@ export function useChatRealtime(chatId: string) {
   // Catch up after the realtime socket may have missed events (phone sleep,
   // network blip, tab backgrounded). Re-pulls the latest page and merges,
   // de-duping our own optimistic echoes against their real rows.
+  // "Vaciar chat": drop the in-memory + cached history immediately. The server
+  // already recorded the clear instant (clearChatForMe), so a later refetch
+  // returns nothing older than it.
+  const clearMessages = useCallback(() => {
+    setMessages([]);
+    try { setCached(`msgs:${chatId}`, []); } catch {}
+  }, [chatId]);
+
   const refetch = useCallback(async () => {
     try {
       const rows = await listMessages(chatId, PAGE_SIZE, 0);
@@ -332,6 +340,7 @@ export function useChatRealtime(chatId: string) {
     messages,
     loading,
     appendLocal,
+    clearMessages,
     loadMore,
     hasMore,
     loadingMore,

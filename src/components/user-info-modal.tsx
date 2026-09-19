@@ -58,6 +58,7 @@ export function UserInfoModal({
   onToggleMute,
   disappearingSeconds,
   onChangeDisappearing,
+  onClearChat,
 }: {
   open: boolean;
   onClose: () => void;
@@ -74,6 +75,7 @@ export function UserInfoModal({
   onToggleMute?: () => void;
   disappearingSeconds?: number | null;
   onChangeDisappearing?: (seconds: number) => void;
+  onClearChat?: () => void;
 }) {
   const { t, lang } = useLanguage();
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -83,6 +85,7 @@ export function UserInfoModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
   const [disappearingOpen, setDisappearingOpen] = useState(false);
+  const [confirmClear, setConfirmClear] = useState(false);
 
   useEffect(() => {
     if (!open || !userId) return;
@@ -336,6 +339,37 @@ export function UserInfoModal({
                 >
                   {t('userInfo.report')}
                 </button>
+              )}
+              {onClearChat && (
+                confirmClear ? (
+                  <div className="rounded-lg border border-rose-900/50 bg-rose-950/20 p-3">
+                    <p className="text-xs text-slate-300">{t('userInfo.clearChatConfirm')}</p>
+                    <div className="mt-2 flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setConfirmClear(false)}
+                        className="flex-1 rounded-lg border border-slate-800 bg-slate-900 px-3 py-1.5 text-xs text-slate-300 hover:bg-slate-800"
+                      >
+                        {t('common.cancel')}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { onClearChat(); onClose(); }}
+                        className="flex-1 rounded-lg bg-rose-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-rose-600"
+                      >
+                        {t('userInfo.clearChatYes')}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setConfirmClear(true)}
+                    className="w-full rounded-lg border border-rose-900/50 bg-rose-950/20 px-4 py-2 text-sm text-rose-300 hover:bg-rose-950/30"
+                  >
+                    {t('userInfo.clearChat')}
+                  </button>
+                )
               )}
             </div>
           </>
