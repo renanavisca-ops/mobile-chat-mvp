@@ -11,6 +11,7 @@ import { AttachSheet } from '@/components/attach-sheet';
 import { CameraCapture } from '@/components/camera-capture';
 import { ReportModal } from '@/components/report-modal';
 import { GroupInfoModal } from '@/components/group-info-modal';
+import { UserInfoModal } from '@/components/user-info-modal';
 import { getWallpaperId, wallpaperCss, getCustomWallpaperUrl, CUSTOM_WALLPAPER_ID } from '@/lib/wallpaper';
 import { blockUser, unblockUser, isBlockedByMe } from '@/lib/db/safety';
 import { EmojiPicker } from '@/components/emoji-picker';
@@ -231,6 +232,9 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
   const [reportOpen, setReportOpen] = useState(false);
   const [reportMessageId, setReportMessageId] = useState<string | null>(null);
   const [groupInfoOpen, setGroupInfoOpen] = useState(false);
+  // Contact-info sheet: the user id whose info to show (peer in a 1:1, or a
+  // tapped group member). Null = closed.
+  const [userInfoId, setUserInfoId] = useState<string | null>(null);
   const [blocked, setBlocked] = useState(false);
   const [blockBusy, setBlockBusy] = useState(false);
   const [muted, setMuted] = useState(false);
@@ -1898,7 +1902,7 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
         {/* Rounded-square avatar of the person/group you're chatting with */}
         <button
           type="button"
-          onClick={() => { if (isGroup) setGroupInfoOpen(true); }}
+          onClick={() => { if (isGroup) setGroupInfoOpen(true); else if (otherUserId) setUserInfoId(otherUserId); }}
           className="shrink-0"
           aria-label={headerName}
         >
@@ -1918,7 +1922,7 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
         {/* Name + connection status */}
         <button
           type="button"
-          onClick={() => { if (isGroup) setGroupInfoOpen(true); }}
+          onClick={() => { if (isGroup) setGroupInfoOpen(true); else if (otherUserId) setUserInfoId(otherUserId); }}
           className="min-w-0 flex-1 px-1 text-left"
         >
           <div className="truncate text-base font-semibold leading-tight">{headerName}</div>
@@ -2379,6 +2383,21 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
         messageId={reportMessageId}
       />
 
+      {userInfoId && (() => {
+        const uid = userInfoId;
+        const isPeer = uid === otherUserId;
+        return (
+          <UserInfoModal
+            open
+            onClose={() => setUserInfoId(null)}
+            userId={uid}
+            onAudioCall={isPeer ? () => startCall({ chatId, peerIds: [uid], label: headerName, video: false, isGroup: false }) : undefined}
+            onVideoCall={isPeer ? () => startCall({ chatId, peerIds: [uid], label: headerName, video: true, isGroup: false }) : undefined}
+            onReport={isPeer ? () => { setReportMessageId(null); setReportOpen(true); } : undefined}
+          />
+        );
+      })()}
+
       {isGroup && (
         <GroupInfoModal
           open={groupInfoOpen}
@@ -2392,6 +2411,7 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
           disappearingSeconds={chat?.disappearing_seconds}
           onUpdated={(patch) => setChat((prev) => (prev ? { ...prev, ...patch } : prev))}
           onMembersChanged={() => setMembersReloadKey((k) => k + 1)}
+          onMemberClick={(id) => { setGroupInfoOpen(false); setUserInfoId(id); }}
           onLeft={() => {
             setGroupInfoOpen(false);
             window.location.href = '/chats';
