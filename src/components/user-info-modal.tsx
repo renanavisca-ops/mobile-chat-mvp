@@ -58,6 +58,7 @@ export function UserInfoModal({
   onToggleMute,
   disappearingSeconds,
   onChangeDisappearing,
+  onExport,
   onClearChat,
 }: {
   open: boolean;
@@ -75,6 +76,7 @@ export function UserInfoModal({
   onToggleMute?: () => void;
   disappearingSeconds?: number | null;
   onChangeDisappearing?: (seconds: number) => void;
+  onExport?: () => void;
   onClearChat?: () => void;
 }) {
   const { t, lang } = useLanguage();
@@ -86,6 +88,7 @@ export function UserInfoModal({
   const [error, setError] = useState(false);
   const [disappearingOpen, setDisappearingOpen] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
+  const [confirmExport, setConfirmExport] = useState(false);
 
   useEffect(() => {
     if (!open || !userId) return;
@@ -339,6 +342,37 @@ export function UserInfoModal({
                 >
                   {t('userInfo.report')}
                 </button>
+              )}
+              {onExport && (
+                confirmExport ? (
+                  <div className="rounded-lg border border-slate-800 bg-slate-900 p-3">
+                    <p className="text-xs text-slate-300">{t('userInfo.exportChatConfirm')}</p>
+                    <div className="mt-2 flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setConfirmExport(false)}
+                        className="flex-1 rounded-lg border border-slate-800 bg-slate-900 px-3 py-1.5 text-xs text-slate-300 hover:bg-slate-800"
+                      >
+                        {t('common.cancel')}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { onExport(); onClose(); }}
+                        className="flex-1 rounded-lg toky-grad toky-ring-brand px-3 py-1.5 text-xs font-semibold text-white"
+                      >
+                        {t('userInfo.exportChatYes')}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setConfirmExport(true)}
+                    className="w-full rounded-lg border border-slate-800 bg-slate-900 px-4 py-2 text-sm text-slate-300 hover:bg-slate-800"
+                  >
+                    {t('userInfo.exportChat')}
+                  </button>
+                )
               )}
               {onClearChat && (
                 confirmClear ? (

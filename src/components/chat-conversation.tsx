@@ -42,7 +42,7 @@ import { VideoTrimmer, TrimmedVideo } from '@/components/video-trimmer';
 import { suggestReplies, translateText } from '@/lib/ai';
 import { avatarBg, initials } from '@/lib/ui/avatar';
 import { PhoneIcon, VideoIcon, PlusIcon, SmileIcon, MicIcon, PencilIcon, ReplyIcon, ForwardIcon, CopyIcon, DownloadIcon, EyeOffIcon, TrashIcon, PinIcon, FlagIcon, PaperclipIcon, SparklesIcon, GlobeIcon, SendIcon, CheckIcon, ExternalLinkIcon } from '@/components/icons';
-import { canNativeFiles, shareNativeFile } from '@/lib/native-files';
+import { canNativeFiles, shareNativeFile, saveNativeFile } from '@/lib/native-files';
 import { compressImage } from '@/lib/image-compress';
 import type { ChatSummary, MessageRow } from '@/lib/db/types';
 
@@ -693,6 +693,53 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
     } finally {
       setSuggestBusy(false);
     }
+  }
+
+  // Export the (decrypted) conversation to a plain-text file. The user confirms
+  // an "unencrypted" warning first (in the info sheet). Media becomes a bracketed
+  // marker; system messages are skipped.
+  async function handleExportChat() {
+    function marker(b: Payload): string {
+      if (b.is_deleted) return `[${t('export.deleted')}]`;
+      if (b.text) return b.text;
+      if (b.imagePath || (b.imagePaths && b.imagePaths.length)) return `[${t('export.image')}]`;
+      if (b.videoPath) return `[${t('export.video')}]`;
+      if (b.audioPath) return `[${t('export.audio')}]`;
+      if (b.gifUrl) return `[${t('export.gif')}]`;
+      if (b.filePath) return `[${t('export.file')}: ${b.fileName || ''}]`;
+      if (b.poll) return `[${t('export.poll')}: ${b.poll.question}]`;
+      return '';
+    }
+    const lines = items
+      .filter((m) => m.message_type !== 'system')
+      .map((m) => {
+        const d = new Date(m.created_at);
+        const stamp = `${d.toLocaleDateString(lang)} ${d.toLocaleTimeString(lang, { hour: '2-digit', minute: '2-digit' })}`;
+        const who = isMine(m) ? t('export.me') : senderName(m) || headerName;
+        return `[${stamp}] ${who}: ${marker(m.body)}`;
+      });
+    const text = `${t('export.header', { name: headerName })}\n\n${lines.join('\n')}\n`;
+    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+    const filename = `Toky - ${headerName}.txt`.replace(/[^\w.\- ]+/g, '_');
+    if (canNativeFiles()) {
+      try {
+        await saveNativeFile(blob, filename);
+        toast(t('chat.savedToDevice'));
+      } catch {
+        toast(t('chat.downloadFailed'));
+      }
+      return;
+    }
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => {
+      try { URL.revokeObjectURL(url); } catch {}
+    }, 4000);
   }
 
   async function onTranslate(messageId: string, text: string) {
@@ -2403,6 +2450,7 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
             onToggleMute={isPeer ? toggleMute : undefined}
             disappearingSeconds={isPeer ? chat?.disappearing_seconds : undefined}
             onChangeDisappearing={isPeer ? chooseDisappearing : undefined}
+            onExport={isPeer ? handleExportChat : undefined}
             onClearChat={isPeer ? async () => { try { await clearChatForMe(chatId); clearMessages(); } catch {} } : undefined}
           />
         );
@@ -2432,6 +2480,7 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
           onMembersChanged={() => setMembersReloadKey((k) => k + 1)}
           onMemberClick={(id) => { setGroupInfoOpen(false); setUserInfoId(id); }}
           onMedia={() => { setGroupInfoOpen(false); setMediaGalleryOpen(true); }}
+          onExport={handleExportChat}
           onClearChat={async () => { try { await clearChatForMe(chatId); clearMessages(); } catch {} }}
           onLeft={() => {
             setGroupInfoOpen(false);
