@@ -358,6 +358,7 @@ const es: Dictionary = {
     message: 'Mensaje',
     audioCall: 'Llamar',
     videoCall: 'Video',
+    media: 'Archivos, enlaces y docs',
     memberSince: 'Miembro desde {{when}}',
     safetyNumber: 'Número de seguridad',
     safetyNumberDesc: 'Verifica que coincida con el de tu contacto para confirmar el cifrado de extremo a extremo.',
@@ -366,6 +367,13 @@ const es: Dictionary = {
     report: 'Reportar',
     blockedNotice: 'Has bloqueado a este usuario.',
     loadError: 'No se pudo cargar la información.',
+  },
+  gallery: {
+    title: 'Archivos, enlaces y docs',
+    media: 'Multimedia',
+    docs: 'Documentos',
+    links: 'Enlaces',
+    empty: 'Nada aquí todavía.',
   },
   reportModal: {
     title: 'Reportar',

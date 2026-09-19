@@ -356,6 +356,7 @@ const en = {
     message: 'Message',
     audioCall: 'Call',
     videoCall: 'Video',
+    media: 'Files, links & docs',
     memberSince: 'Member since {{when}}',
     safetyNumber: 'Safety number',
     safetyNumberDesc: 'Check it matches your contact’s to confirm the end-to-end encryption.',
@@ -364,6 +365,13 @@ const en = {
     report: 'Report',
     blockedNotice: 'You have blocked this user.',
     loadError: 'Couldn’t load the info.',
+  },
+  gallery: {
+    title: 'Files, links & docs',
+    media: 'Media',
+    docs: 'Docs',
+    links: 'Links',
+    empty: 'Nothing here yet.',
   },
   reportModal: {
     title: 'Report',

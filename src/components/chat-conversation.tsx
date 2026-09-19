@@ -12,6 +12,7 @@ import { CameraCapture } from '@/components/camera-capture';
 import { ReportModal } from '@/components/report-modal';
 import { GroupInfoModal } from '@/components/group-info-modal';
 import { UserInfoModal } from '@/components/user-info-modal';
+import { ChatMediaGallery } from '@/components/chat-media-gallery';
 import { getWallpaperId, wallpaperCss, getCustomWallpaperUrl, CUSTOM_WALLPAPER_ID } from '@/lib/wallpaper';
 import { blockUser, unblockUser, isBlockedByMe } from '@/lib/db/safety';
 import { EmojiPicker } from '@/components/emoji-picker';
@@ -235,6 +236,7 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
   // Contact-info sheet: the user id whose info to show (peer in a 1:1, or a
   // tapped group member). Null = closed.
   const [userInfoId, setUserInfoId] = useState<string | null>(null);
+  const [mediaGalleryOpen, setMediaGalleryOpen] = useState(false);
   const [blocked, setBlocked] = useState(false);
   const [blockBusy, setBlockBusy] = useState(false);
   const [muted, setMuted] = useState(false);
@@ -2396,6 +2398,7 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
             onReport={isPeer ? () => { setReportMessageId(null); setReportOpen(true); } : undefined}
             onSearch={isPeer ? () => setSearchOpen(true) : undefined}
             onStarred={isPeer ? () => setStarredOpen(true) : undefined}
+            onMedia={isPeer ? () => setMediaGalleryOpen(true) : undefined}
             muted={isPeer ? muted : undefined}
             onToggleMute={isPeer ? toggleMute : undefined}
             disappearingSeconds={isPeer ? chat?.disappearing_seconds : undefined}
@@ -2403,6 +2406,15 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
           />
         );
       })()}
+
+      <ChatMediaGallery
+        open={mediaGalleryOpen}
+        onClose={() => setMediaGalleryOpen(false)}
+        messages={items}
+        resolveUrl={(p) => signedUrls[p]}
+        onOpenImage={(url) => setLightboxUrl(url)}
+        onOpenDoc={(body) => setDocPreview(body)}
+      />
 
       {isGroup && (
         <GroupInfoModal
@@ -2418,6 +2430,7 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
           onUpdated={(patch) => setChat((prev) => (prev ? { ...prev, ...patch } : prev))}
           onMembersChanged={() => setMembersReloadKey((k) => k + 1)}
           onMemberClick={(id) => { setGroupInfoOpen(false); setUserInfoId(id); }}
+          onMedia={() => { setGroupInfoOpen(false); setMediaGalleryOpen(true); }}
           onLeft={() => {
             setGroupInfoOpen(false);
             window.location.href = '/chats';

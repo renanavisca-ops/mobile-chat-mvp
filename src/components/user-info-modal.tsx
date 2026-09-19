@@ -53,6 +53,7 @@ export function UserInfoModal({
   onReport,
   onSearch,
   onStarred,
+  onMedia,
   muted,
   onToggleMute,
   disappearingSeconds,
@@ -68,6 +69,7 @@ export function UserInfoModal({
   // Chat-level options (only for the current 1:1 chat's peer) — WhatsApp-style.
   onSearch?: () => void;
   onStarred?: () => void;
+  onMedia?: () => void;
   muted?: boolean;
   onToggleMute?: () => void;
   disappearingSeconds?: number | null;
@@ -209,13 +211,27 @@ export function UserInfoModal({
             )}
 
             {/* Chat options (only for the current 1:1 chat's peer) */}
-            {(onSearch || onStarred || onToggleMute || onChangeDisappearing) && (
+            {(onMedia || onSearch || onStarred || onToggleMute || onChangeDisappearing) && (
               <div className="mt-5 overflow-hidden rounded-lg border border-slate-900 bg-slate-950/60">
+                {onMedia && (
+                  <button
+                    type="button"
+                    onClick={() => { onMedia(); onClose(); }}
+                    className="flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm text-slate-200 hover:bg-slate-900"
+                  >
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <rect x="3" y="3" width="18" height="18" rx="2" />
+                      <circle cx="9" cy="9" r="2" />
+                      <path d="m21 15-3.5-3.5a2 2 0 0 0-3 0L5 21" />
+                    </svg>
+                    {t('userInfo.media')}
+                  </button>
+                )}
                 {onSearch && (
                   <button
                     type="button"
                     onClick={() => { onSearch(); onClose(); }}
-                    className="flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm text-slate-200 hover:bg-slate-900"
+                    className="flex w-full items-center gap-3 border-t border-slate-900 px-3 py-2.5 text-left text-sm text-slate-200 hover:bg-slate-900 first:border-t-0"
                   >
                     <SearchIcon size={18} /> {t('chat.searchInChat')}
                   </button>
