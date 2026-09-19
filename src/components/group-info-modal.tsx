@@ -29,6 +29,7 @@ export function GroupInfoModal({
   onLeft,
   onMemberClick,
   onMedia,
+  onExport,
   onClearChat,
 }: {
   open: boolean;
@@ -47,6 +48,8 @@ export function GroupInfoModal({
   onMemberClick?: (userId: string) => void;
   /** Open the shared media / docs / links gallery for this chat. */
   onMedia?: () => void;
+  /** Export the conversation to a plain-text file. */
+  onExport?: () => void;
   /** "Vaciar chat": hide this conversation for me. */
   onClearChat?: () => void;
 }) {
@@ -72,6 +75,7 @@ export function GroupInfoModal({
   const [leaving, setLeaving] = useState(false);
   const [confirmLeave, setConfirmLeave] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
+  const [confirmExport, setConfirmExport] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -390,6 +394,40 @@ export function GroupInfoModal({
                   </li>
                 ))}
               </ul>
+            )}
+          </div>
+        )}
+
+        {onExport && (
+          <div className="mt-4">
+            {confirmExport ? (
+              <div className="rounded-lg border border-slate-800 bg-slate-900 p-3">
+                <p className="text-xs text-slate-300">{t('userInfo.exportChatConfirm')}</p>
+                <div className="mt-2 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setConfirmExport(false)}
+                    className="flex-1 rounded-lg border border-slate-800 bg-slate-900 px-3 py-1.5 text-xs text-slate-300 hover:bg-slate-800"
+                  >
+                    {t('common.cancel')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { onExport(); onClose(); }}
+                    className="flex-1 rounded-lg toky-grad toky-ring-brand px-3 py-1.5 text-xs font-semibold text-white"
+                  >
+                    {t('userInfo.exportChatYes')}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setConfirmExport(true)}
+                className="w-full rounded-lg border border-slate-800 bg-slate-900 px-4 py-2 text-sm text-slate-300 hover:bg-slate-800"
+              >
+                {t('userInfo.exportChat')}
+              </button>
             )}
           </div>
         )}
