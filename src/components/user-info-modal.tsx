@@ -6,7 +6,14 @@ import { browserSupabase } from '@/lib/supabase/client';
 import { peerFingerprint } from '@/lib/crypto/keystore';
 import { blockUser, unblockUser, isBlockedByMe } from '@/lib/db/safety';
 import { avatarBg, initials } from '@/lib/ui/avatar';
-import { PhoneIcon, VideoIcon, ChatBubbleIcon, XIcon } from '@/components/icons';
+import { PhoneIcon, VideoIcon, ChatBubbleIcon, XIcon, SearchIcon } from '@/components/icons';
+
+const DISAPPEARING_OPTIONS: { seconds: number; labelKey: string }[] = [
+  { seconds: 0, labelKey: 'chat.disappearingOff' },
+  { seconds: 86400, labelKey: 'chat.disappearing24h' },
+  { seconds: 604800, labelKey: 'chat.disappearing7d' },
+  { seconds: 2592000, labelKey: 'chat.disappearing30d' },
+];
 
 type Profile = {
   id: string;
@@ -44,6 +51,12 @@ export function UserInfoModal({
   onAudioCall,
   onVideoCall,
   onReport,
+  onSearch,
+  onStarred,
+  muted,
+  onToggleMute,
+  disappearingSeconds,
+  onChangeDisappearing,
 }: {
   open: boolean;
   onClose: () => void;
@@ -52,6 +65,13 @@ export function UserInfoModal({
   onAudioCall?: () => void;
   onVideoCall?: () => void;
   onReport?: () => void;
+  // Chat-level options (only for the current 1:1 chat's peer) — WhatsApp-style.
+  onSearch?: () => void;
+  onStarred?: () => void;
+  muted?: boolean;
+  onToggleMute?: () => void;
+  disappearingSeconds?: number | null;
+  onChangeDisappearing?: (seconds: number) => void;
 }) {
   const { t, lang } = useLanguage();
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -60,6 +80,7 @@ export function UserInfoModal({
   const [blockBusy, setBlockBusy] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
+  const [disappearingOpen, setDisappearingOpen] = useState(false);
 
   useEffect(() => {
     if (!open || !userId) return;
@@ -183,6 +204,80 @@ export function UserInfoModal({
                 )}
                 {onVideoCall && (
                   <ActionCircle label={t('userInfo.videoCall')} icon={<VideoIcon size={22} />} onClick={() => { onVideoCall(); onClose(); }} />
+                )}
+              </div>
+            )}
+
+            {/* Chat options (only for the current 1:1 chat's peer) */}
+            {(onSearch || onStarred || onToggleMute || onChangeDisappearing) && (
+              <div className="mt-5 overflow-hidden rounded-lg border border-slate-900 bg-slate-950/60">
+                {onSearch && (
+                  <button
+                    type="button"
+                    onClick={() => { onSearch(); onClose(); }}
+                    className="flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm text-slate-200 hover:bg-slate-900"
+                  >
+                    <SearchIcon size={18} /> {t('chat.searchInChat')}
+                  </button>
+                )}
+                {onStarred && (
+                  <button
+                    type="button"
+                    onClick={() => { onStarred(); onClose(); }}
+                    className="flex w-full items-center gap-3 border-t border-slate-900 px-3 py-2.5 text-left text-sm text-slate-200 hover:bg-slate-900"
+                  >
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
+                      <path d="M12 2l2.9 6.26L22 9.27l-5 4.87L18.18 21 12 17.27 5.82 21 7 14.14l-5-4.87 7.1-1.01L12 2z" />
+                    </svg>
+                    {t('chat.starredTitle')}
+                  </button>
+                )}
+                {onToggleMute && (
+                  <div className="flex items-center justify-between border-t border-slate-900 px-3 py-2.5">
+                    <span className="text-sm text-slate-200">{muted ? t('common.unmute') : t('common.mute')}</span>
+                    <button
+                      type="button"
+                      onClick={onToggleMute}
+                      role="switch"
+                      aria-checked={!!muted}
+                      className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${muted ? 'bg-emerald-600' : 'bg-slate-700'}`}
+                    >
+                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${muted ? 'translate-x-6' : 'translate-x-1'}`} />
+                    </button>
+                  </div>
+                )}
+                {onChangeDisappearing && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setDisappearingOpen((v) => !v)}
+                      className="flex w-full items-center justify-between border-t border-slate-900 px-3 py-2.5 text-left text-sm text-slate-200 hover:bg-slate-900"
+                    >
+                      <span>{t('chat.disappearingMenu')}</span>
+                      <span className="text-xs text-slate-500">
+                        {t(
+                          (DISAPPEARING_OPTIONS.find((o) => o.seconds === (disappearingSeconds ?? 0)) ??
+                            DISAPPEARING_OPTIONS[0]).labelKey,
+                        )}
+                      </span>
+                    </button>
+                    {disappearingOpen && (
+                      <div className="border-t border-slate-900 bg-slate-950/80">
+                        {DISAPPEARING_OPTIONS.map((opt) => (
+                          <button
+                            key={opt.seconds}
+                            type="button"
+                            onClick={() => { onChangeDisappearing(opt.seconds); setDisappearingOpen(false); }}
+                            className={`block w-full px-4 py-1.5 text-left text-xs hover:bg-slate-900 ${
+                              (disappearingSeconds ?? 0) === opt.seconds ? 'text-blue-400' : 'text-slate-300'
+                            }`}
+                          >
+                            {t(opt.labelKey)}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             )}
