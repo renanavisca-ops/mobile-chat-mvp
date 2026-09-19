@@ -2394,6 +2394,12 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
             onAudioCall={isPeer ? () => startCall({ chatId, peerIds: [uid], label: headerName, video: false, isGroup: false }) : undefined}
             onVideoCall={isPeer ? () => startCall({ chatId, peerIds: [uid], label: headerName, video: true, isGroup: false }) : undefined}
             onReport={isPeer ? () => { setReportMessageId(null); setReportOpen(true); } : undefined}
+            onSearch={isPeer ? () => setSearchOpen(true) : undefined}
+            onStarred={isPeer ? () => setStarredOpen(true) : undefined}
+            muted={isPeer ? muted : undefined}
+            onToggleMute={isPeer ? toggleMute : undefined}
+            disappearingSeconds={isPeer ? chat?.disappearing_seconds : undefined}
+            onChangeDisappearing={isPeer ? chooseDisappearing : undefined}
           />
         );
       })()}
