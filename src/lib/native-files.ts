@@ -68,6 +68,37 @@ export async function shareNativeFile(blob: Blob, filename: string, dialogTitle?
 }
 
 /**
+ * Share plain text through the OS share sheet (native) or the Web Share API,
+ * falling back to copying it to the clipboard on the web. Returns what happened
+ * so the caller can show the right confirmation.
+ */
+export async function shareText(text: string): Promise<'shared' | 'copied' | 'failed'> {
+  if (Capacitor.isNativePlatform()) {
+    try {
+      await Share.share({ text });
+      return 'shared';
+    } catch {
+      return 'failed';
+    }
+  }
+  try {
+    if (typeof navigator !== 'undefined' && navigator.share) {
+      await navigator.share({ text });
+      return 'shared';
+    }
+  } catch {
+    // user cancelled the share sheet
+    return 'failed';
+  }
+  try {
+    await navigator.clipboard.writeText(text);
+    return 'copied';
+  } catch {
+    return 'failed';
+  }
+}
+
+/**
  * OPEN (view) the decrypted file in a real viewer app via the OS "open with"
  * action (Android ACTION_VIEW), NOT the share sheet — so tapping "Abrir" opens
  * the document (PDF viewer, Word, Excel…) instead of offering to send it.
