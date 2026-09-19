@@ -367,6 +367,9 @@ const es: Dictionary = {
     report: 'Reportar',
     blockedNotice: 'Has bloqueado a este usuario.',
     loadError: 'No se pudo cargar la información.',
+    clearChat: 'Vaciar chat',
+    clearChatConfirm: '¿Vaciar esta conversación? Se ocultará para ti; los demás la conservan.',
+    clearChatYes: 'Vaciar',
   },
   gallery: {
     title: 'Archivos, enlaces y docs',

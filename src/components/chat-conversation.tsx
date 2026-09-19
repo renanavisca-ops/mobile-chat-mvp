@@ -17,7 +17,7 @@ import { getWallpaperId, wallpaperCss, getCustomWallpaperUrl, CUSTOM_WALLPAPER_I
 import { blockUser, unblockUser, isBlockedByMe } from '@/lib/db/safety';
 import { EmojiPicker } from '@/components/emoji-picker';
 import { useRequireAuth } from '@/lib/auth/use-require-auth';
-import { listChats, sendMessage, deleteMessage, hideMessageForMe, editMessage, pinMessage, unpinMessage, searchMessages, setChatMuted, getChatMuted, toggleReaction, createPoll, votePoll, setDisappearingMessages, enableChatEncryption, chatMustEncrypt, EncryptionRequiredError } from '@/lib/db/chats';
+import { listChats, sendMessage, deleteMessage, hideMessageForMe, editMessage, pinMessage, unpinMessage, searchMessages, setChatMuted, getChatMuted, toggleReaction, createPoll, votePoll, setDisappearingMessages, enableChatEncryption, chatMustEncrypt, clearChatForMe, EncryptionRequiredError } from '@/lib/db/chats';
 import { initKeystore, isUnlocked } from '@/lib/crypto/keystore';
 import { uploadChatImage, uploadChatMedia, uploadChatAudio, uploadChatFile, createSignedChatMediaUrl, uploadEncryptedChatMedia, fetchDecryptedMediaUrl } from '@/lib/storage/upload';
 import { decryptMedia, type MediaEnc } from '@/lib/crypto/media';
@@ -142,7 +142,7 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
 
   const supabase = browserSupabase();
   const { startCall, busy: callBusy } = useCall();
-  const { messages, loading: msgLoading, appendLocal, loadMore, hasMore, loadingMore, typingUsers, setMeTyping, reactions, pollVotes, hiddenIds } = useChatRealtime(chatId);
+  const { messages, loading: msgLoading, appendLocal, clearMessages, loadMore, hasMore, loadingMore, typingUsers, setMeTyping, reactions, pollVotes, hiddenIds } = useChatRealtime(chatId);
 
   // chat details
   const [chat, setChat] = useState<ChatSummary | null>(null);
@@ -2403,6 +2403,7 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
             onToggleMute={isPeer ? toggleMute : undefined}
             disappearingSeconds={isPeer ? chat?.disappearing_seconds : undefined}
             onChangeDisappearing={isPeer ? chooseDisappearing : undefined}
+            onClearChat={isPeer ? async () => { try { await clearChatForMe(chatId); clearMessages(); } catch {} } : undefined}
           />
         );
       })()}
@@ -2431,6 +2432,7 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
           onMembersChanged={() => setMembersReloadKey((k) => k + 1)}
           onMemberClick={(id) => { setGroupInfoOpen(false); setUserInfoId(id); }}
           onMedia={() => { setGroupInfoOpen(false); setMediaGalleryOpen(true); }}
+          onClearChat={async () => { try { await clearChatForMe(chatId); clearMessages(); } catch {} }}
           onLeft={() => {
             setGroupInfoOpen(false);
             window.location.href = '/chats';

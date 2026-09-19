@@ -36,6 +36,7 @@ export type Database = {
         Row: {
           archived: boolean
           chat_id: string
+          cleared_at: string | null
           joined_at: string
           muted: boolean
           user_id: string
@@ -43,6 +44,7 @@ export type Database = {
         Insert: {
           archived?: boolean
           chat_id: string
+          cleared_at?: string | null
           joined_at?: string
           muted?: boolean
           user_id: string
@@ -50,6 +52,7 @@ export type Database = {
         Update: {
           archived?: boolean
           chat_id?: string
+          cleared_at?: string | null
           joined_at?: string
           muted?: boolean
           user_id?: string
@@ -941,6 +944,10 @@ export type Database = {
       }
       set_chat_archived: {
         Args: { p_chat_id: string; p_archived: boolean }
+        Returns: undefined
+      }
+      clear_chat: {
+        Args: { p_chat_id: string }
         Returns: undefined
       }
       set_chat_muted: {

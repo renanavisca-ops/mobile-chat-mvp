@@ -365,6 +365,9 @@ const en = {
     report: 'Report',
     blockedNotice: 'You have blocked this user.',
     loadError: 'Couldn’t load the info.',
+    clearChat: 'Clear chat',
+    clearChatConfirm: 'Clear this conversation? It will be hidden for you; others keep it.',
+    clearChatYes: 'Clear',
   },
   gallery: {
     title: 'Files, links & docs',

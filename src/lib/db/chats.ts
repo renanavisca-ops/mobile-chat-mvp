@@ -368,6 +368,29 @@ export async function joinChannel(chatId: string): Promise<void> {
   if (error && !String(error.message).includes('duplicate')) throw error;
 }
 
+/** When the current user "cleared" this chat, only messages after this instant
+ *  are shown to them. Null when they never cleared it. */
+export async function myChatClearedAt(chatId: string): Promise<string | null> {
+  const supabase = browserSupabase();
+  const { data: me } = await supabase.auth.getUser();
+  if (!me.user) return null;
+  const { data } = await supabase
+    .from('chat_members')
+    .select('cleared_at')
+    .eq('chat_id', chatId)
+    .eq('user_id', me.user.id)
+    .maybeSingle();
+  return data?.cleared_at ?? null;
+}
+
+/** "Vaciar chat": hide the whole conversation for me from here on (server-side,
+ *  permanent, per-member). Other members are unaffected. */
+export async function clearChatForMe(chatId: string): Promise<void> {
+  const supabase = browserSupabase();
+  const { error } = await supabase.rpc('clear_chat', { p_chat_id: chatId });
+  if (error) throw error;
+}
+
 export async function listMessages(
   chatId: string,
   limit = 50,
@@ -375,12 +398,16 @@ export async function listMessages(
 ): Promise<MessageRow[]> {
   const supabase = browserSupabase();
 
-  const { data, error } = await supabase
+  const clearedAt = await myChatClearedAt(chatId);
+  let query = supabase
     .from('messages')
     .select(
       'id, chat_id, sender_device_id, ciphertext, nonce, message_type, created_at, read, content, sender_type, sender_id, delivery_status, edited_at, expires_at'
     )
-    .eq('chat_id', chatId)
+    .eq('chat_id', chatId);
+  if (clearedAt) query = query.gt('created_at', clearedAt);
+
+  const { data, error } = await query
     .order('created_at', { ascending: false })
     .range(offset, offset + limit - 1);
 
@@ -399,13 +426,16 @@ export async function listMessages(
  */
 export async function listMessagesSince(chatId: string, sinceIso: string): Promise<MessageRow[]> {
   const supabase = browserSupabase();
+  const clearedAt = await myChatClearedAt(chatId);
+  // Catch up only after both the cache high-water mark AND any "cleared" instant.
+  const since = clearedAt && clearedAt > sinceIso ? clearedAt : sinceIso;
   const { data, error } = await supabase
     .from('messages')
     .select(
       'id, chat_id, sender_device_id, ciphertext, nonce, message_type, created_at, read, content, sender_type, sender_id, delivery_status, edited_at, expires_at'
     )
     .eq('chat_id', chatId)
-    .gt('created_at', sinceIso)
+    .gt('created_at', since)
     .order('created_at', { ascending: true })
     .limit(200);
   if (error) throw error;
