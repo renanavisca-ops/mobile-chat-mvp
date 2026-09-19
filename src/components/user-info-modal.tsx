@@ -7,6 +7,7 @@ import { browserSupabase } from '@/lib/supabase/client';
 import { peerFingerprint } from '@/lib/crypto/keystore';
 import { blockUser, unblockUser, isBlockedByMe } from '@/lib/db/safety';
 import { shareText } from '@/lib/native-files';
+import { listBroadcastLists, saveBroadcastList, createBroadcastList, type BroadcastList } from '@/lib/broadcast-lists';
 import { avatarBg, initials } from '@/lib/ui/avatar';
 import { PhoneIcon, VideoIcon, ChatBubbleIcon, XIcon, SearchIcon } from '@/components/icons';
 
@@ -92,6 +93,9 @@ export function UserInfoModal({
   const [disappearingOpen, setDisappearingOpen] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [confirmClear, setConfirmClear] = useState(false);
+  const [myId, setMyId] = useState<string | null>(null);
+  const [lists, setLists] = useState<BroadcastList[]>([]);
+  const [listPanelOpen, setListPanelOpen] = useState(false);
   const [confirmExport, setConfirmExport] = useState(false);
 
   useEffect(() => {
@@ -123,6 +127,12 @@ export function UserInfoModal({
       // These are best-effort; failures shouldn't block the info sheet.
       isBlockedByMe(userId).then((b) => !cancelled && setBlocked(b)).catch(() => {});
       peerFingerprint(userId).then((f) => !cancelled && setFingerprint(f)).catch(() => {});
+      browserSupabase().auth.getUser().then(({ data }) => {
+        if (cancelled) return;
+        const uid = data.user?.id ?? null;
+        setMyId(uid);
+        if (uid) setLists(listBroadcastLists(uid));
+      }).catch(() => {});
     })();
     return () => {
       cancelled = true;
@@ -342,6 +352,54 @@ export function UserInfoModal({
                 </svg>
                 {t('userInfo.shareContact')}
               </button>
+              <button
+                type="button"
+                onClick={() => setListPanelOpen((v) => !v)}
+                className="flex w-full items-center gap-3 border-t border-slate-900 px-3 py-2.5 text-left text-sm text-slate-200 hover:bg-slate-900"
+              >
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M3 12h.01M3 6h.01M3 18h.01M8 6h13M8 12h13M8 18h13" />
+                </svg>
+                {t('userInfo.addToList')}
+              </button>
+              {listPanelOpen && (
+                <div className="border-t border-slate-900 bg-slate-950/80 px-3 py-2">
+                  {lists.length === 0 && (
+                    <p className="px-1 py-1 text-xs text-slate-500">{t('userInfo.noLists')}</p>
+                  )}
+                  {lists.map((l) => (
+                    <button
+                      key={l.id}
+                      type="button"
+                      onClick={() => {
+                        if (!myId) return;
+                        const already = l.members.some((m) => m.id === userId);
+                        const members = already ? l.members : [...l.members, { id: userId, username: profile?.username ?? null }];
+                        saveBroadcastList(myId, { ...l, members });
+                        setLists(listBroadcastLists(myId));
+                        setNotice(t('userInfo.addedToList', { name: l.name }));
+                        setListPanelOpen(false);
+                      }}
+                      className="block w-full truncate rounded px-2 py-1.5 text-left text-sm text-slate-200 hover:bg-slate-900"
+                    >
+                      {l.name} <span className="text-xs text-slate-500">({l.members.length})</span>
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!myId) return;
+                      createBroadcastList(myId, name, [{ id: userId, username: profile?.username ?? null }]);
+                      setLists(listBroadcastLists(myId));
+                      setNotice(t('userInfo.addedToList', { name }));
+                      setListPanelOpen(false);
+                    }}
+                    className="mt-1 block w-full rounded px-2 py-1.5 text-left text-sm text-blue-400 hover:bg-slate-900"
+                  >
+                    {t('userInfo.newListWith')}
+                  </button>
+                </div>
+              )}
             </div>
 
             {notice && <p className="mt-2 text-center text-xs text-emerald-400">{notice}</p>}
