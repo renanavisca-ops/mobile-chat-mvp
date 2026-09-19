@@ -27,6 +27,7 @@ export function GroupInfoModal({
   onUpdated,
   onMembersChanged,
   onLeft,
+  onMemberClick,
 }: {
   open: boolean;
   onClose: () => void;
@@ -40,6 +41,8 @@ export function GroupInfoModal({
   onUpdated: (patch: { title?: string; description?: string; avatar_url?: string; disappearing_seconds?: number | null }) => void;
   onMembersChanged: () => void;
   onLeft: () => void;
+  /** Open a member's contact-info sheet (tap their name). */
+  onMemberClick?: (userId: string) => void;
 }) {
   const t = useT();
   const [name, setName] = useState(title ?? '');
@@ -317,7 +320,13 @@ export function GroupInfoModal({
           <ul className="mt-2 max-h-40 space-y-1 overflow-auto">
             {members.map((m) => (
               <li key={m.id} className="flex items-center justify-between rounded-lg px-2 py-1.5 text-sm text-slate-200 hover:bg-slate-900">
-                <span>{m.username ?? m.id.slice(0, 8)}</span>
+                {onMemberClick ? (
+                  <button type="button" onClick={() => onMemberClick(m.id)} className="flex-1 truncate text-left hover:text-white">
+                    {m.username ?? m.id.slice(0, 8)}
+                  </button>
+                ) : (
+                  <span>{m.username ?? m.id.slice(0, 8)}</span>
+                )}
                 {isCreator && (
                   <button
                     type="button"
