@@ -25,6 +25,27 @@ export default function NewGroupPage() {
 
   const canSearch = useMemo(() => q.trim().length >= 2, [q]);
 
+  // Preselect a member when arriving from "Crear grupo con este contacto"
+  // (/groups/new?with=<id>&u=<username>). Read from the URL directly to avoid
+  // the useSearchParams Suspense requirement in the static export.
+  useEffect(() => {
+    try {
+      const sp = new URLSearchParams(window.location.search);
+      const withId = sp.get('with');
+      if (withId) {
+        const u = sp.get('u');
+        setSelected((prev) => {
+          if (prev.has(withId)) return prev;
+          const copy = new Map(prev);
+          copy.set(withId, u || null);
+          return copy;
+        });
+      }
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
   // Load contacts as convenient quick-picks (optional — search covers everyone).
   useEffect(() => {
     if (authLoading) return;

@@ -1,10 +1,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useLanguage } from '@/lib/i18n/context';
 import { browserSupabase } from '@/lib/supabase/client';
 import { peerFingerprint } from '@/lib/crypto/keystore';
 import { blockUser, unblockUser, isBlockedByMe } from '@/lib/db/safety';
+import { shareText } from '@/lib/native-files';
 import { avatarBg, initials } from '@/lib/ui/avatar';
 import { PhoneIcon, VideoIcon, ChatBubbleIcon, XIcon, SearchIcon } from '@/components/icons';
 
@@ -80,6 +82,7 @@ export function UserInfoModal({
   onClearChat?: () => void;
 }) {
   const { t, lang } = useLanguage();
+  const router = useRouter();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [fingerprint, setFingerprint] = useState<string | null>(null);
   const [blocked, setBlocked] = useState(false);
@@ -87,6 +90,7 @@ export function UserInfoModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
   const [disappearingOpen, setDisappearingOpen] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
   const [confirmClear, setConfirmClear] = useState(false);
   const [confirmExport, setConfirmExport] = useState(false);
 
@@ -304,9 +308,47 @@ export function UserInfoModal({
               </div>
             )}
 
+            {/* More actions (create group with, share contact) */}
+            <div className="mt-5 overflow-hidden rounded-lg border border-slate-900 bg-slate-950/60">
+              <button
+                type="button"
+                onClick={() => {
+                  router.push(`/groups/new?with=${encodeURIComponent(userId)}&u=${encodeURIComponent(profile?.username ?? '')}`);
+                  onClose();
+                }}
+                className="flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm text-slate-200 hover:bg-slate-900"
+              >
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                  <circle cx="9" cy="7" r="4" />
+                  <path d="M19 8v6M22 11h-6" />
+                </svg>
+                {t('userInfo.createGroup')}
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  const label = profile?.username ? `${name} · @${profile.username}` : name;
+                  const r = await shareText(label);
+                  if (r === 'copied') setNotice(t('userInfo.contactShared'));
+                }}
+                className="flex w-full items-center gap-3 border-t border-slate-900 px-3 py-2.5 text-left text-sm text-slate-200 hover:bg-slate-900"
+              >
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <circle cx="18" cy="5" r="3" />
+                  <circle cx="6" cy="12" r="3" />
+                  <circle cx="18" cy="19" r="3" />
+                  <path d="m8.6 13.5 6.8 4M15.4 6.5 8.6 10.5" />
+                </svg>
+                {t('userInfo.shareContact')}
+              </button>
+            </div>
+
+            {notice && <p className="mt-2 text-center text-xs text-emerald-400">{notice}</p>}
+
             {/* Member since */}
             {profile?.created_at && (
-              <div className="mt-5 rounded-lg border border-slate-900 bg-slate-950/60 p-3 text-sm text-slate-300">
+              <div className="mt-3 rounded-lg border border-slate-900 bg-slate-950/60 p-3 text-sm text-slate-300">
                 {t('userInfo.memberSince', { when: formatSince(profile.created_at, lang) })}
               </div>
             )}
