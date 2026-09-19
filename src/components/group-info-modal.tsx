@@ -28,6 +28,7 @@ export function GroupInfoModal({
   onMembersChanged,
   onLeft,
   onMemberClick,
+  onMedia,
 }: {
   open: boolean;
   onClose: () => void;
@@ -43,6 +44,8 @@ export function GroupInfoModal({
   onLeft: () => void;
   /** Open a member's contact-info sheet (tap their name). */
   onMemberClick?: (userId: string) => void;
+  /** Open the shared media / docs / links gallery for this chat. */
+  onMedia?: () => void;
 }) {
   const t = useT();
   const [name, setName] = useState(title ?? '');
@@ -271,6 +274,21 @@ export function GroupInfoModal({
           </button>
         ) : (
           <p className="mt-1 ml-1 text-xs text-slate-500">{t('groupInfo.onlyCreatorCanEdit')}</p>
+        )}
+
+        {onMedia && (
+          <button
+            type="button"
+            onClick={onMedia}
+            className="mt-4 flex w-full items-center gap-3 rounded-lg border border-slate-900 bg-slate-950/60 px-3 py-2.5 text-left text-sm text-slate-200 hover:bg-slate-900"
+          >
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <rect x="3" y="3" width="18" height="18" rx="2" />
+              <circle cx="9" cy="9" r="2" />
+              <path d="m21 15-3.5-3.5a2 2 0 0 0-3 0L5 21" />
+            </svg>
+            {t('gallery.title')}
+          </button>
         )}
 
         <div className="mt-4 flex items-center justify-between rounded-lg border border-slate-900 bg-slate-950/60 p-3">
