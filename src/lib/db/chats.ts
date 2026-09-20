@@ -620,6 +620,20 @@ export async function setChatMuted(chatId: string, muted: boolean) {
   if (error) throw error;
 }
 
+/**
+ * Mute for a duration. `until` = when the mute expires (null = forever);
+ * pass muted=false to unmute. Uses the set_chat_mute RPC (SECURITY DEFINER).
+ */
+export async function setChatMuteUntil(chatId: string, until: Date | null, muted = true) {
+  const supabase = browserSupabase();
+  const { error } = await supabase.rpc('set_chat_mute', {
+    p_chat_id: chatId,
+    p_muted: muted,
+    p_until: muted && until ? until.toISOString() : null,
+  });
+  if (error) throw error;
+}
+
 export async function getChatMuted(chatId: string): Promise<boolean> {
   const supabase = browserSupabase();
   const { data: me } = await supabase.auth.getUser();
@@ -627,12 +641,15 @@ export async function getChatMuted(chatId: string): Promise<boolean> {
 
   const { data, error } = await supabase
     .from('chat_members')
-    .select('muted')
+    .select('muted, muted_until')
     .eq('chat_id', chatId)
     .eq('user_id', me.user.id)
     .maybeSingle();
   if (error) throw error;
-  return data?.muted ?? false;
+  if (!data?.muted) return false;
+  // A timed mute that has elapsed counts as unmuted.
+  if (data.muted_until && new Date(data.muted_until).getTime() <= Date.now()) return false;
+  return true;
 }
 
 /** Archive/unarchive a chat for yourself (hides it from the main list). */
