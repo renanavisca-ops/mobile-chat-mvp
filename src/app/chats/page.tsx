@@ -12,7 +12,7 @@ import { ChatListSkeleton } from '@/components/skeleton';
 import { useRequireAuth } from '@/lib/auth/use-require-auth';
 import { ensureIdentity } from '@/lib/crypto/keystore';
 import { browserSupabase } from '@/lib/supabase/client';
-import { listChats, markIncomingDelivered, setChatArchived } from '@/lib/db/chats';
+import { listChats, markIncomingDelivered, setChatArchived, getOrCreateSelfChat } from '@/lib/db/chats';
 import { getCached, setCached } from '@/lib/cache';
 import { tap, impact } from '@/lib/haptics';
 import { useIsOnline } from '@/components/presence-provider';
@@ -348,6 +348,24 @@ export default function ChatsPage() {
                       <Link href="/broadcast" onClick={() => setMenuOpen(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-200 hover:bg-slate-900">
                         <SpeakerIcon size={18} /> {t('broadcast.title')}
                       </Link>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          setMenuOpen(false);
+                          try {
+                            const id = await getOrCreateSelfChat(t('chatsList.selfNotes'));
+                            router.push(`/chats/view?c=${id}`);
+                          } catch {
+                            /* ignore */
+                          }
+                        }}
+                        className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-slate-200 hover:bg-slate-900"
+                      >
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+                        </svg>
+                        {t('chatsList.selfNotes')}
+                      </button>
                       <Link href="/channels" onClick={() => setMenuOpen(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-200 hover:bg-slate-900">
                         <HashIcon size={18} /> {t('nav.channels')}
                       </Link>
