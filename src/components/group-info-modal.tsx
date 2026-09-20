@@ -31,6 +31,8 @@ export function GroupInfoModal({
   onMedia,
   onExport,
   onClearChat,
+  autoSave,
+  onToggleAutoSave,
 }: {
   open: boolean;
   onClose: () => void;
@@ -52,6 +54,9 @@ export function GroupInfoModal({
   onExport?: () => void;
   /** "Vaciar chat": hide this conversation for me. */
   onClearChat?: () => void;
+  /** "Guardar en Fotos": auto-save incoming media (native only). */
+  autoSave?: boolean;
+  onToggleAutoSave?: () => void;
 }) {
   const t = useT();
   const [name, setName] = useState(title ?? '');
@@ -317,6 +322,21 @@ export function GroupInfoModal({
             <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${muted ? 'translate-x-6' : 'translate-x-1'}`} />
           </button>
         </div>
+
+        {onToggleAutoSave && (
+          <div className="mt-3 flex items-center justify-between rounded-lg border border-slate-900 bg-slate-950/60 p-3">
+            <div className="text-sm font-medium text-slate-200">{t('userInfo.autoSave')}</div>
+            <button
+              type="button"
+              onClick={onToggleAutoSave}
+              role="switch"
+              aria-checked={!!autoSave}
+              className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${autoSave ? 'bg-emerald-600' : 'bg-slate-700'}`}
+            >
+              <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${autoSave ? 'translate-x-6' : 'translate-x-1'}`} />
+            </button>
+          </div>
+        )}
 
         {isCreator && (
           <div className="mt-3 rounded-lg border border-slate-900 bg-slate-950/60 p-3">

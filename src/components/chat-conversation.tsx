@@ -42,7 +42,8 @@ import { VideoTrimmer, TrimmedVideo } from '@/components/video-trimmer';
 import { suggestReplies, translateText } from '@/lib/ai';
 import { avatarBg, initials } from '@/lib/ui/avatar';
 import { PhoneIcon, VideoIcon, PlusIcon, SmileIcon, MicIcon, PencilIcon, ReplyIcon, ForwardIcon, CopyIcon, DownloadIcon, EyeOffIcon, TrashIcon, PinIcon, FlagIcon, PaperclipIcon, SparklesIcon, GlobeIcon, SendIcon, CheckIcon, ExternalLinkIcon } from '@/components/icons';
-import { canNativeFiles, shareNativeFile, saveNativeFile } from '@/lib/native-files';
+import { canNativeFiles, shareNativeFile, saveNativeFile, saveMediaToGallery } from '@/lib/native-files';
+import { isAutoSaveOn, setAutoSaveOn, isMediaSaved, markMediaSaved } from '@/lib/media-autosave';
 import { compressImage } from '@/lib/image-compress';
 import type { ChatSummary, MessageRow } from '@/lib/db/types';
 
@@ -237,6 +238,7 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
   // tapped group member). Null = closed.
   const [userInfoId, setUserInfoId] = useState<string | null>(null);
   const [mediaGalleryOpen, setMediaGalleryOpen] = useState(false);
+  const [autoSaveMedia, setAutoSaveMedia] = useState(false);
   const [blocked, setBlocked] = useState(false);
   const [blockBusy, setBlockBusy] = useState(false);
   const [muted, setMuted] = useState(false);
@@ -598,6 +600,52 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
     () => messages.filter((m) => !hiddenIds.has(m.id)).map((m) => ({ ...m, body: getMessagePayload(m) })),
     [messages, hiddenIds]
   );
+
+  // "Guardar en Fotos": load the per-chat preference.
+  useEffect(() => {
+    setAutoSaveMedia(isAutoSaveOn(chatId));
+  }, [chatId]);
+
+  function toggleAutoSaveMedia() {
+    const next = !autoSaveMedia;
+    setAutoSaveMedia(next);
+    setAutoSaveOn(chatId, next);
+    // Seed the saved set with the current history so turning it on only
+    // auto-saves NEW incoming media, never the whole backlog.
+    if (next) markMediaSaved(chatId, items.map((m) => m.id));
+  }
+
+  // Auto-save incoming images/videos to the gallery when enabled (native only).
+  useEffect(() => {
+    if (!autoSaveMedia || !canNativeFiles()) return;
+    let cancelled = false;
+    (async () => {
+      for (const m of items) {
+        if (cancelled) return;
+        if (isMine(m) || m.body.is_deleted) continue;
+        if (isMediaSaved(chatId, m.id)) continue;
+        const paths = [
+          ...(m.body.imagePath ? [m.body.imagePath] : []),
+          ...(m.body.imagePaths ?? []),
+          ...(m.body.videoPath ? [m.body.videoPath] : []),
+        ].filter(Boolean) as string[];
+        if (paths.length === 0) continue;
+        try {
+          for (const p of paths) {
+            const blob = await fetchSourceBlob(p, m.body.enc?.[p]);
+            await saveMediaToGallery(blob, m.body.fileName || `toky-${m.id}`);
+          }
+          markMediaSaved(chatId, [m.id]);
+        } catch {
+          /* skip this one; try again on a later change */
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoSaveMedia, items, chatId]);
 
   // Human-friendly date label for the day separators between messages.
   function dayLabel(iso: string) {
@@ -2448,6 +2496,8 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
             onMedia={isPeer ? () => setMediaGalleryOpen(true) : undefined}
             muted={isPeer ? muted : undefined}
             onToggleMute={isPeer ? toggleMute : undefined}
+            autoSave={isPeer && canNativeFiles() ? autoSaveMedia : undefined}
+            onToggleAutoSave={isPeer && canNativeFiles() ? toggleAutoSaveMedia : undefined}
             disappearingSeconds={isPeer ? chat?.disappearing_seconds : undefined}
             onChangeDisappearing={isPeer ? chooseDisappearing : undefined}
             onExport={isPeer ? handleExportChat : undefined}
@@ -2482,6 +2532,8 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
           onMedia={() => { setGroupInfoOpen(false); setMediaGalleryOpen(true); }}
           onExport={handleExportChat}
           onClearChat={async () => { try { await clearChatForMe(chatId); clearMessages(); } catch {} }}
+          autoSave={canNativeFiles() ? autoSaveMedia : undefined}
+          onToggleAutoSave={canNativeFiles() ? toggleAutoSaveMedia : undefined}
           onLeft={() => {
             setGroupInfoOpen(false);
             window.location.href = '/chats';

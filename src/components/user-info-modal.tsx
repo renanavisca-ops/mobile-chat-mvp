@@ -59,6 +59,8 @@ export function UserInfoModal({
   onMedia,
   muted,
   onToggleMute,
+  autoSave,
+  onToggleAutoSave,
   disappearingSeconds,
   onChangeDisappearing,
   onExport,
@@ -77,6 +79,8 @@ export function UserInfoModal({
   onMedia?: () => void;
   muted?: boolean;
   onToggleMute?: () => void;
+  autoSave?: boolean;
+  onToggleAutoSave?: () => void;
   disappearingSeconds?: number | null;
   onChangeDisappearing?: (seconds: number) => void;
   onExport?: () => void;
@@ -231,7 +235,7 @@ export function UserInfoModal({
             )}
 
             {/* Chat options (only for the current 1:1 chat's peer) */}
-            {(onMedia || onSearch || onStarred || onToggleMute || onChangeDisappearing) && (
+            {(onMedia || onSearch || onStarred || onToggleMute || onToggleAutoSave || onChangeDisappearing) && (
               <div className="mt-5 overflow-hidden rounded-lg border border-slate-900 bg-slate-950/60">
                 {onMedia && (
                   <button
@@ -279,6 +283,20 @@ export function UserInfoModal({
                       className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${muted ? 'bg-emerald-600' : 'bg-slate-700'}`}
                     >
                       <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${muted ? 'translate-x-6' : 'translate-x-1'}`} />
+                    </button>
+                  </div>
+                )}
+                {onToggleAutoSave && (
+                  <div className="flex items-center justify-between border-t border-slate-900 px-3 py-2.5">
+                    <span className="text-sm text-slate-200">{t('userInfo.autoSave')}</span>
+                    <button
+                      type="button"
+                      onClick={onToggleAutoSave}
+                      role="switch"
+                      aria-checked={!!autoSave}
+                      className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${autoSave ? 'bg-emerald-600' : 'bg-slate-700'}`}
+                    >
+                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${autoSave ? 'translate-x-6' : 'translate-x-1'}`} />
                     </button>
                   </div>
                 )}
