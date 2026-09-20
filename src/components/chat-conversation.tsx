@@ -18,7 +18,7 @@ import { getWallpaperId, wallpaperCss, getCustomWallpaperUrl, CUSTOM_WALLPAPER_I
 import { blockUser, unblockUser, isBlockedByMe } from '@/lib/db/safety';
 import { EmojiPicker } from '@/components/emoji-picker';
 import { useRequireAuth } from '@/lib/auth/use-require-auth';
-import { listChats, sendMessage, deleteMessage, hideMessageForMe, editMessage, pinMessage, unpinMessage, searchMessages, setChatMuted, getChatMuted, setChatMuteUntil, toggleReaction, createPoll, votePoll, setDisappearingMessages, enableChatEncryption, chatMustEncrypt, clearChatForMe, EncryptionRequiredError } from '@/lib/db/chats';
+import { listChats, sendMessage, deleteMessage, hideMessageForMe, editMessage, pinMessage, unpinMessage, searchMessages, getChatMuted, setChatMuteUntil, toggleReaction, createPoll, votePoll, setDisappearingMessages, enableChatEncryption, chatMustEncrypt, clearChatForMe, EncryptionRequiredError } from '@/lib/db/chats';
 import { initKeystore, isUnlocked } from '@/lib/crypto/keystore';
 import { uploadChatImage, uploadChatMedia, uploadChatAudio, uploadChatFile, createSignedChatMediaUrl, uploadEncryptedChatMedia, fetchDecryptedMediaUrl } from '@/lib/storage/upload';
 import { decryptMedia, type MediaEnc } from '@/lib/crypto/media';
@@ -246,6 +246,7 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
   const [muted, setMuted] = useState(false);
   const [muteBusy, setMuteBusy] = useState(false);
   const [disappearingMenuOpen, setDisappearingMenuOpen] = useState(false);
+  const [muteMenuOpen, setMuteMenuOpen] = useState(false);
   const [disappearingBusy, setDisappearingBusy] = useState(false);
   const [encBusy, setEncBusy] = useState(false);
 
@@ -289,20 +290,6 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
     } finally {
       setDisappearingBusy(false);
       setDisappearingMenuOpen(false);
-      setSafetyMenuOpen(false);
-    }
-  }
-
-  async function toggleMute() {
-    const next = !muted;
-    setMuteBusy(true);
-    try {
-      await setChatMuted(chatId, next);
-      setMuted(next);
-    } catch (e: any) {
-      setErr(sendErrorMessage(e));
-    } finally {
-      setMuteBusy(false);
       setSafetyMenuOpen(false);
     }
   }
@@ -2163,16 +2150,35 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
                   </button>
                 )}
                 {otherUserId && <div className="my-1 border-t border-slate-800/70" />}
-                {otherUserId && (
+                {otherUserId && (<>
                 <button
                   type="button"
-                  onClick={toggleMute}
+                  onClick={() => (muted ? unmute() : setMuteMenuOpen((v) => !v))}
                   disabled={muteBusy}
                   className="block w-full px-3 py-2 text-left text-slate-200 hover:bg-slate-900 disabled:opacity-50"
                 >
-                  {muted ? t('common.unmute') : t('common.mute')}
+                  {muted ? t('userInfo.unmuteNotifs') : t('userInfo.mute')}
                 </button>
+                {!muted && muteMenuOpen && (
+                  <div className="border-t border-slate-900 bg-slate-950/60">
+                    {[
+                      { ms: 8 * 3600e3, key: 'mute8h' },
+                      { ms: 7 * 24 * 3600e3, key: 'mute1w' },
+                      { ms: null as number | null, key: 'muteForever' },
+                    ].map((opt) => (
+                      <button
+                        key={opt.key}
+                        type="button"
+                        onClick={() => { muteFor(opt.ms); setMuteMenuOpen(false); }}
+                        disabled={muteBusy}
+                        className="block w-full px-4 py-1.5 text-left text-xs text-slate-300 hover:bg-slate-900 disabled:opacity-50"
+                      >
+                        {t(`userInfo.${opt.key}`)}
+                      </button>
+                    ))}
+                  </div>
                 )}
+                </>)}
                 {otherUserId && (<>
                 <button
                   type="button"
