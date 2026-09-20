@@ -145,6 +145,7 @@ const es: Dictionary = {
   chatsList: {
     title: 'Chats',
     newChat: 'Nuevo chat',
+    selfNotes: 'Notas personales',
     searchPlaceholder: 'Buscar chats…',
     pickChat: 'Selecciona una conversación para empezar a chatear',
     loading: 'Cargando…',

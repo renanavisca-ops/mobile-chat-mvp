@@ -281,6 +281,39 @@ export async function createDirectChatWith(userId: string): Promise<string> {
   return chatId;
 }
 
+/**
+ * "Notas personales": a chat with only yourself. Reuses create_group_chat
+ * (which folds the creator in and dedupes, so passing [me] yields a solo chat),
+ * locks it end-to-end to your own key, and remembers its id on-device so tapping
+ * the entry again reopens the same chat instead of making duplicates.
+ */
+export async function getOrCreateSelfChat(title: string): Promise<string> {
+  const supabase = browserSupabase();
+  const { data: me } = await supabase.auth.getUser();
+  if (!me.user) throw new Error('Not authenticated');
+  const uid = me.user.id;
+  const key = `toky.selfChat.${uid}`;
+  try {
+    const saved = localStorage.getItem(key);
+    if (saved) return saved;
+  } catch {
+    /* ignore */
+  }
+  const chatId = await createGroupChat(title, [uid]);
+  // Encrypt notes to yourself (best effort; never block opening the chat).
+  try {
+    await ksLockChat(chatId, [uid]);
+  } catch {
+    /* ignore */
+  }
+  try {
+    localStorage.setItem(key, chatId);
+  } catch {
+    /* ignore */
+  }
+  return chatId;
+}
+
 export async function createGroupChat(title: string, memberIds: string[]): Promise<string> {
   const supabase = browserSupabase();
 

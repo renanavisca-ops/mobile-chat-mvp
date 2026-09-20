@@ -143,6 +143,7 @@ const en = {
   chatsList: {
     title: 'Chats',
     newChat: 'New chat',
+    selfNotes: 'My notes',
     searchPlaceholder: 'Search chats…',
     pickChat: 'Select a conversation to start chatting',
     loading: 'Loading…',
