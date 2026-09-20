@@ -403,6 +403,18 @@ const en = {
     links: 'Links',
     empty: 'Nothing here yet.',
   },
+  schedule: {
+    title: 'Schedule message',
+    messageLabel: 'Message',
+    messagePlaceholder: 'Type the message…',
+    timeLabel: 'Send date & time',
+    add: 'Schedule',
+    pending: 'Scheduled',
+    empty: 'No scheduled messages.',
+    cancel: 'Cancel',
+    pastError: 'Pick a future date and time.',
+    note: 'It sends at the set time while the app is open (or when you open it, if the time has passed).',
+  },
   reportModal: {
     title: 'Report',
     reasonHarassment: 'Harassment or bullying',

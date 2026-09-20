@@ -405,6 +405,18 @@ const es: Dictionary = {
     links: 'Enlaces',
     empty: 'Nada aquí todavía.',
   },
+  schedule: {
+    title: 'Programar mensaje',
+    messageLabel: 'Mensaje',
+    messagePlaceholder: 'Escribe el mensaje…',
+    timeLabel: 'Fecha y hora de envío',
+    add: 'Programar',
+    pending: 'Programados',
+    empty: 'No hay mensajes programados.',
+    cancel: 'Cancelar',
+    pastError: 'Elige una fecha y hora futuras.',
+    note: 'Se enviará a la hora indicada mientras la app esté abierta (o al abrirla, si ya pasó).',
+  },
   reportModal: {
     title: 'Reportar',
     reasonHarassment: 'Acoso u hostigamiento',

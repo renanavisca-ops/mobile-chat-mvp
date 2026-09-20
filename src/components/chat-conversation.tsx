@@ -8,6 +8,7 @@ import { ForwardModal } from '@/components/forward-modal';
 import { AudioMessage } from '@/components/audio-message';
 import { MessageActionsSheet } from '@/components/message-actions-sheet';
 import { AttachSheet } from '@/components/attach-sheet';
+import { ScheduleMessageModal } from '@/components/schedule-message-modal';
 import { CameraCapture } from '@/components/camera-capture';
 import { ReportModal } from '@/components/report-modal';
 import { GroupInfoModal } from '@/components/group-info-modal';
@@ -239,6 +240,7 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
   const [userInfoId, setUserInfoId] = useState<string | null>(null);
   const [mediaGalleryOpen, setMediaGalleryOpen] = useState(false);
   const [autoSaveMedia, setAutoSaveMedia] = useState(false);
+  const [scheduleOpen, setScheduleOpen] = useState(false);
   const [blocked, setBlocked] = useState(false);
   const [blockBusy, setBlockBusy] = useState(false);
   const [muted, setMuted] = useState(false);
@@ -2462,6 +2464,18 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
           setEmojiOpen(false);
           setGifPickerOpen(true);
         }}
+        onSchedule={() => {
+          setEmojiOpen(false);
+          setAttachOpen(false);
+          setScheduleOpen(true);
+        }}
+      />
+
+      <ScheduleMessageModal
+        open={scheduleOpen}
+        onClose={() => setScheduleOpen(false)}
+        chatId={chatId}
+        chatLabel={headerName}
       />
 
       <GifPicker open={gifPickerOpen} onClose={() => setGifPickerOpen(false)} onPick={onPickGif} />

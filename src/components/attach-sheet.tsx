@@ -14,8 +14,9 @@ export function AttachSheet(props: {
   onPickFile: () => void;
   onPoll: () => void;
   onGif: () => void;
+  onSchedule?: () => void;
 }) {
-  const { open, onClose, onPickPhotos, onPickVideo, onCameraPhoto, onCameraVideo, onPickFile, onPoll, onGif } = props;
+  const { open, onClose, onPickPhotos, onPickVideo, onCameraPhoto, onCameraVideo, onPickFile, onPoll, onGif, onSchedule } = props;
   const t = useT();
 
   useEffect(() => {
@@ -105,6 +106,18 @@ export function AttachSheet(props: {
           <Btn icon={<GifIcon size={18} />} label={t('attach.gif')} onClick={onGif} />
           <Btn icon={<BarChartIcon size={18} />} label={t('attach.poll')} onClick={onPoll} />
           <Btn icon={<PaperclipIcon size={18} />} label={t('attach.file')} onClick={onPickFile} />
+          {onSchedule && (
+            <Btn
+              icon={
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <circle cx="12" cy="12" r="9" />
+                  <path d="M12 7v5l3 2" />
+                </svg>
+              }
+              label={t('schedule.title')}
+              onClick={onSchedule}
+            />
+          )}
         </div>
 
         <button
