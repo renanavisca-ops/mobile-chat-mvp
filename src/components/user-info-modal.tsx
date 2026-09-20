@@ -59,6 +59,8 @@ export function UserInfoModal({
   onMedia,
   muted,
   onToggleMute,
+  onMuteFor,
+  onUnmute,
   autoSave,
   onToggleAutoSave,
   disappearingSeconds,
@@ -79,6 +81,9 @@ export function UserInfoModal({
   onMedia?: () => void;
   muted?: boolean;
   onToggleMute?: () => void;
+  /** Richer mute control: mute for a duration (ms; null = forever) / unmute. */
+  onMuteFor?: (durationMs: number | null) => void;
+  onUnmute?: () => void;
   autoSave?: boolean;
   onToggleAutoSave?: () => void;
   disappearingSeconds?: number | null;
@@ -95,6 +100,7 @@ export function UserInfoModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
   const [disappearingOpen, setDisappearingOpen] = useState(false);
+  const [muteMenuOpen, setMuteMenuOpen] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [confirmClear, setConfirmClear] = useState(false);
   const [myId, setMyId] = useState<string | null>(null);
@@ -235,7 +241,7 @@ export function UserInfoModal({
             )}
 
             {/* Chat options (only for the current 1:1 chat's peer) */}
-            {(onMedia || onSearch || onStarred || onToggleMute || onToggleAutoSave || onChangeDisappearing) && (
+            {(onMedia || onSearch || onStarred || onToggleMute || onMuteFor || onUnmute || onToggleAutoSave || onChangeDisappearing) && (
               <div className="mt-5 overflow-hidden rounded-lg border border-slate-900 bg-slate-950/60">
                 {onMedia && (
                   <button
@@ -272,7 +278,45 @@ export function UserInfoModal({
                     {t('chat.starredTitle')}
                   </button>
                 )}
-                {onToggleMute && (
+                {onMuteFor || onUnmute ? (
+                  muted ? (
+                    <button
+                      type="button"
+                      onClick={() => onUnmute?.()}
+                      className="flex w-full items-center gap-3 border-t border-slate-900 px-3 py-2.5 text-left text-sm text-slate-200 hover:bg-slate-900"
+                    >
+                      <MuteGlyph off /> {t('userInfo.unmuteNotifs')}
+                    </button>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setMuteMenuOpen((v) => !v)}
+                        className="flex w-full items-center gap-3 border-t border-slate-900 px-3 py-2.5 text-left text-sm text-slate-200 hover:bg-slate-900"
+                      >
+                        <MuteGlyph /> {t('userInfo.mute')}
+                      </button>
+                      {muteMenuOpen && (
+                        <div className="border-t border-slate-900 bg-slate-950/80">
+                          {[
+                            { ms: 8 * 3600e3, key: 'mute8h' },
+                            { ms: 7 * 24 * 3600e3, key: 'mute1w' },
+                            { ms: null as number | null, key: 'muteForever' },
+                          ].map((opt) => (
+                            <button
+                              key={opt.key}
+                              type="button"
+                              onClick={() => { onMuteFor?.(opt.ms); setMuteMenuOpen(false); }}
+                              className="block w-full px-4 py-1.5 text-left text-xs text-slate-300 hover:bg-slate-900"
+                            >
+                              {t(`userInfo.${opt.key}`)}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  )
+                ) : onToggleMute ? (
                   <div className="flex items-center justify-between border-t border-slate-900 px-3 py-2.5">
                     <span className="text-sm text-slate-200">{muted ? t('common.unmute') : t('common.mute')}</span>
                     <button
@@ -285,7 +329,7 @@ export function UserInfoModal({
                       <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${muted ? 'translate-x-6' : 'translate-x-1'}`} />
                     </button>
                   </div>
-                )}
+                ) : null}
                 {onToggleAutoSave && (
                   <div className="flex items-center justify-between border-t border-slate-900 px-3 py-2.5">
                     <span className="text-sm text-slate-200">{t('userInfo.autoSave')}</span>
@@ -528,6 +572,16 @@ export function UserInfoModal({
         )}
       </div>
     </div>
+  );
+}
+
+function MuteGlyph({ off }: { off?: boolean }) {
+  return (
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+      <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+      {off && <path d="M3 3l18 18" />}
+    </svg>
   );
 }
 

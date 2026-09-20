@@ -17,7 +17,7 @@ import { getWallpaperId, wallpaperCss, getCustomWallpaperUrl, CUSTOM_WALLPAPER_I
 import { blockUser, unblockUser, isBlockedByMe } from '@/lib/db/safety';
 import { EmojiPicker } from '@/components/emoji-picker';
 import { useRequireAuth } from '@/lib/auth/use-require-auth';
-import { listChats, sendMessage, deleteMessage, hideMessageForMe, editMessage, pinMessage, unpinMessage, searchMessages, setChatMuted, getChatMuted, toggleReaction, createPoll, votePoll, setDisappearingMessages, enableChatEncryption, chatMustEncrypt, clearChatForMe, EncryptionRequiredError } from '@/lib/db/chats';
+import { listChats, sendMessage, deleteMessage, hideMessageForMe, editMessage, pinMessage, unpinMessage, searchMessages, setChatMuted, getChatMuted, setChatMuteUntil, toggleReaction, createPoll, votePoll, setDisappearingMessages, enableChatEncryption, chatMustEncrypt, clearChatForMe, EncryptionRequiredError } from '@/lib/db/chats';
 import { initKeystore, isUnlocked } from '@/lib/crypto/keystore';
 import { uploadChatImage, uploadChatMedia, uploadChatAudio, uploadChatFile, createSignedChatMediaUrl, uploadEncryptedChatMedia, fetchDecryptedMediaUrl } from '@/lib/storage/upload';
 import { decryptMedia, type MediaEnc } from '@/lib/crypto/media';
@@ -302,6 +302,32 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
     } finally {
       setMuteBusy(false);
       setSafetyMenuOpen(false);
+    }
+  }
+
+  // Mute for a duration (ms; null = forever) or unmute — used by the richer
+  // contact-info control.
+  async function muteFor(durationMs: number | null) {
+    setMuteBusy(true);
+    try {
+      await setChatMuteUntil(chatId, durationMs ? new Date(Date.now() + durationMs) : null, true);
+      setMuted(true);
+    } catch (e: any) {
+      setErr(sendErrorMessage(e));
+    } finally {
+      setMuteBusy(false);
+    }
+  }
+
+  async function unmute() {
+    setMuteBusy(true);
+    try {
+      await setChatMuteUntil(chatId, null, false);
+      setMuted(false);
+    } catch (e: any) {
+      setErr(sendErrorMessage(e));
+    } finally {
+      setMuteBusy(false);
     }
   }
 
@@ -2495,7 +2521,8 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
             onStarred={isPeer ? () => setStarredOpen(true) : undefined}
             onMedia={isPeer ? () => setMediaGalleryOpen(true) : undefined}
             muted={isPeer ? muted : undefined}
-            onToggleMute={isPeer ? toggleMute : undefined}
+            onMuteFor={isPeer ? muteFor : undefined}
+            onUnmute={isPeer ? unmute : undefined}
             autoSave={isPeer && canNativeFiles() ? autoSaveMedia : undefined}
             onToggleAutoSave={isPeer && canNativeFiles() ? toggleAutoSaveMedia : undefined}
             disappearingSeconds={isPeer ? chat?.disappearing_seconds : undefined}

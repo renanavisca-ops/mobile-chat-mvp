@@ -39,6 +39,7 @@ export type Database = {
           cleared_at: string | null
           joined_at: string
           muted: boolean
+          muted_until: string | null
           user_id: string
         }
         Insert: {
@@ -47,6 +48,7 @@ export type Database = {
           cleared_at?: string | null
           joined_at?: string
           muted?: boolean
+          muted_until?: string | null
           user_id: string
         }
         Update: {
@@ -55,6 +57,7 @@ export type Database = {
           cleared_at?: string | null
           joined_at?: string
           muted?: boolean
+          muted_until?: string | null
           user_id?: string
         }
         Relationships: [
@@ -948,6 +951,10 @@ export type Database = {
       }
       clear_chat: {
         Args: { p_chat_id: string }
+        Returns: undefined
+      }
+      set_chat_mute: {
+        Args: { p_chat_id: string; p_muted: boolean; p_until?: string | null }
         Returns: undefined
       }
       set_chat_muted: {
