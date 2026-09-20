@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { searchUsers } from '@/lib/db/contacts';
-import { updateGroupInfo, addGroupMembers, removeGroupMember, leaveChat, setChatMuted, getChatMuted, setDisappearingMessages } from '@/lib/db/chats';
+import { updateGroupInfo, addGroupMembers, removeGroupMember, leaveChat, getChatMuted, setChatMuteUntil, setDisappearingMessages } from '@/lib/db/chats';
 import { uploadGroupAvatar } from '@/lib/db/groupAvatar';
 import { useT } from '@/lib/i18n/context';
 import type { ProfileLite } from '@/lib/db/types';
@@ -69,6 +69,7 @@ export function GroupInfoModal({
 
   const [muted, setMuted] = useState(false);
   const [muteBusy, setMuteBusy] = useState(false);
+  const [muteMenuOpen, setMuteMenuOpen] = useState(false);
   const [disappearing, setDisappearing] = useState(disappearingSeconds ?? 0);
   const [disappearingBusy, setDisappearingBusy] = useState(false);
 
@@ -144,12 +145,24 @@ export function GroupInfoModal({
     }
   }
 
-  async function toggleMute() {
-    const next = !muted;
+  async function muteFor(durationMs: number | null) {
     setMuteBusy(true);
     try {
-      await setChatMuted(chatId, next);
-      setMuted(next);
+      await setChatMuteUntil(chatId, durationMs ? new Date(Date.now() + durationMs) : null, true);
+      setMuted(true);
+    } catch (e: any) {
+      setErr(e?.message ?? String(e));
+    } finally {
+      setMuteBusy(false);
+      setMuteMenuOpen(false);
+    }
+  }
+
+  async function unmute() {
+    setMuteBusy(true);
+    try {
+      await setChatMuteUntil(chatId, null, false);
+      setMuted(false);
     } catch (e: any) {
       setErr(e?.message ?? String(e));
     } finally {
@@ -304,23 +317,47 @@ export function GroupInfoModal({
           </button>
         )}
 
-        <div className="mt-4 flex items-center justify-between rounded-lg border border-slate-900 bg-slate-950/60 p-3">
-          <div>
-            <div className="text-sm font-medium text-slate-200">{t('groupInfo.muteTitle')}</div>
-            <div className="text-xs text-slate-500">{t('groupInfo.muteDesc')}</div>
-          </div>
-          <button
-            type="button"
-            onClick={toggleMute}
-            disabled={muteBusy}
-            role="switch"
-            aria-checked={muted}
-            className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors disabled:opacity-50 ${
-              muted ? 'bg-emerald-600' : 'bg-slate-700'
-            }`}
-          >
-            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${muted ? 'translate-x-6' : 'translate-x-1'}`} />
-          </button>
+        <div className="mt-4 overflow-hidden rounded-lg border border-slate-900 bg-slate-950/60">
+          {muted ? (
+            <button
+              type="button"
+              onClick={unmute}
+              disabled={muteBusy}
+              className="flex w-full items-center justify-between px-3 py-2.5 text-left text-sm text-slate-200 hover:bg-slate-900 disabled:opacity-50"
+            >
+              <span>{t('userInfo.unmuteNotifs')}</span>
+            </button>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={() => setMuteMenuOpen((v) => !v)}
+                disabled={muteBusy}
+                className="flex w-full items-center justify-between px-3 py-2.5 text-left text-sm text-slate-200 hover:bg-slate-900 disabled:opacity-50"
+              >
+                <span>{t('userInfo.mute')}</span>
+              </button>
+              {muteMenuOpen && (
+                <div className="border-t border-slate-900 bg-slate-950/80">
+                  {[
+                    { ms: 8 * 3600e3, key: 'mute8h' },
+                    { ms: 7 * 24 * 3600e3, key: 'mute1w' },
+                    { ms: null as number | null, key: 'muteForever' },
+                  ].map((opt) => (
+                    <button
+                      key={opt.key}
+                      type="button"
+                      onClick={() => muteFor(opt.ms)}
+                      disabled={muteBusy}
+                      className="block w-full px-4 py-1.5 text-left text-xs text-slate-300 hover:bg-slate-900 disabled:opacity-50"
+                    >
+                      {t(`userInfo.${opt.key}`)}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
         </div>
 
         {onToggleAutoSave && (
