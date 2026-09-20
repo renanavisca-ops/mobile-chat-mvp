@@ -362,6 +362,7 @@ const es: Dictionary = {
     createGroup: 'Crear grupo con este contacto',
     shareContact: 'Compartir contacto',
     contactShared: 'Copiado al portapapeles.',
+    autoSave: 'Guardar en Fotos',
     addToList: 'Añadir a lista de difusión',
     newListWith: '+ Nueva lista con este contacto',
     addedToList: 'Añadido a {{name}}.',

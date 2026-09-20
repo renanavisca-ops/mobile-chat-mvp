@@ -360,6 +360,7 @@ const en = {
     createGroup: 'Create group with this contact',
     shareContact: 'Share contact',
     contactShared: 'Copied to clipboard.',
+    autoSave: 'Save to Photos',
     addToList: 'Add to broadcast list',
     newListWith: '+ New list with this contact',
     addedToList: 'Added to {{name}}.',
