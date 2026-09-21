@@ -127,6 +127,69 @@ function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
   ]);
 }
 
+// A short chime for a push that arrives while the app is in the FOREGROUND.
+// Android/iOS don't display an FCM notification message while the app is open —
+// the plugin hands it to JS instead — so without this the app is silent while
+// you're using it. Best-effort (a suspended AudioContext or no Web Audio just
+// no-ops).
+function playChime(): void {
+  try {
+    const Ctx = (window as unknown as { AudioContext?: typeof AudioContext; webkitAudioContext?: typeof AudioContext }).AudioContext
+      || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!Ctx) return;
+    const ctx = new Ctx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = 880;
+    gain.gain.value = 0.0001;
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    const t = ctx.currentTime;
+    gain.gain.exponentialRampToValueAtTime(0.18, t + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.3);
+    osc.start(t);
+    osc.stop(t + 0.32);
+    osc.onended = () => { try { void ctx.close(); } catch { /* ignore */ } };
+  } catch {
+    /* ignore */
+  }
+}
+
+let foregroundReady = false;
+
+/**
+ * Handle pushes that arrive while the app is in the foreground: play a chime and
+ * raise a `toky:push` window event so an in-app banner can show (see
+ * PushBanner). The OS won't display a foreground FCM message on its own, so this
+ * is what makes messages audible/visible while you're using the app. Idempotent;
+ * no-op on web.
+ */
+export async function initForegroundPush(): Promise<void> {
+  if (!isNativeApp() || foregroundReady) return;
+  foregroundReady = true;
+  try {
+    await FirebaseMessaging.addListener('notificationReceived', (event: unknown) => {
+      const n = (event as { notification?: Record<string, unknown> })?.notification
+        ?? (event as Record<string, unknown>);
+      const title = (n?.title as string) || 'Toky Chat';
+      const body = (n?.body as string) || '';
+      const data = (n?.data as Record<string, unknown>) || {};
+      const url = typeof data.url === 'string' ? (data.url as string) : undefined;
+      // Skip if you're already looking at that chat.
+      try {
+        if (url && typeof window !== 'undefined' && window.location.href.includes(url)) return;
+      } catch { /* ignore */ }
+      playChime();
+      try {
+        window.dispatchEvent(new CustomEvent('toky:push', { detail: { title, body, url } }));
+      } catch { /* ignore */ }
+    });
+  } catch {
+    foregroundReady = false;
+  }
+}
+
 /** Request permission, get the FCM token, and persist it for this user. */
 export async function registerNativePush(userId: string): Promise<void> {
   // Overall guard: even if the plugin load or an unwrapped call stalls, this

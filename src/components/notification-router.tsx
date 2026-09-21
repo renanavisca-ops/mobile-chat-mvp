@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { isNativeApp, initNativeNotifications, clearDeliveredNotifications } from '@/lib/native-push';
+import { isNativeApp, initNativeNotifications, initForegroundPush, clearDeliveredNotifications } from '@/lib/native-push';
 import { App } from '@capacitor/app';
 
 /**
@@ -37,6 +37,9 @@ export function NotificationRouter() {
   useEffect(() => {
     if (!isNativeApp()) return;
     void initNativeNotifications((url) => router.push(url));
+    // Foreground pushes: chime + in-app banner (the OS won't show them while the
+    // app is open).
+    void initForegroundPush();
   }, [router]);
 
   // Once the user is in the app, the per-message notifications are effectively

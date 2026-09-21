@@ -36,12 +36,18 @@ export async function POST(req: Request) {
     if (message.message_type === 'system') return NextResponse.json({ ok: true, skipped: 'system_message' });
 
     const [{ data: members }, { data: chat }] = await Promise.all([
-      supabaseAdmin.from('chat_members').select('user_id, muted').eq('chat_id', message.chat_id),
+      supabaseAdmin.from('chat_members').select('user_id, muted, muted_until').eq('chat_id', message.chat_id),
       supabaseAdmin.from('chats').select('kind, title, encrypted').eq('id', message.chat_id).single(),
     ]);
 
+    // A member is effectively muted only while a mute is active. A timed mute
+    // leaves `muted = true` after it elapses (only `muted_until` marks the end),
+    // so an expired timed-mute must NOT keep suppressing push.
+    const now = Date.now();
+    const isMutedNow = (m: { muted: boolean; muted_until: string | null }) =>
+      m.muted && (!m.muted_until || new Date(m.muted_until).getTime() > now);
     const recipientIds = (members ?? [])
-      .filter((m) => !m.muted)
+      .filter((m) => !isMutedNow(m))
       .map((m) => m.user_id)
       .filter((id) => id !== message.sender_id);
     if (recipientIds.length === 0) return NextResponse.json({ ok: true, skipped: 'no_recipients' });
