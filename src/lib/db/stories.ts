@@ -26,7 +26,9 @@ export async function createImageStory(file: File): Promise<void> {
   const { error: upErr } = await supabase.storage.from('stories').upload(path, file, {
     upsert: false,
     contentType: file.type,
-    cacheControl: '3600',
+    // Immutable, content-addressed path → cache for a year instead of 1 hour so
+    // repeat story views are served from cache, not re-downloaded from origin.
+    cacheControl: '31536000',
   });
   if (upErr) throw upErr;
 

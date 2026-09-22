@@ -12,7 +12,8 @@ export async function uploadGroupAvatar(chatId: string, file: File): Promise<str
   const { error } = await supabase.storage.from('group-avatars').upload(path, file, {
     upsert: true,
     contentType: file.type || 'image/jpeg',
-    cacheControl: '3600',
+    // Unique timestamped path per upload → immutable, so cache for a year.
+    cacheControl: '31536000',
   });
   if (error) throw error;
 

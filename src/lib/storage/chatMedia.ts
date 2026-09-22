@@ -10,6 +10,19 @@ const IMAGE_EXT = new Set(['jpg', 'jpeg', 'png', 'webp']);
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024; // 5MB
 const MAX_VIDEO_BYTES = 200 * 1024 * 1024; // 200MB
 
+// Attachments live at an immutable, content-addressed path (timestamp + uuid),
+// so the bytes never change once uploaded. Cache them for a year at the edge and
+// in the browser instead of the old 1 hour — repeat views are then served from
+// cache (much cheaper "cached egress") rather than re-downloaded from origin.
+const MEDIA_CACHE_CONTROL = '31536000';
+
+const VIDEO_EXT = new Set(['mp4', 'webm', 'mov', 'ogv', 'avi', 'mkv', 'mpeg', 'mpg', '3gp', '3g2']);
+
+function isVideoPath(path: string): boolean {
+  const m = path.toLowerCase().match(/\.([a-z0-9]+)$/);
+  return m ? VIDEO_EXT.has(m[1]) : false;
+}
+
 function sanitizeFilename(name: string) {
   let cleaned = (name || '').replace(/[^a-zA-Z0-9._-]/g, '_');
   cleaned = cleaned.replace(/^\.+/, '');
@@ -166,7 +179,7 @@ export async function uploadChatMedia(input: {
   const { error } = await supabase.storage.from('chat-media').upload(path, file, {
     upsert: false,
     contentType,
-    cacheControl: '3600',
+    cacheControl: MEDIA_CACHE_CONTROL,
   });
 
   if (error) throw error;
@@ -212,6 +225,32 @@ export async function createSignedChatMediaUrl(
 }
 
 /**
+ * Resolve a plain (non-encrypted) attachment to a displayable URL, caching the
+ * downloaded bytes on-device so the object is fetched from Storage only ONCE —
+ * not re-downloaded on every chat reopen, which was the main source of Storage
+ * egress. Mirrors the encrypted path (fetchDecryptedMediaUrl) minus the decrypt.
+ *
+ * Videos are excluded on purpose: they stream from a signed URL (range
+ * requests) instead of being buffered whole into the cache, so playback still
+ * starts immediately and we never pull a 200 MB file down just to display it.
+ * The caller must URL.revokeObjectURL(...) the blob: URL when done.
+ */
+export async function fetchCachedMediaUrl(path: string, expiresSeconds = 300): Promise<string> {
+  if (isVideoPath(path)) return createSignedChatMediaUrl(path, expiresSeconds);
+
+  const cached = await getCachedMedia(path);
+  if (cached) return URL.createObjectURL(cached);
+
+  const signed = await createSignedChatMediaUrl(path, expiresSeconds);
+  const res = await fetch(signed);
+  if (!res.ok) throw new Error('Could not fetch media.');
+  const blob = await res.blob();
+  // Immutable, content-addressed path → safe to cache indefinitely.
+  void putCachedMedia(path, blob);
+  return URL.createObjectURL(blob);
+}
+
+/**
  * Encrypt a file with toky-media-v1 and upload only the ciphertext to
  * chats/<chatId>/enc/. Returns the storage path plus the per-object encryption
  * metadata to embed in the (sealed) message payload. Used for encrypted chats.
@@ -227,6 +266,7 @@ export async function uploadEncryptedChatMedia(input: {
   const { error } = await supabase.storage.from('chat-media').upload(path, cipher, {
     contentType: 'application/octet-stream',
     upsert: false,
+    cacheControl: MEDIA_CACHE_CONTROL,
   });
   if (error) throw error;
   // Seed the on-device cache with the plaintext we already have, so the sender
@@ -277,7 +317,7 @@ export async function uploadChatFile(chatId: string, file: File): Promise<Upload
   const { error } = await supabase.storage.from('chat-media').upload(path, file, {
     upsert: false,
     contentType,
-    cacheControl: '3600',
+    cacheControl: MEDIA_CACHE_CONTROL,
   });
   if (error) throw error;
 
