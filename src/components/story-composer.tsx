@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { createImageStory, createTextStory } from '@/lib/db/stories';
+import { compressImage } from '@/lib/image-compress';
 import { useT } from '@/lib/i18n/context';
 import { ImageIcon, TypeIcon, PencilIcon, XIcon, PlusIcon } from '@/components/icons';
 import { ImageEditor } from '@/components/image-editor';
@@ -102,7 +103,10 @@ export function StoryComposer({
     for (let i = 0; i < files.length; i++) {
       setProgress({ done: i, total });
       try {
-        await createImageStory(files[i]);
+        // Downscale/re-encode before upload (same as chat images) so stories,
+        // which are viewed repeatedly, don't ship full-size phone photos.
+        const compressed = await compressImage(files[i]);
+        await createImageStory(compressed);
       } catch {
         remaining.push(files[i]);
       }

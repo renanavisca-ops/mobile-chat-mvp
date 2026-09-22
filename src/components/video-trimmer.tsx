@@ -181,6 +181,12 @@ export function TrimmedVideo({
       ref={ref}
       src={src}
       controls
+      // Load the video only when the user hits play, not on every chat open.
+      // Inline videos can be large (up to 200MB), so preloading them — even just
+      // metadata — for messages nobody plays is a needless download. Playback,
+      // the trim-start seek (onLoadedMetadata) and the inline-play/error checks
+      // all still work; they just fire on first play.
+      preload="none"
       className={className}
       onError={onError}
       onCanPlay={onCanPlay}
