@@ -20,7 +20,7 @@ import { EmojiPicker } from '@/components/emoji-picker';
 import { useRequireAuth } from '@/lib/auth/use-require-auth';
 import { listChats, sendMessage, deleteMessage, hideMessageForMe, editMessage, pinMessage, unpinMessage, searchMessages, getChatMuted, setChatMuteUntil, toggleReaction, createPoll, votePoll, setDisappearingMessages, enableChatEncryption, chatMustEncrypt, clearChatForMe, EncryptionRequiredError } from '@/lib/db/chats';
 import { initKeystore, isUnlocked } from '@/lib/crypto/keystore';
-import { uploadChatImage, uploadChatMedia, uploadChatAudio, uploadChatFile, createSignedChatMediaUrl, uploadEncryptedChatMedia, fetchDecryptedMediaUrl } from '@/lib/storage/upload';
+import { uploadChatImage, uploadChatMedia, uploadChatAudio, uploadChatFile, createSignedChatMediaUrl, fetchCachedMediaUrl, uploadEncryptedChatMedia, fetchDecryptedMediaUrl } from '@/lib/storage/upload';
 import { decryptMedia, type MediaEnc } from '@/lib/crypto/media';
 import { useChatRealtime } from '@/lib/realtime/use-chat-realtime';
 import { browserSupabase } from '@/lib/supabase/client';
@@ -1246,7 +1246,7 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
       async function resolveOne(path: string): Promise<string> {
         const enc = encByPath.get(path);
         const attempt = () =>
-          enc ? fetchDecryptedMediaUrl(path, enc) : createSignedChatMediaUrl(path, 300);
+          enc ? fetchDecryptedMediaUrl(path, enc) : fetchCachedMediaUrl(path, 300);
         try {
           return await attempt();
         } catch {
@@ -1262,7 +1262,10 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
       const results = await Promise.allSettled(
         missing.map(async (path) => {
           const url = await resolveOne(path);
-          if (encByPath.get(path)) trackObjectUrl(url);
+          // Encrypted media and cached plain media both return blob: object
+          // URLs that must be revoked on unmount; streamed video returns an
+          // https signed URL that must not be revoked.
+          if (url.startsWith('blob:')) trackObjectUrl(url);
           return [path, url] as const;
         })
       );

@@ -54,7 +54,8 @@ export async function uploadCustomWallpaper(userId: string, file: File): Promise
   const { error } = await supabase.storage.from('wallpapers').upload(path, file, {
     upsert: true,
     contentType: file.type || 'image/jpeg',
-    cacheControl: '3600',
+    // Unique timestamped path per upload → immutable, so cache for a year.
+    cacheControl: '31536000',
   });
   if (error) throw error;
 

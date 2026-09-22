@@ -262,9 +262,14 @@ export default function ChatsPage() {
       )
       .subscribe();
 
+    // Only a NEW message (INSERT) changes the chat list's preview/ordering.
+    // Listening to '*' also fired a full listChats() refetch on every message
+    // UPDATE — read receipts and delivery-status writes happen constantly — so
+    // scoping to INSERT removes that refetch storm (and the matching realtime
+    // row broadcasts) with no visible change to the list.
     const messagesChannel = supabase
       .channel('public:messages')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, () => {
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, () => {
         scheduleReload();
       })
       .subscribe();

@@ -32,7 +32,8 @@ export async function POST(req: Request) {
 
     const { error: upErr } = await supabaseAdmin.storage.from('avatars').upload(path, bytes, {
       contentType: file.type || 'image/png',
-      cacheControl: '3600',
+      // Unique timestamped path per upload → immutable, so cache for a year.
+      cacheControl: '31536000',
       upsert: true,
     });
     if (upErr) throw upErr;
