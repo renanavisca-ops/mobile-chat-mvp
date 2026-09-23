@@ -116,12 +116,20 @@ export default function ChatsPage() {
   const { t, lang } = useLanguage();
   const router = useRouter();
   const [chats, setChats] = useState<ChatSummary[]>([]);
+  // Latest chats, readable from effects that must NOT re-run when the list
+  // changes (freezing the opened chat's unread status at the moment of opening).
+  const chatsRef = useRef<ChatSummary[]>([]);
+  chatsRef.current = chats;
   // Distinct from the auth `loading` flag: tracks whether the chats fetch itself
   // has completed at least once. Without this the empty state ("no chats yet")
   // flashes after auth resolves but before listChats() returns.
   const [chatsLoaded, setChatsLoaded] = useState(false);
   const [err, setErr] = useState<string>('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // Whether the chat you're currently viewing was UNREAD when you opened it.
+  // While it's open we keep it in its original (unread) spot so it doesn't slide
+  // down under you; it drops to time order only once you leave it.
+  const [openedWhileUnread, setOpenedWhileUnread] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [, setUnreadCount] = useState(0);
@@ -296,16 +304,25 @@ export default function ChatsPage() {
   // markMessagesAsRead has run — otherwise a read chat keeps showing as unread on
   // the desktop/web split view where the list stays mounted.
   useEffect(() => {
-    if (!selectedId || !user) return;
+    if (!selectedId) {
+      setOpenedWhileUnread(false);
+      return;
+    }
+    // Freeze (from a ref, so this doesn't re-run as the list updates) whether the
+    // chat was unread when opened, to hold its position while it's on screen.
+    const opened = chatsRef.current.find((c) => c.id === selectedId);
+    setOpenedWhileUnread((opened?.unread_count ?? 0) > 0);
+    if (!user) return;
+    // Clear its badge immediately (it's being read now); position is held by the
+    // sort below until you leave it. Marking-as-read emits realtime UPDATEs that
+    // the list subscription turns into a single refetch, so the server-confirmed
+    // count lands without a race.
     setChats((prev) => {
       if (!prev.some((c) => c.id === selectedId && (c.unread_count ?? 0) > 0)) return prev;
       const next = prev.map((c) => (c.id === selectedId ? { ...c, unread_count: 0 } : c));
       try { setCached(`chats:${user.id}`, next); } catch {}
       return next;
     });
-    // No manual reconcile timer: marking-as-read emits realtime UPDATEs that the
-    // list subscription turns into a single refetch, so the server-confirmed
-    // count lands without a race that could bounce the row back up.
   }, [selectedId, user]);
 
   function statusLabel(status: string | undefined) {
@@ -438,10 +455,12 @@ export default function ChatsPage() {
               const searched = chats.filter((c) => (c.title || '').toLowerCase().includes(search.trim().toLowerCase()));
               const archivedList = searched.filter((c) => c.archived);
               // Unread chats stay pinned above read ones; within each group the
-              // most recent is first. The chat you're currently viewing counts as
-              // read (effUnread → 0) so opening it moves it down ONCE and it never
-              // bounces back up on a new message or a reconcile refetch.
-              const effUnread = (c: ChatSummary) => (c.id === selectedId ? 0 : (c.unread_count ?? 0));
+              // most recent is first. The chat you're currently viewing HOLDS its
+              // spot while open — if it was unread when opened it stays in the
+              // unread group (so it doesn't slide down under you), and only drops
+              // to time order once you leave it. Its badge still clears (it's read).
+              const effUnread = (c: ChatSummary) =>
+                c.id === selectedId ? (openedWhileUnread ? 1 : 0) : (c.unread_count ?? 0);
               const ts = (c: ChatSummary) => (c.last_message_at ? new Date(c.last_message_at).getTime() : 0);
               const byUnreadThenRecent = (a: ChatSummary, b: ChatSummary) => {
                 const au = effUnread(a) > 0 ? 1 : 0;
