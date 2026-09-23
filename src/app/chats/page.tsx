@@ -287,6 +287,24 @@ export default function ChatsPage() {
     if (isWide()) setSelectedId(chats[0].id);
   }, [chats, selectedId]);
 
+  // Opening a chat marks it read (an UPDATE), but the list's realtime is
+  // INSERT-only, so it never refetches on a read. Clear the opened chat's unread
+  // badge instantly here, then reconcile with the server once
+  // markMessagesAsRead has run — otherwise a read chat keeps showing as unread on
+  // the desktop/web split view where the list stays mounted.
+  useEffect(() => {
+    if (!selectedId || !user) return;
+    setChats((prev) => {
+      if (!prev.some((c) => c.id === selectedId && (c.unread_count ?? 0) > 0)) return prev;
+      const next = prev.map((c) => (c.id === selectedId ? { ...c, unread_count: 0 } : c));
+      try { setCached(`chats:${user.id}`, next); } catch {}
+      return next;
+    });
+    const timer = window.setTimeout(() => reloadChats(), 1500);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId, user]);
+
   function statusLabel(status: string | undefined) {
     if (status === 'open') return t('common.statusOpen');
     if (status === 'in_progress') return t('common.statusInProgress');
