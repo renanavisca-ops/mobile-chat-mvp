@@ -262,14 +262,17 @@ export default function ChatsPage() {
       )
       .subscribe();
 
-    // Only a NEW message (INSERT) changes the chat list's preview/ordering.
-    // Listening to '*' also fired a full listChats() refetch on every message
-    // UPDATE — read receipts and delivery-status writes happen constantly — so
-    // scoping to INSERT removes that refetch storm (and the matching realtime
-    // row broadcasts) with no visible change to the list.
+    // React to inserts (new message → preview/order) AND updates (read /
+    // delivery status → unread count). Listening to updates is what keeps the
+    // unread state in sync across a user's devices: reading on the phone clears
+    // it on the web and vice versa. scheduleReload() coalesces the burst of
+    // per-row UPDATEs from one "mark as read" into a single refetch.
     const messagesChannel = supabase
       .channel('public:messages')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, () => {
+        scheduleReload();
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages' }, () => {
         scheduleReload();
       })
       .subscribe();
@@ -300,9 +303,9 @@ export default function ChatsPage() {
       try { setCached(`chats:${user.id}`, next); } catch {}
       return next;
     });
-    const timer = window.setTimeout(() => reloadChats(), 1500);
-    return () => window.clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // No manual reconcile timer: marking-as-read emits realtime UPDATEs that the
+    // list subscription turns into a single refetch, so the server-confirmed
+    // count lands without a race that could bounce the row back up.
   }, [selectedId, user]);
 
   function statusLabel(status: string | undefined) {
@@ -434,14 +437,21 @@ export default function ChatsPage() {
             ) : (() => {
               const searched = chats.filter((c) => (c.title || '').toLowerCase().includes(search.trim().toLowerCase()));
               const archivedList = searched.filter((c) => c.archived);
-              // Order by most-recent activity only (WhatsApp-style). Unread is
-              // shown as a badge, NOT as a sort key — otherwise reading a chat
-              // changes its position and the row visibly jumps around.
+              // Unread chats stay pinned above read ones; within each group the
+              // most recent is first. The chat you're currently viewing counts as
+              // read (effUnread → 0) so opening it moves it down ONCE and it never
+              // bounces back up on a new message or a reconcile refetch.
+              const effUnread = (c: ChatSummary) => (c.id === selectedId ? 0 : (c.unread_count ?? 0));
               const ts = (c: ChatSummary) => (c.last_message_at ? new Date(c.last_message_at).getTime() : 0);
-              const byRecent = (a: ChatSummary, b: ChatSummary) => ts(b) - ts(a);
+              const byUnreadThenRecent = (a: ChatSummary, b: ChatSummary) => {
+                const au = effUnread(a) > 0 ? 1 : 0;
+                const bu = effUnread(b) > 0 ? 1 : 0;
+                if (au !== bu) return bu - au;
+                return ts(b) - ts(a);
+              };
               const visible = (showArchived ? archivedList : searched.filter((c) => !c.archived))
                 .slice()
-                .sort(byRecent);
+                .sort(byUnreadThenRecent);
               return (
               <ul className="space-y-0.5">
                 {showArchived ? (
@@ -471,7 +481,9 @@ export default function ChatsPage() {
                 ) : null}
                 {visible.map((c, i) => {
                   const active = c.id === selectedId;
-                  const unread = c.unread_count ?? 0;
+                  // The open chat reads as read (no badge, not bold) even before
+                  // the server refetch lands.
+                  const unread = active ? 0 : (c.unread_count ?? 0);
                   return (
                     <li key={c.id} className="toky-rise" style={{ animationDelay: `${Math.min(i, 12) * 28}ms` }}>
                       <button
