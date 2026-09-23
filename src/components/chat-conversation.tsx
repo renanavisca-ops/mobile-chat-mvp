@@ -1796,6 +1796,35 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
     setPreviewImages((prev) => [...prev, ...urls].slice(0, MAX_FILES));
   }
 
+  // Paste a screenshot / copied image straight into the composer (mainly the web
+  // build, where users copy-paste captures). Turns any image on the clipboard
+  // into an attachment through the same pipeline as picking a file; plain-text
+  // pastes fall through untouched.
+  async function onComposerPaste(e: React.ClipboardEvent<HTMLTextAreaElement>) {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    const images: File[] = [];
+    for (const it of Array.from(items)) {
+      if (it.kind === 'file' && it.type.startsWith('image/')) {
+        const f = it.getAsFile();
+        if (f) {
+          images.push(
+            f.name ? f : new File([f], `pegado_${Date.now()}.png`, { type: f.type || 'image/png' })
+          );
+        }
+      }
+    }
+    if (images.length === 0) return; // ordinary text paste — leave it alone
+    e.preventDefault();
+    try {
+      const dt = new DataTransfer();
+      images.forEach((f) => dt.items.add(f));
+      await onImagesChange({ target: { files: dt.files, value: '' } } as unknown as React.ChangeEvent<HTMLInputElement>);
+    } catch {
+      setErr(t('chat.imageReadFailed'));
+    }
+  }
+
   // -------- Input change: video (library)
   async function onVideoChange(e: React.ChangeEvent<HTMLInputElement>) {
     setErr('');
@@ -3261,6 +3290,7 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
                 }}
                 placeholder={t('chat.composerPlaceholder')}
                 onFocus={() => setEmojiOpen(false)}
+                onPaste={onComposerPaste}
                 onKeyDown={(e) => {
                   // Enter sends; Shift+Enter inserts a newline.
                   if (e.key === 'Enter' && !e.shiftKey) {
