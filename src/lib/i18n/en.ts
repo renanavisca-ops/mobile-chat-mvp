@@ -407,6 +407,14 @@ const en = {
   push: {
     newMessages: '{{n}} new messages',
   },
+  sounds: {
+    chime: 'Chime',
+    ding: 'Ding',
+    tritone: 'Tritone',
+    pop: 'Pop',
+    marimba: 'Marimba',
+    none: 'Silent',
+  },
   schedule: {
     title: 'Schedule message',
     messageLabel: 'Message',
@@ -730,6 +738,8 @@ const en = {
     enable: 'Enable',
     enabling: 'Enabling…',
     pushResubscribe: 'Re-subscribe this device',
+    notifSoundLabel: 'Notification sound',
+    notifSoundHint: 'Tap an option to hear it and choose it.',
     encTitle: 'End-to-end encryption',
     encDesc: 'Set up a private key on this device so you can turn on the lock in any chat. Once locked, only you and the other members can read the messages — not even the server.',
     encSetUp: 'Set up encryption',

@@ -9,6 +9,7 @@
 import { Capacitor } from '@capacitor/core';
 import { FirebaseMessaging } from '@capacitor-firebase/messaging';
 import { browserSupabase } from '@/lib/supabase/client';
+import { playNotifSound } from '@/lib/notification-sound';
 
 export function isNativeApp(): boolean {
   try {
@@ -127,35 +128,6 @@ function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
   ]);
 }
 
-// A short chime for a push that arrives while the app is in the FOREGROUND.
-// Android/iOS don't display an FCM notification message while the app is open —
-// the plugin hands it to JS instead — so without this the app is silent while
-// you're using it. Best-effort (a suspended AudioContext or no Web Audio just
-// no-ops).
-function playChime(): void {
-  try {
-    const Ctx = (window as unknown as { AudioContext?: typeof AudioContext; webkitAudioContext?: typeof AudioContext }).AudioContext
-      || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-    if (!Ctx) return;
-    const ctx = new Ctx();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = 'sine';
-    osc.frequency.value = 880;
-    gain.gain.value = 0.0001;
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    const t = ctx.currentTime;
-    gain.gain.exponentialRampToValueAtTime(0.18, t + 0.02);
-    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.3);
-    osc.start(t);
-    osc.stop(t + 0.32);
-    osc.onended = () => { try { void ctx.close(); } catch { /* ignore */ } };
-  } catch {
-    /* ignore */
-  }
-}
-
 let foregroundReady = false;
 
 // Foreground pushes are coalesced: reopening the app after it was closed
@@ -172,7 +144,7 @@ function flushPushBuffer(): void {
   const items = pushBuffer;
   pushBuffer = [];
   if (items.length === 0) return;
-  playChime(); // once for the whole burst
+  playNotifSound(); // the user's chosen sound, once for the whole burst
   const urls = new Set(items.map((i) => i.url).filter(Boolean));
   const detail =
     items.length === 1

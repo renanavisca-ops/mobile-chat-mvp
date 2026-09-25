@@ -409,6 +409,14 @@ const es: Dictionary = {
   push: {
     newMessages: '{{n}} mensajes nuevos',
   },
+  sounds: {
+    chime: 'Campana',
+    ding: 'Ding',
+    tritone: 'Tritono',
+    pop: 'Pop',
+    marimba: 'Marimba',
+    none: 'Silencio',
+  },
   schedule: {
     title: 'Programar mensaje',
     messageLabel: 'Mensaje',
@@ -732,6 +740,8 @@ const es: Dictionary = {
     enable: 'Activar',
     enabling: 'Activando…',
     pushResubscribe: 'Volver a suscribir este dispositivo',
+    notifSoundLabel: 'Sonido de notificación',
+    notifSoundHint: 'Toca una opción para escucharla y elegirla.',
     encTitle: 'Cifrado de extremo a extremo',
     encDesc: 'Configura una clave privada en este dispositivo para poder activar el candado en cualquier chat. Una vez cifrado, solo tú y los demás miembros pueden leer los mensajes — ni siquiera el servidor.',
     encSetUp: 'Configurar cifrado',

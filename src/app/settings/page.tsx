@@ -11,6 +11,7 @@ import { clearMediaCache } from '@/lib/storage/media-cache';
 import { validatePassword } from '@/lib/password';
 import { isMfaEnabled, enrollTotp, verifyEnroll, disableTotp, generateRecoveryCodes } from '@/lib/auth/mfa';
 import { WALLPAPERS, CUSTOM_WALLPAPER_ID, getWallpaperId, setWallpaperId as saveWallpaperId, uploadCustomWallpaper, getCustomWallpaperUrl } from '@/lib/wallpaper';
+import { NOTIF_SOUNDS, getNotifSound, setNotifSound as saveNotifSound, playNotifSound, type NotifSoundId } from '@/lib/notification-sound';
 import { uploadAvatar } from '@/lib/db/avatar';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import { subscribeToPush, unsubscribeFromPush, isPushSubscribed, pushSupported } from '@/lib/push';
@@ -80,6 +81,7 @@ export default function SettingsPage() {
   const [pushBusy, setPushBusy] = useState(false);
   const [pushErr, setPushErr] = useState('');
   const [pushOn, setPushOn] = useState(false);
+  const [notifSound, setNotifSoundState] = useState<NotifSoundId>('chime');
 
   useEffect(() => {
     isPushSubscribed().then(setPushOn).catch(() => {});
@@ -346,11 +348,19 @@ export default function SettingsPage() {
     if (id === CUSTOM_WALLPAPER_ID) {
       getCustomWallpaperUrl().then(setCustomWallpaperUrl).catch(() => {});
     }
+    setNotifSoundState(getNotifSound());
   }, []);
 
   function chooseWallpaper(id: string) {
     saveWallpaperId(id);
     setWpId(id);
+  }
+
+  // Pick a notification sound: save it and play a preview so the user hears it.
+  function chooseNotifSound(id: NotifSoundId) {
+    setNotifSoundState(id);
+    saveNotifSound(id);
+    playNotifSound(id);
   }
 
   async function onWallpaperFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -1132,6 +1142,28 @@ export default function SettingsPage() {
                 </button>
               )}
               {pushErr && <p className="mt-2 text-xs text-red-400">{pushErr}</p>}
+
+              <div className="mt-4 border-t border-slate-900 pt-4">
+                <div className="text-sm font-medium text-slate-200">{t('settings.notifSoundLabel')}</div>
+                <div className="text-xs text-slate-400 mt-1">{t('settings.notifSoundHint')}</div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {NOTIF_SOUNDS.map((s) => (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => chooseNotifSound(s.id)}
+                      aria-pressed={notifSound === s.id}
+                      className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
+                        notifSound === s.id
+                          ? 'bg-indigo-600 text-white'
+                          : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                      }`}
+                    >
+                      {t(s.labelKey)}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           </section>
 
