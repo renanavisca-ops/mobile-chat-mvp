@@ -63,6 +63,13 @@ export function useChatRealtime(chatId: string) {
   // carga inicial — paint cached history instantly, then only pull what's new.
   useEffect(() => {
     let alive = true;
+    // Mark the chat read on EVERY open, independent of the cache fast-path below.
+    // Otherwise, when the cache is already current (listMessagesSince returns no
+    // new rows) we'd skip marking — so a message that arrived while away, or one
+    // whose earlier realtime mark didn't persist, stays stuck as unread forever.
+    // This hits the DB directly (chat_id + read=false + not mine), so it doesn't
+    // depend on what's painted.
+    markMessagesAsRead(chatId).catch(console.error);
     const cached = getCached<MessageRow[]>(`msgs:${chatId}`);
 
     if (cached && cached.length) {
