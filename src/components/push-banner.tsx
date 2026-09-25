@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useT } from '@/lib/i18n/context';
 
 type Banner = { id: number; title: string; body: string; url?: string };
 
@@ -12,14 +13,24 @@ type Banner = { id: number; title: string; body: string; url?: string };
  */
 export function PushBanner() {
   const router = useRouter();
+  const t = useT();
   const [banner, setBanner] = useState<Banner | null>(null);
 
   useEffect(() => {
     let hideTimer: ReturnType<typeof setTimeout> | undefined;
     const onPush = (e: Event) => {
-      const detail = (e as CustomEvent).detail as { title?: string; body?: string; url?: string } | undefined;
+      const detail = (e as CustomEvent).detail as
+        | { title?: string; body?: string; url?: string; count?: number }
+        | undefined;
       if (!detail) return;
-      setBanner({ id: Date.now(), title: detail.title || 'Toky Chat', body: detail.body || '', url: detail.url });
+      // A coalesced burst (count > 1) shows one summary line instead of each msg.
+      const multi = (detail.count ?? 1) > 1;
+      setBanner({
+        id: Date.now(),
+        title: multi ? t('push.newMessages', { n: detail.count ?? 0 }) : detail.title || 'Toky Chat',
+        body: multi ? '' : detail.body || '',
+        url: detail.url,
+      });
       if (hideTimer) clearTimeout(hideTimer);
       hideTimer = setTimeout(() => setBanner(null), 4500);
     };
@@ -28,6 +39,7 @@ export function PushBanner() {
       window.removeEventListener('toky:push', onPush as EventListener);
       if (hideTimer) clearTimeout(hideTimer);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (!banner) return null;
