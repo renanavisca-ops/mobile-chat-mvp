@@ -469,3 +469,34 @@ export function GearIcon(props: IconProps) {
     </Base>
   );
 }
+
+export function ScreenShareIcon(props: IconProps) {
+  return (
+    <Base {...props}>
+      <path d="M13 3H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-5" />
+      <path d="M8 21h8" />
+      <path d="M12 17v4" />
+      <path d="m17 8 5-5" />
+      <path d="M17 3h5v5" />
+    </Base>
+  );
+}
+
+export function ScreenShareOffIcon(props: IconProps) {
+  return (
+    <Base {...props}>
+      <path d="M13 3H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-5" />
+      <path d="M8 21h8" />
+      <path d="M12 17v4" />
+      <line x1="2" y1="2" x2="22" y2="22" />
+    </Base>
+  );
+}
+
+export function HandPointerIcon(props: IconProps) {
+  return (
+    <Base {...props}>
+      <path d="M4 4l7.07 17 2.51-7.39L21 11.07z" />
+    </Base>
+  );
+}

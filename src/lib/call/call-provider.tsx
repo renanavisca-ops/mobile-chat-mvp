@@ -22,6 +22,8 @@ import {
   nativeStopCallAudio,
 } from '@/lib/call/native-audio';
 import { useT } from '@/lib/i18n/context';
+import { screenShareSupported, captureScreenTrack } from '@/lib/call/screen-share';
+import { applyRemoteControl, RELAYED_KEYS, type RcMsg } from '@/lib/call/remote-control';
 import {
   PhoneIcon,
   PhoneOffIcon,
@@ -32,6 +34,9 @@ import {
   SwitchCameraIcon,
   SpeakerIcon,
   SpeakerOffIcon,
+  ScreenShareIcon,
+  ScreenShareOffIcon,
+  HandPointerIcon,
 } from '@/components/icons';
 
 type Phase = 'idle' | 'ringing' | 'incall';
@@ -68,17 +73,32 @@ const MEDIA = (video: boolean): MediaStreamConstraints => ({
   video: video ? { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' } : false,
 });
 
+/** A control/pointer event captured from the shared-screen tile, normalized. */
+type TileInput = { kind: RcMsg['kind']; x?: number; y?: number; dy?: number };
+
 /** Attaches a MediaStream to a <video> and shows an avatar fallback for audio. */
 function RemoteTile({
   p,
   fill,
   register,
+  screen,
+  pointerActive,
+  controlActive,
+  onInput,
 }: {
   p: Participant;
   fill?: boolean;
   register?: (el: HTMLVideoElement, attach: boolean) => void;
+  // A screen share fits the whole surface (no crop) so coordinates map exactly.
+  screen?: boolean;
+  // Send pointer moves (helper is viewing the shared screen).
+  pointerActive?: boolean;
+  // Also relay clicks/scroll (helper has been granted control).
+  controlActive?: boolean;
+  onInput?: (e: TileInput) => void;
 }) {
   const ref = useRef<HTMLVideoElement | null>(null);
+  const lastPtr = useRef(0);
   useEffect(() => {
     if (ref.current && p.stream) ref.current.srcObject = p.stream;
   }, [p.stream]);
@@ -92,9 +112,37 @@ function RemoteTile({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [register]);
   const hasVideo = p.stream?.getVideoTracks().some((t) => t.enabled) ?? false;
+
+  // Map a mouse event to [0..1] coords over the ACTUAL video content, honoring
+  // the object-contain letterboxing so a click lands where the helper aimed.
+  const norm = (e: { clientX: number; clientY: number }): { x: number; y: number } | null => {
+    const el = ref.current;
+    if (!el) return null;
+    const rect = el.getBoundingClientRect();
+    const vw = el.videoWidth || rect.width;
+    const vh = el.videoHeight || rect.height;
+    if (!vw || !vh) return null;
+    const scale = Math.min(rect.width / vw, rect.height / vh);
+    const cw = vw * scale;
+    const chh = vh * scale;
+    const offX = (rect.width - cw) / 2;
+    const offY = (rect.height - chh) / 2;
+    const x = (e.clientX - rect.left - offX) / cw;
+    const y = (e.clientY - rect.top - offY) / chh;
+    if (x < 0 || y < 0 || x > 1 || y > 1) return null;
+    return { x, y };
+  };
+
+  const capture = pointerActive || controlActive;
+
   return (
     <div className={`relative overflow-hidden bg-slate-900 ${fill ? 'h-full w-full' : 'aspect-square rounded-xl'}`}>
-      <video ref={ref} autoPlay playsInline className={`h-full w-full object-cover ${hasVideo ? '' : 'invisible'}`} />
+      <video
+        ref={ref}
+        autoPlay
+        playsInline
+        className={`h-full w-full ${screen ? 'object-contain' : 'object-cover'} ${hasVideo ? '' : 'invisible'}`}
+      />
       {!hasVideo && (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
           <div className="grid h-16 w-16 place-items-center rounded-full bg-slate-800 text-2xl text-slate-300">
@@ -102,7 +150,36 @@ function RemoteTile({
           </div>
         </div>
       )}
-      <span className="absolute bottom-1 left-2 text-xs text-white/80 drop-shadow">{p.name}</span>
+      {capture && (
+        <div
+          className={`absolute inset-0 z-[2] ${controlActive ? 'cursor-crosshair' : 'cursor-default'}`}
+          onMouseMove={(e) => {
+            if (!pointerActive && !controlActive) return;
+            const now = Date.now();
+            if (now - lastPtr.current < 90) return; // ~11/s, kind to the channel
+            lastPtr.current = now;
+            const c = norm(e);
+            if (c) onInput?.({ kind: 'ptr', x: c.x, y: c.y });
+          }}
+          onMouseLeave={() => onInput?.({ kind: 'ptrgone' })}
+          onClick={(e) => {
+            if (!controlActive) return;
+            const c = norm(e);
+            if (c) onInput?.({ kind: 'click', x: c.x, y: c.y });
+          }}
+          onDoubleClick={(e) => {
+            if (!controlActive) return;
+            const c = norm(e);
+            if (c) onInput?.({ kind: 'dblclick', x: c.x, y: c.y });
+          }}
+          onWheel={(e) => {
+            if (!controlActive) return;
+            const c = norm(e);
+            if (c) onInput?.({ kind: 'scroll', x: c.x, y: c.y, dy: e.deltaY });
+          }}
+        />
+      )}
+      <span className="absolute bottom-1 left-2 z-[3] text-xs text-white/80 drop-shadow">{p.name}</span>
     </div>
   );
 }
@@ -131,6 +208,40 @@ export function CallProvider({ children }: { children: ReactNode }) {
   const [errText, setErrText] = useState('');
   // Brief banner shown after a call ends for a notable reason (e.g. rejected).
   const [endedNote, setEndedNote] = useState('');
+
+  // --- Screen share + remote assistance -------------------------------------
+  // I am sharing my screen.
+  const [screenSharing, setScreenSharing] = useState(false);
+  // A peer is sharing their screen (their id), so I can view/point/control it.
+  const [remoteSharing, setRemoteSharing] = useState<string | null>(null);
+  // The call UI collapses to a floating bar while I share, so I can use Toky
+  // behind it (and the helper can see/drive the real app, not the call screen).
+  const [minimized, setMinimized] = useState(false);
+  // A peer whose Toky *I* am currently driving (I'm the helper).
+  const [controllingPeer, setControllingPeer] = useState<string | null>(null);
+  // I asked this peer for control and am waiting for their answer.
+  const [controlPending, setControlPending] = useState<string | null>(null);
+  // A peer who is currently driving MY Toky (I granted them control).
+  const [controlHostingFor, setControlHostingFor] = useState<string | null>(null);
+  // An incoming request: this peer wants to control my Toky.
+  const [controlRequestFrom, setControlRequestFrom] = useState<string | null>(null);
+  // Live position (normalized) of the helper's pointer, shown on my screen.
+  const [remotePtr, setRemotePtr] = useState<{ x: number; y: number } | null>(null);
+
+  // Refs mirror the above so the once-created signaling handlers read live values.
+  const screenSharingRef = useRef(false);
+  const remoteSharingRef = useRef<string | null>(null);
+  const controllingPeerRef = useRef<string | null>(null);
+  const controlPendingRef = useRef<string | null>(null);
+  const controlHostingForRef = useRef<string | null>(null);
+  const screenTrackRef = useRef<MediaStreamTrack | null>(null);
+  const shareRestoreRef = useRef<{
+    via: 'replace' | 'add';
+    cam: MediaStreamTrack | null;
+    prevIsVideo: boolean;
+    prevLocalHasVideo: boolean;
+  } | null>(null);
+  const canScreenShare = screenShareSupported();
 
   const pcsRef = useRef<Map<string, RTCPeerConnection>>(new Map());
   const remoteSetRef = useRef<Map<string, boolean>>(new Map());
@@ -244,6 +355,23 @@ export function CallProvider({ children }: { children: ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Keep refs in sync for the signaling handlers (created once, below).
+  useEffect(() => {
+    screenSharingRef.current = screenSharing;
+  }, [screenSharing]);
+  useEffect(() => {
+    remoteSharingRef.current = remoteSharing;
+  }, [remoteSharing]);
+  useEffect(() => {
+    controllingPeerRef.current = controllingPeer;
+  }, [controllingPeer]);
+  useEffect(() => {
+    controlPendingRef.current = controlPending;
+  }, [controlPending]);
+  useEffect(() => {
+    controlHostingForRef.current = controlHostingFor;
+  }, [controlHostingFor]);
+
   const teardownPeer = useCallback((pid: string) => {
     const pc = pcsRef.current.get(pid);
     if (pc) {
@@ -289,6 +417,11 @@ export function CallProvider({ children }: { children: ReactNode }) {
     pcsRef.current.clear();
     remoteSetRef.current.clear();
     pendingIceRef.current.clear();
+    try {
+      screenTrackRef.current?.stop();
+    } catch {}
+    screenTrackRef.current = null;
+    shareRestoreRef.current = null;
     localStreamRef.current?.getTracks().forEach((tr) => tr.stop());
     localStreamRef.current = null;
     // Restore the phone's normal audio state (undo MODE_IN_COMMUNICATION /
@@ -311,6 +444,14 @@ export function CallProvider({ children }: { children: ReactNode }) {
     setErrText('');
     setIsVideo(false);
     setLocalHasVideo(false);
+    setScreenSharing(false);
+    setRemoteSharing(null);
+    setMinimized(false);
+    setControllingPeer(null);
+    setControlPending(null);
+    setControlHostingFor(null);
+    setControlRequestFrom(null);
+    setRemotePtr(null);
     setPhaseBoth('idle');
   }, [supabase]);
 
@@ -465,6 +606,71 @@ export function CallProvider({ children }: { children: ReactNode }) {
       if (payload.to !== myIdRef.current) return;
       addIce(payload.from as string, payload.candidate as RTCIceCandidateInit);
     });
+    // A peer started/stopped sharing their screen.
+    ch.on('broadcast', { event: 'share' }, ({ payload }) => {
+      if (payload.to !== myIdRef.current) return;
+      const from = payload.from as string;
+      const on = !!payload.on;
+      if (on) {
+        setRemoteSharing(from);
+      } else {
+        if (remoteSharingRef.current === from) setRemoteSharing(null);
+        // If I was controlling them, that ends when their share ends.
+        if (controllingPeerRef.current === from) setControllingPeer(null);
+        if (controlPendingRef.current === from) setControlPending(null);
+      }
+    });
+    // Remote-assistance events (pointer + control). See remote-control.ts.
+    ch.on('broadcast', { event: 'rc' }, ({ payload }) => {
+      if (payload.to !== myIdRef.current) return;
+      handleRc(payload as RcMsg);
+    });
+  }
+
+  // Apply one remote-assistance message. Runs on whichever side it's addressed
+  // to; roles are enforced here so a peer can only drive me once I've granted it.
+  function handleRc(msg: RcMsg) {
+    switch (msg.kind) {
+      case 'ptr':
+        // Someone viewing MY shared screen is pointing — show the dot.
+        if (screenSharingRef.current && msg.x != null && msg.y != null) {
+          setRemotePtr({ x: msg.x, y: msg.y });
+        }
+        break;
+      case 'ptrgone':
+        setRemotePtr(null);
+        break;
+      case 'req':
+        // A viewer asks to control my Toky — only valid while I'm sharing.
+        if (screenSharingRef.current) setControlRequestFrom(msg.from);
+        break;
+      case 'grant':
+        // My control request was accepted.
+        if (controlPendingRef.current === msg.from) {
+          setControlPending(null);
+          setControllingPeer(msg.from);
+        }
+        break;
+      case 'deny':
+        if (controlPendingRef.current === msg.from) {
+          setControlPending(null);
+          setEndedNote(t('call.controlDenied'));
+          window.setTimeout(() => setEndedNote(''), 3000);
+        }
+        break;
+      case 'end':
+        // The other side ended the session (in either role).
+        if (controlHostingForRef.current === msg.from) {
+          setControlHostingFor(null);
+          setRemotePtr(null);
+        }
+        if (controllingPeerRef.current === msg.from) setControllingPeer(null);
+        break;
+      default:
+        // click / dblclick / scroll / text / key — apply only if this peer
+        // currently holds control of me.
+        if (controlHostingForRef.current === msg.from) applyRemoteControl(msg);
+    }
   }
 
   async function joinCall(callId: string) {
@@ -683,6 +889,163 @@ export function CallProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  // Send a remote-assistance message to one peer over the call channel.
+  function sendRc(to: string, kind: RcMsg['kind'], extra?: Partial<RcMsg>) {
+    sendSignal('rc', { from: myIdRef.current, to, kind, ...extra });
+  }
+
+  // --- Screen share ---------------------------------------------------------
+  async function startScreenShare() {
+    if (screenSharing) return;
+    if (!canScreenShare) {
+      setErrText(t('call.screenShareUnsupported'));
+      return;
+    }
+    try {
+      const track = await captureScreenTrack();
+      screenTrackRef.current = track;
+      let via: 'replace' | 'add' = 'add';
+      let cam: MediaStreamTrack | null = null;
+      for (const [pid, pc] of pcsRef.current.entries()) {
+        const sender = pc.getSenders().find((s) => s.track && s.track.kind === 'video');
+        if (sender) {
+          cam = sender.track; // the camera track, to restore on stop
+          via = 'replace';
+          await sender.replaceTrack(track);
+        } else if (localStreamRef.current) {
+          pc.addTrack(track, localStreamRef.current);
+          const offer = await pc.createOffer();
+          await pc.setLocalDescription(offer);
+          sendSignal('offer', { from: myIdRef.current, to: pid, sdp: offer });
+        }
+      }
+      shareRestoreRef.current = {
+        via,
+        cam,
+        prevIsVideo: isVideo,
+        prevLocalHasVideo: localHasVideo,
+      };
+      setLocalHasVideo(true);
+      setIsVideo(true);
+      setScreenSharing(true);
+      setMinimized(true);
+      for (const pid of pcsRef.current.keys()) sendSignal('share', { from: myIdRef.current, to: pid, on: true });
+      // The browser's own "Stop sharing" ends the track — mirror that here.
+      track.onended = () => {
+        void stopScreenShare();
+      };
+    } catch (e: any) {
+      // A user cancelling the picker throws too; only surface real errors.
+      if (e?.name !== 'NotAllowedError' && e?.name !== 'AbortError') {
+        setErrText(e?.message ?? String(e));
+      }
+    }
+  }
+
+  async function stopScreenShare() {
+    const track = screenTrackRef.current;
+    const restore = shareRestoreRef.current;
+    if (!track) return;
+    for (const [pid, pc] of pcsRef.current.entries()) {
+      const sender = pc.getSenders().find((s) => s.track === track);
+      if (!sender) continue;
+      if (restore?.via === 'replace') {
+        await sender.replaceTrack(restore.cam);
+      } else {
+        try {
+          pc.removeTrack(sender);
+        } catch {}
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        sendSignal('offer', { from: myIdRef.current, to: pid, sdp: offer });
+      }
+    }
+    try {
+      track.stop();
+    } catch {}
+    screenTrackRef.current = null;
+    // Tell viewers, and end any control they held over me.
+    for (const pid of pcsRef.current.keys()) sendSignal('share', { from: myIdRef.current, to: pid, on: false });
+    if (controlHostingForRef.current) {
+      sendRc(controlHostingForRef.current, 'end');
+      setControlHostingFor(null);
+    }
+    setControlRequestFrom(null);
+    setRemotePtr(null);
+    setLocalHasVideo(restore?.prevLocalHasVideo ?? false);
+    setIsVideo(restore?.prevIsVideo ?? false);
+    shareRestoreRef.current = null;
+    setScreenSharing(false);
+    setMinimized(false);
+  }
+
+  // --- Remote control (co-browse of the Toky app) ---------------------------
+  function requestControl() {
+    if (!remoteSharing) return;
+    setControlPending(remoteSharing);
+    sendRc(remoteSharing, 'req');
+  }
+
+  function grantControl() {
+    const who = controlRequestFrom;
+    if (!who) return;
+    setControlRequestFrom(null);
+    setControlHostingFor(who);
+    sendRc(who, 'grant');
+  }
+
+  function denyControl() {
+    const who = controlRequestFrom;
+    if (!who) return;
+    setControlRequestFrom(null);
+    sendRc(who, 'deny');
+  }
+
+  // The person being controlled ends it (always-available "stop" button).
+  function endHostedControl() {
+    const who = controlHostingForRef.current;
+    if (who) sendRc(who, 'end');
+    setControlHostingFor(null);
+    setRemotePtr(null);
+  }
+
+  // The helper stops driving the other person's Toky.
+  function stopControlling() {
+    const who = controllingPeerRef.current;
+    if (who) sendRc(who, 'end');
+    setControllingPeer(null);
+    setControlPending(null);
+  }
+
+  // Emit pointer/click/scroll captured over the shared-screen tile (helper side).
+  function onTileInput(inp: { kind: RcMsg['kind']; x?: number; y?: number; dy?: number }) {
+    const to = remoteSharing;
+    if (!to) return;
+    // Pointer is always allowed while viewing a share; the rest needs control.
+    if ((inp.kind === 'ptr' || inp.kind === 'ptrgone') || controllingPeer === to) {
+      sendRc(to, inp.kind, { x: inp.x, y: inp.y, dy: inp.dy });
+    }
+  }
+
+  // While I'm controlling a peer, relay my keyboard to their focused field.
+  useEffect(() => {
+    if (!controllingPeer) return;
+    const to = controllingPeer;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return; // don't hijack shortcuts
+      if (e.key.length === 1) {
+        e.preventDefault();
+        sendRc(to, 'text', { text: e.key });
+      } else if (RELAYED_KEYS.has(e.key)) {
+        e.preventDefault();
+        sendRc(to, 'key', { key: e.key });
+      }
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [controllingPeer]);
+
   // Personal signaling channel: incoming invites, cancels, declines.
   useEffect(() => {
     if (!myId) return;
@@ -758,6 +1121,109 @@ export function CallProvider({ children }: { children: ReactNode }) {
         </div>
       )}
 
+      {/* Minimized call bar — shown while I share my screen, so the real Toky
+          app is usable behind it (and visible/controllable to the helper). */}
+      {phase === 'incall' && minimized && (
+        <div className="fixed inset-x-0 bottom-0 z-[96] flex justify-center px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+          <div className="toky-glass flex items-center gap-2 rounded-2xl border border-white/10 px-3 py-2 shadow-2xl">
+            <span className="flex items-center gap-1.5 pl-1 pr-1 text-xs font-medium text-emerald-300">
+              <ScreenShareIcon size={16} /> {t('call.sharingScreen')}
+            </span>
+            <button
+              type="button"
+              onClick={toggleMute}
+              aria-label={muted ? t('call.unmute') : t('call.mute')}
+              className={`grid h-10 w-10 place-items-center rounded-full ${
+                muted ? 'bg-white text-slate-900' : 'bg-slate-800 text-white hover:bg-slate-700'
+              }`}
+            >
+              {muted ? <MicOffIcon size={18} /> : <MicIcon size={18} />}
+            </button>
+            <button
+              type="button"
+              onClick={() => setMinimized(false)}
+              className="rounded-full bg-slate-800 px-3 py-2 text-xs font-medium text-white hover:bg-slate-700"
+            >
+              {t('call.expand')}
+            </button>
+            <button
+              type="button"
+              onClick={() => void stopScreenShare()}
+              className="rounded-full bg-slate-800 px-3 py-2 text-xs font-medium text-white hover:bg-slate-700"
+            >
+              {t('call.stopScreenShare')}
+            </button>
+            <button
+              type="button"
+              onClick={endCall}
+              aria-label={t('call.hangUp')}
+              className="grid h-10 w-10 place-items-center rounded-full bg-rose-600 text-white hover:bg-rose-500"
+            >
+              <PhoneOffIcon size={18} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* The helper's live pointer, drawn over my whole viewport while I share. */}
+      {phase === 'incall' && screenSharing && remotePtr && (
+        <div
+          className="pointer-events-none fixed z-[97]"
+          style={{ left: `${remotePtr.x * 100}%`, top: `${remotePtr.y * 100}%`, transform: 'translate(-2px,-2px)' }}
+        >
+          <HandPointerIcon size={28} className="text-amber-400 drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)]" />
+        </div>
+      )}
+
+      {/* Persistent "someone is controlling my Toky" banner — always endable. */}
+      {phase === 'incall' && controlHostingFor && (
+        <div className="fixed inset-x-0 top-0 z-[98] flex justify-center px-3 pt-safe">
+          <div className="mt-2 flex items-center gap-3 rounded-full border border-amber-500/40 bg-amber-950/90 px-4 py-2 text-sm text-amber-100 shadow-2xl backdrop-blur">
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
+              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-amber-400" />
+            </span>
+            <span className="font-medium">{t('call.beingControlled')}</span>
+            <button
+              type="button"
+              onClick={endHostedControl}
+              className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-900 hover:bg-slate-200"
+            >
+              {t('call.endControl')}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Incoming request to control my Toky. */}
+      {phase === 'incall' && controlRequestFrom && (
+        <div className="fixed inset-0 z-[99] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+          <div className="toky-glass toky-elev w-full max-w-xs rounded-3xl border border-slate-800 p-6 text-center">
+            <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-amber-500/20 text-amber-300">
+              <HandPointerIcon size={26} />
+            </div>
+            <div className="mt-4 font-display text-lg font-bold text-slate-100">{t('call.controlRequestTitle')}</div>
+            <p className="mt-1 text-sm text-slate-400">{t('call.controlRequestBody')}</p>
+            <div className="mt-5 flex gap-3">
+              <button
+                type="button"
+                onClick={denyControl}
+                className="flex-1 rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm font-medium text-slate-200 hover:bg-slate-800"
+              >
+                {t('call.controlDeny')}
+              </button>
+              <button
+                type="button"
+                onClick={grantControl}
+                className="flex-1 rounded-xl bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-500"
+              >
+                {t('call.controlAllow')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Incoming */}
       {phase === 'ringing' && incoming && (
         <div className="fixed inset-0 z-[95] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
@@ -800,7 +1266,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
       )}
 
       {/* Active call */}
-      {phase === 'incall' && (
+      {phase === 'incall' && !minimized && (
         <div
           className="fixed inset-0 z-[95] flex flex-col bg-slate-950"
           style={{
@@ -812,7 +1278,15 @@ export function CallProvider({ children }: { children: ReactNode }) {
             {oneToOne ? (
               <>
                 {remoteList[0] ? (
-                  <RemoteTile p={remoteList[0]} fill register={registerMediaEl} />
+                  <RemoteTile
+                    p={remoteList[0]}
+                    fill
+                    register={registerMediaEl}
+                    screen={remoteSharing === remoteList[0].id}
+                    pointerActive={remoteSharing === remoteList[0].id}
+                    controlActive={controllingPeer === remoteList[0].id}
+                    onInput={onTileInput}
+                  />
                 ) : (
                   <div className="flex h-full w-full flex-col items-center justify-center gap-4">
                     <div className="relative">
@@ -927,6 +1401,33 @@ export function CallProvider({ children }: { children: ReactNode }) {
             >
               {speakerOn ? <SpeakerIcon size={22} /> : <SpeakerOffIcon size={22} />}
             </button>
+            {canScreenShare && (
+              <button
+                type="button"
+                onClick={() => (screenSharing ? void stopScreenShare() : void startScreenShare())}
+                aria-label={screenSharing ? t('call.stopScreenShare') : t('call.screenShare')}
+                title={screenSharing ? t('call.stopScreenShare') : t('call.screenShare')}
+                className={`grid h-12 w-12 place-items-center rounded-full ${
+                  screenSharing ? 'bg-white text-slate-900' : 'bg-slate-800 text-white hover:bg-slate-700'
+                }`}
+              >
+                {screenSharing ? <ScreenShareOffIcon size={22} /> : <ScreenShareIcon size={22} />}
+              </button>
+            )}
+            {oneToOne && remoteList[0] && remoteSharing === remoteList[0].id && (
+              <button
+                type="button"
+                onClick={() => (controllingPeer ? stopControlling() : requestControl())}
+                disabled={!!controlPending}
+                aria-label={controllingPeer ? t('call.stopControlling') : t('call.requestControl')}
+                title={controllingPeer ? t('call.stopControlling') : t('call.requestControl')}
+                className={`grid h-12 w-12 place-items-center rounded-full disabled:opacity-50 ${
+                  controllingPeer ? 'bg-emerald-500 text-white' : 'bg-slate-800 text-white hover:bg-slate-700'
+                }`}
+              >
+                <HandPointerIcon size={22} />
+              </button>
+            )}
             <button
               type="button"
               onClick={endCall}
