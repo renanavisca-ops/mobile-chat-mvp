@@ -139,6 +139,33 @@ export default function ChatsPage() {
   const justLongPressed = useRef(false);
   const newMenuRef = useRef<HTMLDivElement>(null);
 
+  // Read-guard: chats we've just read, mapped to the newest message time that was
+  // read. A background refetch can race ahead of markMessagesAsRead's commit and
+  // momentarily report the chat as unread again (the "read → drops down → unread
+  // again" flip). We keep such a chat at 0 unread until a STRICTLY newer message
+  // arrives (last_message_at advances past the guarded time), which is the only
+  // legitimate way it can become unread again. Self-clears once the server agrees.
+  const readGuardRef = useRef<Map<string, string>>(new Map());
+  const prevSelectedRef = useRef<string | null>(null);
+  const applyReadGuard = (rows: ChatSummary[]): ChatSummary[] =>
+    rows.map((c) => {
+      const g = readGuardRef.current.get(c.id);
+      if (g === undefined) return c;
+      const lm = c.last_message_at ?? '';
+      if (lm > g) {
+        // A genuinely newer message arrived — stop guarding, trust the server.
+        readGuardRef.current.delete(c.id);
+        return c;
+      }
+      if ((c.unread_count ?? 0) === 0) {
+        // Server has caught up to our read; guard no longer needed.
+        readGuardRef.current.delete(c.id);
+        return c;
+      }
+      // Stale race: keep it read.
+      return { ...c, unread_count: 0 };
+    });
+
   // Close the "new chat" (+) menu on any tap outside it. A document listener
   // (not a fixed backdrop) is required because the glass header's backdrop-filter
   // would contain a fixed catcher to the header strip only.
@@ -154,8 +181,9 @@ export default function ChatsPage() {
   const reloadChats = () => {
     listChats()
       .then((rows) => {
-        setChats(rows);
-        if (user) setCached(`chats:${user.id}`, rows);
+        const guarded = applyReadGuard(rows);
+        setChats(guarded);
+        if (user) setCached(`chats:${user.id}`, guarded);
       })
       .catch((e) => setErr(e?.message ?? String(e)));
   };
@@ -166,7 +194,7 @@ export default function ChatsPage() {
     if (!user) return;
     const cached = getCached<ChatSummary[]>(`chats:${user.id}`);
     if (cached && cached.length) {
-      setChats(cached);
+      setChats(applyReadGuard(cached));
       setChatsLoaded(true);
     }
   }, [user]);
@@ -224,8 +252,9 @@ export default function ChatsPage() {
     const load = () => {
       listChats()
         .then((rows) => {
-          setChats(rows);
-          setCached(`chats:${user.id}`, rows);
+          const guarded = applyReadGuard(rows);
+          setChats(guarded);
+          setCached(`chats:${user.id}`, guarded);
         })
         .catch((e) => setErr(e?.message ?? String(e)))
         .finally(() => setChatsLoaded(true));
@@ -319,6 +348,16 @@ export default function ChatsPage() {
   // markMessagesAsRead has run — otherwise a read chat keeps showing as unread on
   // the desktop/web split view where the list stays mounted.
   useEffect(() => {
+    // Guard the chat we're LEAVING as fully read up to its latest message, so a
+    // racing refetch can't resurrect its badge after it correctly dropped to time
+    // order. (Everything up to now was read while it was open.)
+    const prev = prevSelectedRef.current;
+    if (prev && prev !== selectedId) {
+      const pc = chatsRef.current.find((c) => c.id === prev);
+      readGuardRef.current.set(prev, pc?.last_message_at ?? new Date().toISOString());
+    }
+    prevSelectedRef.current = selectedId;
+
     if (!selectedId) {
       setOpenedWhileUnread(false);
       return;
@@ -327,6 +366,9 @@ export default function ChatsPage() {
     // chat was unread when opened, to hold its position while it's on screen.
     const opened = chatsRef.current.find((c) => c.id === selectedId);
     setOpenedWhileUnread((opened?.unread_count ?? 0) > 0);
+    // Guard the chat we're opening too (covers the phone flow, where opening
+    // navigates away and this list may refetch before the read commits).
+    readGuardRef.current.set(selectedId, opened?.last_message_at ?? new Date().toISOString());
     if (!user) return;
     // Clear its badge immediately (it's being read now); position is held by the
     // sort below until you leave it. Marking-as-read emits realtime UPDATEs that
