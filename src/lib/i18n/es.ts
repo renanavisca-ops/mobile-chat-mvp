@@ -406,6 +406,9 @@ const es: Dictionary = {
     links: 'Enlaces',
     empty: 'Nada aquí todavía.',
   },
+  push: {
+    newMessages: '{{n}} mensajes nuevos',
+  },
   schedule: {
     title: 'Programar mensaje',
     messageLabel: 'Mensaje',

@@ -158,12 +158,47 @@ function playChime(): void {
 
 let foregroundReady = false;
 
+// Foreground pushes are coalesced: reopening the app after it was closed
+// delivers every queued FCM message at once, so without this each one would
+// chime and pop its own banner. We buffer arrivals for a short window and then
+// chime ONCE and raise a single event — one banner per burst.
+type PendingPush = { title: string; body: string; url?: string };
+let pushBuffer: PendingPush[] = [];
+let flushTimer: ReturnType<typeof setTimeout> | null = null;
+const PUSH_COALESCE_MS = 1200;
+
+function flushPushBuffer(): void {
+  flushTimer = null;
+  const items = pushBuffer;
+  pushBuffer = [];
+  if (items.length === 0) return;
+  playChime(); // once for the whole burst
+  const urls = new Set(items.map((i) => i.url).filter(Boolean));
+  const detail =
+    items.length === 1
+      ? { title: items[0].title, body: items[0].body, url: items[0].url, count: 1 }
+      : {
+          // The banner localizes this from `count`; keep url only if every
+          // message points at the same chat, else send the user to the chat list.
+          title: 'Toky Chat',
+          body: '',
+          url: urls.size === 1 ? items[0].url : '/chats',
+          count: items.length,
+        };
+  try {
+    window.dispatchEvent(new CustomEvent('toky:push', { detail }));
+  } catch {
+    /* ignore */
+  }
+}
+
 /**
- * Handle pushes that arrive while the app is in the foreground: play a chime and
- * raise a `toky:push` window event so an in-app banner can show (see
- * PushBanner). The OS won't display a foreground FCM message on its own, so this
- * is what makes messages audible/visible while you're using the app. Idempotent;
- * no-op on web.
+ * Handle pushes that arrive while the app is in the foreground: chime and raise a
+ * `toky:push` window event so an in-app banner can show (see PushBanner). The OS
+ * won't display a foreground FCM message on its own, so this is what makes
+ * messages audible/visible while you're using the app. Arrivals are coalesced
+ * (see above) so a reopen burst is one chime + one banner. Idempotent; no-op on
+ * web.
  */
 export async function initForegroundPush(): Promise<void> {
   if (!isNativeApp() || foregroundReady) return;
@@ -180,10 +215,8 @@ export async function initForegroundPush(): Promise<void> {
       try {
         if (url && typeof window !== 'undefined' && window.location.href.includes(url)) return;
       } catch { /* ignore */ }
-      playChime();
-      try {
-        window.dispatchEvent(new CustomEvent('toky:push', { detail: { title, body, url } }));
-      } catch { /* ignore */ }
+      pushBuffer.push({ title, body, url });
+      if (!flushTimer) flushTimer = setTimeout(flushPushBuffer, PUSH_COALESCE_MS);
     });
   } catch {
     foregroundReady = false;

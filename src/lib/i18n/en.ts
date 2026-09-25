@@ -404,6 +404,9 @@ const en = {
     links: 'Links',
     empty: 'Nothing here yet.',
   },
+  push: {
+    newMessages: '{{n}} new messages',
+  },
   schedule: {
     title: 'Schedule message',
     messageLabel: 'Message',
