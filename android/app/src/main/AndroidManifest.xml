@@ -49,6 +49,12 @@
             android:name=".CallForegroundService"
             android:foregroundServiceType="microphone"
             android:exported="false" />
+
+        <!-- Captures the screen (MediaProjection) while sharing during a call -->
+        <service
+            android:name=".ScreenCaptureService"
+            android:foregroundServiceType="mediaProjection"
+            android:exported="false" />
     </application>
 
     <!-- Permissions -->
@@ -67,6 +73,9 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+    <!-- Screen sharing during a call (MediaProjection foreground service) -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
 
     <!-- Save photos/videos to the gallery (@capacitor-community/media). Writing to
          MediaStore needs WRITE_EXTERNAL_STORAGE only up to Android 9; the READ_MEDIA_*
