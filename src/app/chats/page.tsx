@@ -285,8 +285,23 @@ export default function ChatsPage() {
       })
       .subscribe();
 
+    // Catch-up on resume. Realtime (postgres_changes) does NOT replay events
+    // missed while the tab was hidden / the phone was backgrounded, so reading a
+    // chat on another device wouldn't clear its unread badge here until some new
+    // event happened. Refetch whenever we come back to the foreground so unread
+    // counts reconcile across devices (mirrors the message thread's catch-up).
+    const onResume = () => {
+      if (document.visibilityState === 'visible') scheduleReload();
+    };
+    document.addEventListener('visibilitychange', onResume);
+    window.addEventListener('focus', onResume);
+    window.addEventListener('online', onResume);
+
     return () => {
       if (reloadTimer) window.clearTimeout(reloadTimer);
+      document.removeEventListener('visibilitychange', onResume);
+      window.removeEventListener('focus', onResume);
+      window.removeEventListener('online', onResume);
       void browserSupabase().removeChannel(channel);
       void browserSupabase().removeChannel(messagesChannel);
     };
