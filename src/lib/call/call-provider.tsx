@@ -22,7 +22,7 @@ import {
   nativeStopCallAudio,
 } from '@/lib/call/native-audio';
 import { useT } from '@/lib/i18n/context';
-import { screenShareSupported, captureScreenTrack } from '@/lib/call/screen-share';
+import { screenShareSupported, captureScreenTrack, stopScreenCapture } from '@/lib/call/screen-share';
 import { applyRemoteControl, RELAYED_KEYS, type RcMsg } from '@/lib/call/remote-control';
 import {
   PhoneIcon,
@@ -420,6 +420,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
     try {
       screenTrackRef.current?.stop();
     } catch {}
+    if (screenTrackRef.current) void stopScreenCapture();
     screenTrackRef.current = null;
     shareRestoreRef.current = null;
     localStreamRef.current?.getTracks().forEach((tr) => tr.stop());
@@ -963,6 +964,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
     try {
       track.stop();
     } catch {}
+    void stopScreenCapture(); // release native MediaProjection (no-op on web)
     screenTrackRef.current = null;
     // Tell viewers, and end any control they held over me.
     for (const pid of pcsRef.current.keys()) sendSignal('share', { from: myIdRef.current, to: pid, on: false });
