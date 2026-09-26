@@ -1847,7 +1847,21 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
 
     if (pendingImages.length) clearPendingImages();
 
-    const normalized = new File([file], safeName, { type: file.type });
+    // Copy the bytes into memory RIGHT AWAY. On Android the picked File is backed
+    // by a content:// reference whose read permission is revoked shortly after the
+    // picker returns — reading it later (preview, trim, encrypt, upload) then
+    // fails with "The requested file could not be read…". Reading now, into a
+    // stable in-memory File, sidesteps that for both preview and send. (Mirrors
+    // what onImagesChange already does.)
+    let normalized: File;
+    try {
+      const buf = await file.arrayBuffer();
+      normalized = new File([buf], safeName, { type: file.type || 'video/mp4' });
+    } catch {
+      setErr(t('chat.videoReadFailed'));
+      e.target.value = '';
+      return;
+    }
 
     if (previewVideo) URL.revokeObjectURL(previewVideo);
     setPreviewVideo(URL.createObjectURL(normalized));

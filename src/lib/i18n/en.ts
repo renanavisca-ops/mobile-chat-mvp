@@ -209,6 +209,7 @@ const en = {
     onlyJpgPngWebp: 'Only JPG, PNG or WEBP.',
     maxImageSize: 'Maximum 5MB per image.',
     imageReadFailed: "Couldn't read that image — please pick it again.",
+    videoReadFailed: "Couldn't read that video — please pick it again.",
     invalidFilename: 'Invalid file name.',
     maxVideoSize: 'Maximum 200MB per video.',
     fileFeaturePending: 'File: coming in a future update.',
