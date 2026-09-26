@@ -211,6 +211,7 @@ const es: Dictionary = {
     onlyJpgPngWebp: 'Solo JPG, PNG o WEBP.',
     maxImageSize: 'Máximo 5MB por imagen.',
     imageReadFailed: 'No se pudo leer esa imagen — vuelve a seleccionarla.',
+    videoReadFailed: 'No se pudo leer ese video — vuelve a seleccionarlo.',
     invalidFilename: 'Nombre de archivo inválido.',
     maxVideoSize: 'Máximo 200MB por video.',
     fileFeaturePending: 'Archivos: disponible en una próxima actualización.',
