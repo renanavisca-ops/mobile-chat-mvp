@@ -3,6 +3,11 @@ import webpush from 'web-push';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { sendToTokens } from '@/lib/fcm';
 
+// How long the push services may retain a notification for an offline device.
+// Kept short so reopening a client doesn't replay a backlog of already-seen
+// (often already-read-elsewhere) messages.
+const PUSH_TTL_SECONDS = 120;
+
 /**
  * Called by a Postgres trigger (public.notify_new_message) right after a
  * message is inserted. Auth'd with a shared secret header, not a user token —
@@ -87,7 +92,14 @@ export async function POST(req: Request) {
           try {
             await webpush.sendNotification(
               { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
-              payload
+              payload,
+              // Short TTL: a chat push is only useful while fresh. web-push's
+              // default TTL (~4 weeks) makes the push service HOLD every
+              // notification while a browser is closed and dump them all when it
+              // reopens — so a device that already read everything elsewhere gets
+              // flooded with stale alerts on open. Expiring them after a couple of
+              // minutes stops that; the unread badge still covers anything older.
+              { TTL: PUSH_TTL_SECONDS }
             );
           } catch (e: any) {
             if (e?.statusCode === 404 || e?.statusCode === 410) staleIds.push(sub.id);
@@ -104,7 +116,7 @@ export async function POST(req: Request) {
     let nativeSent = 0;
     if (hasNative) {
       const tokens = deviceTokens!.map((d) => d.token);
-      const { staleTokens, sent } = await sendToTokens(tokens, { title, body, url });
+      const { staleTokens, sent } = await sendToTokens(tokens, { title, body, url }, PUSH_TTL_SECONDS);
       nativeSent = sent;
       if (staleTokens.length > 0) {
         await supabaseAdmin.from('device_tokens').delete().in('token', staleTokens);

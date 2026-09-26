@@ -75,13 +75,18 @@ async function getAccessToken(sa: ServiceAccount): Promise<string> {
  */
 export async function sendToTokens(
   tokens: string[],
-  notif: Notif
+  notif: Notif,
+  ttlSeconds?: number
 ): Promise<{ staleTokens: string[]; sent: number }> {
   const sa = getServiceAccount();
   if (!sa || tokens.length === 0) return { staleTokens: [], sent: 0 };
 
   const accessToken = await getAccessToken(sa);
   const endpoint = `https://fcm.googleapis.com/v1/projects/${sa.project_id}/messages:send`;
+
+  // Expire stale notifications instead of FCM's ~4-week default, so reopening an
+  // app doesn't replay a backlog of messages already seen/read on another device.
+  const apnsExpiration = ttlSeconds ? Math.floor(Date.now() / 1000) + ttlSeconds : undefined;
 
   const staleTokens: string[] = [];
   let sent = 0;
@@ -93,8 +98,15 @@ export async function sendToTokens(
           token,
           notification: { title: notif.title, body: notif.body },
           ...(notif.url ? { data: { url: notif.url } } : {}),
-          android: { priority: 'HIGH', notification: { sound: 'default' } },
-          apns: { payload: { aps: { sound: 'default', badge: 1 } } },
+          android: {
+            priority: 'HIGH',
+            ...(ttlSeconds ? { ttl: `${ttlSeconds}s` } : {}),
+            notification: { sound: 'default' },
+          },
+          apns: {
+            ...(apnsExpiration ? { headers: { 'apns-expiration': String(apnsExpiration) } } : {}),
+            payload: { aps: { sound: 'default', badge: 1 } },
+          },
         },
       };
       try {
