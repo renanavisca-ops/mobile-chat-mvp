@@ -1225,10 +1225,15 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
     async function resolveMissing() {
       // Map each media path to its per-object encryption metadata (if any).
       const encByPath = new Map<string, MediaEnc | undefined>();
+      // Track which paths are videos so we can give the decrypter a MIME fallback
+      // — older/camera-recorded videos were stored without a usable video type,
+      // which mobile WebViews won't play from a blob URL.
+      const videoPaths = new Set<string>();
       for (const m of items) {
         for (const p of extractAllPaths(m.body)) {
           if (!encByPath.has(p)) encByPath.set(p, m.body.enc?.[p]);
         }
+        if (m.body.videoPath) videoPaths.add(m.body.videoPath);
       }
 
       // Skip paths already resolved or already marked failed (tap-to-retry
@@ -1245,8 +1250,9 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
       // and the viewer is a member.
       async function resolveOne(path: string): Promise<string> {
         const enc = encByPath.get(path);
+        const fallbackMime = videoPaths.has(path) ? 'video/mp4' : undefined;
         const attempt = () =>
-          enc ? fetchDecryptedMediaUrl(path, enc) : fetchCachedMediaUrl(path, 300);
+          enc ? fetchDecryptedMediaUrl(path, enc, fallbackMime) : fetchCachedMediaUrl(path, 300);
         try {
           return await attempt();
         } catch {
@@ -1856,7 +1862,13 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
     let normalized: File;
     try {
       const buf = await file.arrayBuffer();
-      normalized = new File([buf], safeName, { type: file.type || 'video/mp4' });
+      // Force a real video MIME. Phone cameras often hand back a File whose type
+      // is empty or "application/octet-stream"; if we keep that, the attachment is
+      // stored/encrypted without a video type and the recipient's Android/iOS
+      // WebView refuses to play it (desktop browsers sniff, so it works there).
+      const rawType = (file.type || '').toLowerCase();
+      const videoType = rawType.startsWith('video/') ? rawType : 'video/mp4';
+      normalized = new File([buf], safeName, { type: videoType });
     } catch {
       setErr(t('chat.videoReadFailed'));
       e.target.value = '';

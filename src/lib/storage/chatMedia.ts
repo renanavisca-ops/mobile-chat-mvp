@@ -275,16 +275,30 @@ export async function uploadEncryptedChatMedia(input: {
   return { path, enc };
 }
 
+// A blob:// video only plays in the Android/iOS WebView when the Blob carries a
+// real video MIME type. Older attachments (and some phone-camera recordings)
+// were stored with an empty or "application/octet-stream" type, which desktop
+// browsers happily sniff but mobile WebViews refuse. When the caller knows the
+// attachment is a video, re-wrap such a blob with a proper type so it plays.
+function withFallbackType(blob: Blob, fallbackMime?: string): Blob {
+  const t = (blob.type || '').toLowerCase();
+  if (fallbackMime && (t === '' || t === 'application/octet-stream')) {
+    return new Blob([blob], { type: fallbackMime });
+  }
+  return blob;
+}
+
 /**
  * Download an encrypted object via a short-lived signed URL, decrypt it in
  * memory, and return an object URL of the plaintext. The caller must
- * URL.revokeObjectURL(...) it when done.
+ * URL.revokeObjectURL(...) it when done. `fallbackMime` (e.g. 'video/mp4') is
+ * applied when the decrypted blob has no usable MIME type.
  */
-export async function fetchDecryptedMediaUrl(path: string, enc: MediaEnc): Promise<string> {
+export async function fetchDecryptedMediaUrl(path: string, enc: MediaEnc, fallbackMime?: string): Promise<string> {
   // Serve previously-decrypted bytes from the on-device cache — no re-download,
   // no re-decrypt — so images don't reload every time a chat is opened.
   const cached = await getCachedMedia(path);
-  if (cached) return URL.createObjectURL(cached);
+  if (cached) return URL.createObjectURL(withFallbackType(cached, fallbackMime));
 
   const signed = await createSignedChatMediaUrl(path, 300);
   const res = await fetch(signed);
@@ -293,7 +307,7 @@ export async function fetchDecryptedMediaUrl(path: string, enc: MediaEnc): Promi
   const blob = await decryptMedia(bytes, enc);
   // Persist for next time (immutable path → safe to cache indefinitely).
   void putCachedMedia(path, blob);
-  return URL.createObjectURL(blob);
+  return URL.createObjectURL(withFallbackType(blob, fallbackMime));
 }
 
 const MAX_FILE_BYTES = 50 * 1024 * 1024; // 50MB — documents (Word/Excel/PPT/PDF)
