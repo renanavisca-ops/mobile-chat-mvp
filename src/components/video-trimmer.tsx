@@ -157,6 +157,8 @@ export function VideoTrimmer({
   );
 }
 
+const VIDEO_SPEEDS = [1, 1.5, 2, 0.5];
+
 /** Video player that honours an optional [start,end] trim window. */
 export function TrimmedVideo({
   src,
@@ -175,33 +177,56 @@ export function TrimmedVideo({
 }) {
   const ref = useRef<HTMLVideoElement | null>(null);
   const hasTrim = typeof start === 'number' && typeof end === 'number' && end > start;
+  const [rate, setRate] = useState(1);
 
+  function cycleRate() {
+    const next = VIDEO_SPEEDS[(VIDEO_SPEEDS.indexOf(rate) + 1) % VIDEO_SPEEDS.length];
+    setRate(next);
+    if (ref.current) ref.current.playbackRate = next;
+  }
+
+  // The native controls' speed menu opens off-screen inside the Android WebView,
+  // so we expose an always-visible speed button that sets playbackRate directly.
   return (
-    <video
-      ref={ref}
-      src={src}
-      controls
-      // Load the video only when the user hits play, not on every chat open.
-      // Inline videos can be large (up to 200MB), so preloading them — even just
-      // metadata — for messages nobody plays is a needless download. Playback,
-      // the trim-start seek (onLoadedMetadata) and the inline-play/error checks
-      // all still work; they just fire on first play.
-      preload="none"
-      className={className}
-      onError={onError}
-      onCanPlay={onCanPlay}
-      onLoadedMetadata={() => {
-        if (hasTrim && ref.current) ref.current.currentTime = start!;
-      }}
-      onTimeUpdate={() => {
-        if (!hasTrim || !ref.current) return;
-        const v = ref.current;
-        if (v.currentTime < start!) v.currentTime = start!;
-        if (v.currentTime >= end!) {
-          v.currentTime = start!;
-          v.pause();
-        }
-      }}
-    />
+    <div className="relative">
+      <video
+        ref={ref}
+        src={src}
+        controls
+        // Load the video only when the user hits play, not on every chat open.
+        // Inline videos can be large (up to 200MB), so preloading them — even just
+        // metadata — for messages nobody plays is a needless download. Playback,
+        // the trim-start seek (onLoadedMetadata) and the inline-play/error checks
+        // all still work; they just fire on first play.
+        preload="none"
+        className={className}
+        onError={onError}
+        onCanPlay={onCanPlay}
+        onLoadedMetadata={() => {
+          if (ref.current) ref.current.playbackRate = rate;
+          if (hasTrim && ref.current) ref.current.currentTime = start!;
+        }}
+        onPlay={() => {
+          if (ref.current) ref.current.playbackRate = rate;
+        }}
+        onTimeUpdate={() => {
+          if (!hasTrim || !ref.current) return;
+          const v = ref.current;
+          if (v.currentTime < start!) v.currentTime = start!;
+          if (v.currentTime >= end!) {
+            v.currentTime = start!;
+            v.pause();
+          }
+        }}
+      />
+      <button
+        type="button"
+        onClick={cycleRate}
+        aria-label="Playback speed"
+        className="absolute right-2 top-2 rounded-full bg-black/60 px-2.5 py-1 text-xs font-bold tabular-nums text-white backdrop-blur-sm"
+      >
+        {rate}×
+      </button>
+    </div>
   );
 }
