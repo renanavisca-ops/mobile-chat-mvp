@@ -25,6 +25,9 @@ export default function LoginPage() {
   const [status, setStatus] = useState('');
   // True once we know this email exists but hasn't confirmed — surfaces a resend.
   const [needsConfirm, setNeedsConfirm] = useState(false);
+  // True when a signup is attempted with an email that already has an account —
+  // surfaces "sign in / recover password" instead of silently doing nothing.
+  const [emailExists, setEmailExists] = useState(false);
   // 2FA challenge state (only when the account has TOTP enabled).
   const [mfaFactorId, setMfaFactorId] = useState('');
   const [mfaCode, setMfaCode] = useState('');
@@ -83,6 +86,7 @@ export default function LoginPage() {
     setBusy(true);
     setStatus('');
     setNeedsConfirm(false);
+    setEmailExists(false);
 
     try {
       const supabase = browserSupabase();
@@ -110,7 +114,30 @@ export default function LoginPage() {
           }
         });
 
-        if (error) throw error;
+        if (error) {
+          // "User already registered" (returned when email confirmation is off).
+          const msg = String(error.message || '').toLowerCase();
+          if (
+            (error as { code?: string }).code === 'user_already_exists' ||
+            msg.includes('already registered') ||
+            msg.includes('already exists')
+          ) {
+            setEmailExists(true);
+            setStatus(`⚠️ ${t('auth.errorEmailExists')}`);
+            return;
+          }
+          throw error;
+        }
+
+        // With email confirmation ON, signing up with an EXISTING email returns a
+        // fake "success" (to avoid leaking who's registered): a user object with an
+        // empty identities array and no session. Detect it and warn instead of
+        // showing "check your email", so people don't think they made a new account.
+        if (data?.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+          setEmailExists(true);
+          setStatus(`⚠️ ${t('auth.errorEmailExists')}`);
+          return;
+        }
 
         const userId = data?.user?.id;
         if (!userId) {
@@ -429,9 +456,30 @@ export default function LoginPage() {
             <div className={`mt-4 p-3 rounded-lg border text-xs whitespace-pre-wrap ${
               status.startsWith('✅')
                 ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                : status.startsWith('⚠️')
+                ? 'bg-amber-500/10 text-amber-300 border-amber-500/20'
                 : 'bg-rose-500/10 text-rose-400 border-rose-500/20'
             }`}>
               {status}
+            </div>
+          )}
+
+          {emailExists && (
+            <div className="mt-3 flex flex-col gap-2">
+              <button
+                className="w-full rounded-lg border border-slate-700 bg-slate-900 px-4 py-2 text-sm font-medium text-slate-200 hover:bg-slate-800 disabled:opacity-50"
+                onClick={() => { setEmailExists(false); setStatus(''); setMode('signin'); }}
+                disabled={busy}
+              >
+                {t('auth.goToSignIn')}
+              </button>
+              <button
+                className="w-full rounded-lg toky-grad px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                onClick={handleForgotPassword}
+                disabled={busy}
+              >
+                {t('auth.recoverPassword')}
+              </button>
             </div>
           )}
 
