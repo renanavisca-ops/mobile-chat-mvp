@@ -15,11 +15,29 @@ function fmt(s: number): string {
  * with a "⋮" overflow menu that opens off-screen. This gives a clean play/pause
  * button + progress bar + time that matches the chat bubbles instead.
  */
+const SPEEDS = [1, 1.5, 2];
+const RATE_KEY = 'toky.audioRate';
+
+function loadRate(): number {
+  try {
+    const v = Number(localStorage.getItem(RATE_KEY));
+    return SPEEDS.includes(v) ? v : 1;
+  } catch {
+    return 1;
+  }
+}
+
 export function AudioMessage({ src, mine }: { src: string; mine?: boolean }) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [playing, setPlaying] = useState(false);
   const [cur, setCur] = useState(0);
   const [dur, setDur] = useState(0);
+  const [rate, setRate] = useState(1);
+
+  // Restore the last-used speed (remembered across voice notes, like WhatsApp).
+  useEffect(() => {
+    setRate(loadRate());
+  }, []);
 
   useEffect(() => {
     const a = audioRef.current;
@@ -42,10 +60,28 @@ export function AudioMessage({ src, mine }: { src: string; mine?: boolean }) {
     };
   }, []);
 
+  // Keep the element's rate in sync (also re-applied on play, since some
+  // WebViews reset playbackRate when the source (re)loads).
+  useEffect(() => {
+    if (audioRef.current) audioRef.current.playbackRate = rate;
+  }, [rate]);
+
+  function cycleRate() {
+    const next = SPEEDS[(SPEEDS.indexOf(rate) + 1) % SPEEDS.length];
+    setRate(next);
+    if (audioRef.current) audioRef.current.playbackRate = next;
+    try {
+      localStorage.setItem(RATE_KEY, String(next));
+    } catch {
+      /* ignore */
+    }
+  }
+
   function toggle() {
     const a = audioRef.current;
     if (!a) return;
     if (a.paused) {
+      a.playbackRate = rate;
       void a.play();
       setPlaying(true);
     } else {
@@ -104,6 +140,16 @@ export function AudioMessage({ src, mine }: { src: string; mine?: boolean }) {
       <span className="w-9 shrink-0 text-right text-[11px] tabular-nums opacity-80">
         {fmt(playing || cur > 0 ? cur : dur)}
       </span>
+      <button
+        type="button"
+        onClick={cycleRate}
+        aria-label="Playback speed"
+        className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold tabular-nums ${
+          mine ? 'bg-white/20 text-white' : 'bg-slate-800 text-slate-200'
+        }`}
+      >
+        {rate}×
+      </button>
     </div>
   );
 }
