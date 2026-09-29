@@ -28,6 +28,10 @@ export type ChatSummary = {
   archived?: boolean;
   /** Count of incoming messages I haven't read yet in this chat. */
   unread_count?: number;
+  /** Official app-news channel (auto-joined by everyone; only admin posts). */
+  is_announcement?: boolean;
+  /** "Notas personales": a solo chat with only yourself. */
+  is_self?: boolean;
 };
 
 export type ProfileLite = {

@@ -519,7 +519,13 @@ export default function ChatsPage() {
               const effUnread = (c: ChatSummary) =>
                 c.id === selectedId ? (openedWhileUnread ? 1 : 0) : (c.unread_count ?? 0);
               const ts = (c: ChatSummary) => (c.last_message_at ? new Date(c.last_message_at).getTime() : 0);
+              // Pinned to the very top, above the unread group: your personal
+              // notes chat first, then the official app-news channel.
+              const pinRank = (c: ChatSummary) => (c.is_self ? 0 : c.is_announcement ? 1 : 2);
               const byUnreadThenRecent = (a: ChatSummary, b: ChatSummary) => {
+                const pa = pinRank(a);
+                const pb = pinRank(b);
+                if (pa !== pb) return pa - pb;
                 const au = effUnread(a) > 0 ? 1 : 0;
                 const bu = effUnread(b) > 0 ? 1 : 0;
                 if (au !== bu) return bu - au;

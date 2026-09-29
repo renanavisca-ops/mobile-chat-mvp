@@ -81,6 +81,7 @@ export type Database = {
           enc_required: boolean
           encrypted: boolean
           id: string
+          is_announcement: boolean
           is_public: boolean
           kind: string
           pinned_message_id: string | null
@@ -98,6 +99,7 @@ export type Database = {
           enc_required?: boolean
           encrypted?: boolean
           id?: string
+          is_announcement?: boolean
           is_public?: boolean
           kind: string
           pinned_message_id?: string | null
@@ -115,6 +117,7 @@ export type Database = {
           enc_required?: boolean
           encrypted?: boolean
           id?: string
+          is_announcement?: boolean
           is_public?: boolean
           kind?: string
           pinned_message_id?: string | null
