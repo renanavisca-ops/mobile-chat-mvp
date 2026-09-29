@@ -1547,6 +1547,14 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
   function onMsgPointerDown(e: React.PointerEvent, m: MessageRow & { body: Payload }) {
     if (selectMode || m.body.is_deleted || m.sender_type === 'system') return;
     swipeStart.current = { x: e.clientX, y: e.clientY, id: m.id, decided: 'none' };
+    // Capture the pointer so the swipe keeps getting move/up events even when the
+    // finger drifts off this bubble (otherwise the gesture is dropped mid-swipe
+    // and the reply never triggers — the main reason swipe-to-reply felt flaky).
+    try {
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    } catch {
+      /* not all pointers support capture */
+    }
     startLongPress(m.id, m.body);
   }
   function onMsgPointerMove(e: React.PointerEvent, m: MessageRow & { body: Payload }) {
@@ -2775,7 +2783,7 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
                     )}
                     <li
                       id={`msg-${m.id}`}
-                      className={`relative flex flex-col mb-1.5 px-3.5 py-2 rounded-[1.25rem] w-fit max-w-[80%] transition-shadow ${grouped ? '-mt-1' : ''} ${
+                      className={`relative flex flex-col mb-1.5 px-3.5 py-2 rounded-[1.25rem] w-fit max-w-[80%] transition-shadow touch-pan-y ${grouped ? '-mt-1' : ''} ${
                         selectMode && selectedIds.has(m.id) ? 'ring-2 ring-blue-400 ring-offset-2 ring-offset-slate-950' : ''
                       } ${
                         m.sender_type === 'system' ? 'mx-auto bg-slate-800/80 text-center text-xs text-slate-400' :
