@@ -104,6 +104,7 @@ const en = {
     resendConfirmation: 'Resend confirmation email',
     statusConfirmResent: 'Confirmation email sent. Check your inbox (and spam).',
     errorEmailExists: 'An account with this email already exists. Sign in, or recover your password if it’s yours.',
+    errorGoogleOnly: 'For now you can only sign up with a Google (@gmail.com) address. Please check the spelling.',
     goToSignIn: 'Sign in',
     recoverPassword: 'Recover password',
     mfaTitle: 'Two-factor authentication',

@@ -12,6 +12,10 @@ import { useT } from '@/lib/i18n/context';
 
 type Mode = 'signin' | 'signup' | 'forgot';
 
+// Closed test: new accounts must use a Google (gmail) address. Existing accounts
+// on other providers can still sign in; this only gates NEW signups.
+const ALLOWED_SIGNUP_DOMAINS = ['gmail.com', 'googlemail.com'];
+
 export default function LoginPage() {
   const router = useRouter();
   const t = useT();
@@ -95,6 +99,13 @@ export default function LoginPage() {
       if (!e.includes('@')) throw new Error(t('auth.errorInvalidEmailShort'));
 
       if (mode === 'signup') {
+        // Closed test: only Google (gmail) addresses may register. This also
+        // rejects typo domains like "@gamil.com" and non-Google providers.
+        const domain = e.split('@')[1] || '';
+        if (!ALLOWED_SIGNUP_DOMAINS.includes(domain)) {
+          throw new Error(t('auth.errorGoogleOnly'));
+        }
+
         const pwCheck = validatePassword(password);
         if (!pwCheck.ok) {
           throw new Error(

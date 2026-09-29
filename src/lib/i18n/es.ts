@@ -106,6 +106,7 @@ const es: Dictionary = {
     resendConfirmation: 'Reenviar correo de confirmación',
     statusConfirmResent: 'Correo de confirmación enviado. Revisa tu bandeja (y spam).',
     errorEmailExists: 'Ya existe una cuenta con este correo. Inicia sesión o, si es tuyo, recupera tu contraseña.',
+    errorGoogleOnly: 'Por ahora solo puedes registrarte con un correo de Google (@gmail.com). Revisa que esté bien escrito.',
     goToSignIn: 'Iniciar sesión',
     recoverPassword: 'Recuperar contraseña',
     mfaTitle: 'Autenticación en dos pasos',
