@@ -64,7 +64,7 @@ export async function listChats(): Promise<ChatSummary[]> {
 
   const { data: chats, error } = await supabase
     .from('chats')
-    .select('id, kind, title, created_at, store_id, assigned_to, status, pinned_message_id, avatar_url, description, disappearing_seconds, created_by, is_public')
+    .select('id, kind, title, created_at, store_id, assigned_to, status, pinned_message_id, avatar_url, description, disappearing_seconds, created_by, is_public, is_announcement')
     .order('created_at', { ascending: false });
 
   if (error) throw error;
@@ -225,6 +225,9 @@ export async function listChats(): Promise<ChatSummary[]> {
       member_ids: otherIds,
       archived: archivedByChat.get(c.id) ?? false,
       unread_count: unreadByChat.get(c.id) ?? 0,
+      is_announcement: !!c.is_announcement,
+      // A "Notas personales" chat is a group I created with no other members.
+      is_self: c.kind === 'group' && otherIds.length === 0 && c.created_by === user.id,
     };
   });
 
