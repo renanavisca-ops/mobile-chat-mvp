@@ -819,6 +819,8 @@ const es: Dictionary = {
     deleteModalConfirm: 'Eliminar definitivamente',
     deleting: 'Eliminando…',
     signOut: 'Cerrar sesión',
+    signOutAll: 'Cerrar sesión en todos los dispositivos',
+    signOutAllConfirm: 'Se cerrará la sesión en TODOS tus dispositivos. ¿Continuar?',
     signedOut: 'Sesión cerrada',
   },
 };

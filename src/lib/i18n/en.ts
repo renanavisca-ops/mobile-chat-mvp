@@ -817,6 +817,8 @@ const en = {
     deleteModalConfirm: 'Delete permanently',
     deleting: 'Deleting…',
     signOut: 'Sign out',
+    signOutAll: 'Sign out on all devices',
+    signOutAllConfirm: 'This will sign you out on ALL your devices. Continue?',
     signedOut: 'Signed out',
   },
 };
