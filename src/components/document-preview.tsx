@@ -5,6 +5,7 @@ import { Capacitor } from '@capacitor/core';
 import { useLanguage } from '@/lib/i18n/context';
 import { canNativeFiles, openNativeFile, saveNativeFile } from '@/lib/native-files';
 import { PdfCanvas } from '@/components/pdf-canvas';
+import { SpreadsheetView, DocxView } from '@/components/office-view';
 import {
   XIcon,
   DownloadIcon,
@@ -139,6 +140,7 @@ export function DocumentPreview({
   const nativeFiles = canNativeFiles();
   const name = fileName || t('chat.file');
   const mime = (fileMime || mimeFromName(fileName) || '').toLowerCase();
+  const e = ext(fileName).toLowerCase();
   const isImage = mime.startsWith('image/');
   const isPdf = mime === 'application/pdf';
   // PDFs render inline via PDF.js (canvas), which works in the Android System
@@ -146,11 +148,19 @@ export function DocumentPreview({
   // <iframe> of a PDF is blank in that WebView, which is why tapping a PDF used
   // to fall through to the share sheet instead of previewing.)
   const canInlinePdf = isPdf;
-  const previewable = isImage || canInlinePdf;
+  // Office types we can render in-app from the decrypted bytes (see office-view).
+  const isCsv = e === 'csv' || mime === 'text/csv';
+  const isXlsx = ['xlsx', 'xlsm'].includes(e) || mime.includes('spreadsheetml');
+  const isDocx = e === 'docx' || mime.includes('wordprocessingml');
+  // Only render Office inline when there's NO public URL (encrypted chats): the
+  // Microsoft/Google online viewers can't reach an encrypted blob, so we parse
+  // the bytes ourselves. Non-encrypted files keep using the lighter online viewer.
+  const officeInline = (isXlsx || isCsv || isDocx) && !httpUrl;
+  const previewable = isImage || canInlinePdf || officeInline;
   // We only need to fetch (and decrypt) the bytes when we'll actually show them
   // inline, or when there's no http URL to hand off to (encrypted chats). A
   // Word/Excel doc on native, say, needs neither — skip the (up-to-50MB) fetch.
-  const needsBytes = isImage || canInlinePdf || !httpUrl || nativeFiles;
+  const needsBytes = isImage || canInlinePdf || officeInline || !httpUrl || nativeFiles;
 
   // Lock body scroll + close on Escape while open.
   useEffect(() => {
@@ -398,6 +408,10 @@ export function DocumentPreview({
           <img src={objUrl!} alt={name} className="max-h-full max-w-full rounded-xl object-contain" />
         ) : ready && canInlinePdf ? (
           <PdfCanvas blob={blob!} fileName={name} />
+        ) : ready && officeInline && (isXlsx || isCsv) ? (
+          <SpreadsheetView blob={blob!} csv={isCsv} />
+        ) : ready && officeInline && isDocx ? (
+          <DocxView blob={blob!} />
         ) : (
           <div className="flex max-w-sm flex-col items-center gap-4 text-center">
             <button
