@@ -329,9 +329,23 @@ export function DocumentPreview({
       }
     }
 
-    // Encrypted file we can't view externally (no URL, no native opener). If it
-    // already shows inline (image/PDF) there's nothing else to do; otherwise ask
-    // the user to download it so they can open it in another app.
+    // Web, encrypted (no signed URL, no native opener): open the DECRYPTED bytes
+    // in a new tab so the browser shows them WITHOUT downloading — PDFs, images,
+    // text, audio and video render inline, matching the app's "tap to open".
+    // (Office docs the browser can't render will fall back to downloading; a
+    // browser has no inline Word/Excel renderer and external viewers can't reach
+    // an encrypted blob.) window.open runs in the click gesture (blob already in
+    // memory, no await) so the popup blocker allows it.
+    if (blob) {
+      const u = URL.createObjectURL(blob);
+      const w = window.open(u, '_blank', 'noopener,noreferrer');
+      // Keep the URL alive for the new tab to load, then reclaim it.
+      setTimeout(() => { try { URL.revokeObjectURL(u); } catch {} }, 60000);
+      if (!w) setNotice(t('chat.openNeedsDownload')); // popup blocked
+      return;
+    }
+
+    // Nothing to open yet.
     if (ready && previewable) return;
     setNotice(t('chat.openNeedsDownload'));
   }
