@@ -488,9 +488,12 @@ export default function SettingsPage() {
     };
   }, []);
 
-  async function signOut() {
+  // scope 'local' signs out ONLY this device; 'global' revokes every session on
+  // all the user's devices. Default to local so logging out here doesn't kick the
+  // user off their phone too — "sign out everywhere" is a separate, explicit action.
+  async function signOut(scope: 'local' | 'global' = 'local') {
     setStatus('');
-    await supabase.auth.signOut();
+    await supabase.auth.signOut({ scope });
     // Wipe this account's local device/keys so the next user to sign in on this
     // browser doesn't inherit them.
     clearLocalIdentity();
@@ -1283,12 +1286,20 @@ export default function SettingsPage() {
             </div>
           </section>
 
-          <div className="pt-4 border-t border-slate-900">
+          <div className="pt-4 border-t border-slate-900 space-y-2">
             <button
               className="w-full rounded-lg border border-slate-800 bg-slate-900/50 px-4 py-2 text-sm text-slate-300 hover:bg-slate-800 hover:text-white transition-colors"
-              onClick={signOut}
+              onClick={() => signOut('local')}
             >
               {t('settings.signOut')}
+            </button>
+            <button
+              className="w-full rounded-lg border border-slate-800 bg-slate-900/40 px-4 py-2 text-xs text-slate-400 hover:bg-slate-800 hover:text-rose-300 transition-colors"
+              onClick={() => {
+                if (confirm(t('settings.signOutAllConfirm'))) void signOut('global');
+              }}
+            >
+              {t('settings.signOutAll')}
             </button>
             {status && <p className="text-xs text-center mt-3 text-slate-500 italic">{status}</p>}
           </div>

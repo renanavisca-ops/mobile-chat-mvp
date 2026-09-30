@@ -218,13 +218,26 @@ export function DocumentPreview({
       return;
     }
     // Web, non-encrypted: a real signed URL with an attachment disposition, which
-    // the browser downloads.
+    // the browser downloads. Reserve the tab synchronously (during the click) so
+    // the popup blocker doesn't kill the window.open that runs after the await.
     if (httpUrl) {
+      const w = window.open('', '_blank');
       try {
         const u = await httpUrl({ download: true });
-        window.open(u, '_blank', 'noopener,noreferrer');
+        if (w) {
+          w.location.href = u;
+        } else {
+          const a = document.createElement('a');
+          a.href = u;
+          a.download = name;
+          a.rel = 'noreferrer';
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+        }
         return;
       } catch {
+        if (w) { try { w.close(); } catch {} }
         setError(t('chat.downloadFailed'));
         return;
       }
@@ -265,11 +278,14 @@ export function DocumentPreview({
   async function handleWebViewer() {
     if (!httpUrl) return;
     setError(null);
+    const w = window.open('', '_blank'); // reserve during the click gesture
     try {
       const u = await httpUrl();
       const target = isOfficeDoc(mime, fileName) ? officeViewerUrl(u) : webViewerUrl(u);
-      window.open(target, '_blank', 'noopener,noreferrer');
+      if (w) w.location.href = target;
+      else window.open(target, '_blank', 'noopener,noreferrer');
     } catch {
+      if (w) { try { w.close(); } catch {} }
       setError(t('chat.previewFailed'));
     }
   }
@@ -293,8 +309,10 @@ export function DocumentPreview({
     }
 
     // Non-encrypted files have a real URL: view them in the browser / a web
-    // document viewer (Office Online for Office docs), with no download.
+    // document viewer (Office Online for Office docs), with no download. Reserve
+    // the tab synchronously so the popup blocker doesn't kill the post-await open.
     if (httpUrl) {
+      const w = window.open('', '_blank');
       try {
         const u = await httpUrl();
         const target = isOfficeDoc(mime, fileName)
@@ -302,9 +320,11 @@ export function DocumentPreview({
           : isImage || isPdf
             ? u // the browser renders images and PDFs directly
             : webViewerUrl(u);
-        window.open(target, '_blank', 'noopener,noreferrer');
+        if (w) w.location.href = target;
+        else window.open(target, '_blank', 'noopener,noreferrer');
         return;
       } catch {
+        if (w) { try { w.close(); } catch {} }
         /* fall through */
       }
     }

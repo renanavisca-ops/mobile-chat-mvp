@@ -1547,14 +1547,10 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
   function onMsgPointerDown(e: React.PointerEvent, m: MessageRow & { body: Payload }) {
     if (selectMode || m.body.is_deleted || m.sender_type === 'system') return;
     swipeStart.current = { x: e.clientX, y: e.clientY, id: m.id, decided: 'none' };
-    // Capture the pointer so the swipe keeps getting move/up events even when the
-    // finger drifts off this bubble (otherwise the gesture is dropped mid-swipe
-    // and the reply never triggers — the main reason swipe-to-reply felt flaky).
-    try {
-      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-    } catch {
-      /* not all pointers support capture */
-    }
+    // NOTE: do NOT setPointerCapture here. Capturing on pointerdown redirects the
+    // eventual `click` to the bubble instead of the inner button that was tapped
+    // (attachment card, reaction, etc.), so those buttons stopped working. We
+    // capture only once the gesture is confirmed HORIZONTAL (in onMsgPointerMove).
     startLongPress(m.id, m.body);
   }
   function onMsgPointerMove(e: React.PointerEvent, m: MessageRow & { body: Payload }) {
@@ -1565,6 +1561,16 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
     if (s.decided === 'none') {
       if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
       s.decided = Math.abs(dx) > Math.abs(dy) ? 'h' : 'v';
+      // Now that it's a real horizontal swipe, capture the pointer so the drag
+      // keeps getting events even if the finger leaves the bubble. Done here (not
+      // on pointerdown) so a plain tap never captures and inner buttons still fire.
+      if (s.decided === 'h') {
+        try {
+          (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+        } catch {
+          /* not all pointers support capture */
+        }
+      }
     }
     if (s.decided !== 'h') {
       clearLongPress(); // vertical → let the list scroll, no reply
