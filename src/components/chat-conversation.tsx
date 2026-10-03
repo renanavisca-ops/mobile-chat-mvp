@@ -1006,10 +1006,24 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
     const el = scrollRef.current;
     if (!el || !chatReady || items.length === 0) return;
     if (!initialScrollDoneRef.current) {
-      el.scrollTop = el.scrollHeight;
       initialScrollDoneRef.current = true;
       stickBottomRef.current = true;
-      return;
+      // Land at the bottom RELIABLY. A single jump often falls short because the
+      // final height isn't settled yet at first paint — images still decoding,
+      // the keyboard/safe-area resizing, or catch-up rows arriving a tick later.
+      // Re-pin over the first ~600ms (guarded by stickBottom, so it stops the
+      // moment the user scrolls up).
+      const pin = () => {
+        const e = scrollRef.current;
+        if (e && stickBottomRef.current) e.scrollTop = e.scrollHeight;
+      };
+      pin();
+      const raf = requestAnimationFrame(pin);
+      const timers = [60, 150, 350, 600].map((ms) => window.setTimeout(pin, ms));
+      return () => {
+        cancelAnimationFrame(raf);
+        timers.forEach((t) => window.clearTimeout(t));
+      };
     }
     // Re-pin to the newest message whenever content grows (new message OR media
     // finishing loading), as long as the user hasn't scrolled up.
