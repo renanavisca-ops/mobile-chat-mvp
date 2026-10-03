@@ -31,9 +31,9 @@ export function useChatRealtime(chatId: string) {
   // Seed synchronously from the persisted cache so the conversation paints
   // instantly on open (even a cold app start) instead of flashing a skeleton.
   const [messages, setMessages] = useState<MessageRow[]>(
-    () => getCached<MessageRow[]>(`msgs:${chatId}`) ?? []
+    () => getCached<MessageRow[]>(`msgs2:${chatId}`) ?? []
   );
-  const [loading, setLoading] = useState(() => !(getCached<MessageRow[]>(`msgs:${chatId}`)?.length));
+  const [loading, setLoading] = useState(() => !(getCached<MessageRow[]>(`msgs2:${chatId}`)?.length));
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
 
@@ -70,7 +70,7 @@ export function useChatRealtime(chatId: string) {
     // This hits the DB directly (chat_id + read=false + not mine), so it doesn't
     // depend on what's painted.
     markMessagesAsRead(chatId).catch(console.error);
-    const cached = getCached<MessageRow[]>(`msgs:${chatId}`);
+    const cached = getCached<MessageRow[]>(`msgs2:${chatId}`);
 
     if (cached && cached.length) {
       // Instant paint from cache; fetch just the messages since the last one.
@@ -108,7 +108,7 @@ export function useChatRealtime(chatId: string) {
   useEffect(() => {
     if (!messages.length) return;
     const persistable = messages.filter((m) => !String(m.id).startsWith('local-')).slice(-CACHE_CAP);
-    if (persistable.length) setCached(`msgs:${chatId}`, persistable);
+    if (persistable.length) setCached(`msgs2:${chatId}`, persistable);
   }, [messages, chatId]);
 
   // Catch up after the realtime socket may have missed events (phone sleep,
@@ -119,7 +119,7 @@ export function useChatRealtime(chatId: string) {
   // returns nothing older than it.
   const clearMessages = useCallback(() => {
     setMessages([]);
-    try { setCached(`msgs:${chatId}`, []); } catch {}
+    try { setCached(`msgs2:${chatId}`, []); } catch {}
   }, [chatId]);
 
   const refetch = useCallback(async () => {

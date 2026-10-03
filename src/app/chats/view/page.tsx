@@ -15,7 +15,10 @@ function ChatFromQuery() {
   if (!UUID_RE.test(c)) {
     return <div className="p-6 text-center text-sm text-slate-400">Chat not found.</div>;
   }
-  return <ChatConversation chatId={c} />;
+  // key={c} forces a fresh mount per chat so NONE of the conversation's state,
+  // caches or realtime subscriptions can leak from one chat into another (which
+  // showed up as a message appearing in the wrong chat).
+  return <ChatConversation key={c} chatId={c} />;
 }
 
 export default function ChatViewPage() {
