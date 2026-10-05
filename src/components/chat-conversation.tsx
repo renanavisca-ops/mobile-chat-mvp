@@ -144,7 +144,7 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
 
   const supabase = browserSupabase();
   const { startCall, busy: callBusy } = useCall();
-  const { messages, loading: msgLoading, appendLocal, clearMessages, loadMore, hasMore, loadingMore, typingUsers, setMeTyping, reactions, pollVotes, hiddenIds } = useChatRealtime(chatId);
+  const { messages, loading: msgLoading, appendLocal, clearMessages, loadMore, hasMore, loadingMore, typingUsers, erasingUsers, setMeActivity, reactions, pollVotes, hiddenIds } = useChatRealtime(chatId);
 
   // chat details
   const [chat, setChat] = useState<ChatSummary | null>(null);
@@ -521,6 +521,8 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
   const cameraVideoRef = useRef<HTMLInputElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const textInputRef = useRef<HTMLTextAreaElement | null>(null);
+  // Whether the composer is focused — gates typing/erasing activity to real edits.
+  const composerFocusedRef = useRef(false);
 
   const composerRef = useRef<HTMLDivElement | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -1073,16 +1075,31 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
     if (el && text === '') el.style.height = 'auto';
   }, [text]);
 
-  // Typing detection
+  // Activity detection: only signal "typing"/"erasing" on a REAL edit while the
+  // composer is focused — not just because text sits in the box or the field has
+  // the cursor. Growing text = typing; shrinking text = erasing. Auto-clears to
+  // idle ~2s after the last change, and on blur.
+  const prevTextLenRef = useRef<number | null>(null);
   useEffect(() => {
-    const typingTimeout = setTimeout(() => setMeTyping(text.length > 0), 300);
-    return () => clearTimeout(typingTimeout);
-  }, [text, setMeTyping]);
-
-  useEffect(() => {
-    const clearTyping = setTimeout(() => setMeTyping(false), 3000);
-    return () => clearTimeout(clearTyping);
-  }, [text, setMeTyping]);
+    const len = text.length;
+    const prev = prevTextLenRef.current;
+    prevTextLenRef.current = len;
+    // First run (initial mount / draft restore): seed the baseline, don't signal.
+    if (prev === null) return;
+    // Only a focused composer means the user is actually editing right now.
+    if (!composerFocusedRef.current) {
+      setMeActivity(null);
+      return;
+    }
+    let act: 'typing' | 'erasing' | null;
+    if (len === 0) act = null;
+    else if (len < prev) act = 'erasing';
+    else act = 'typing'; // grew, or same length with changed content
+    setMeActivity(act);
+    if (!act) return;
+    const clear = setTimeout(() => setMeActivity(null), 2000);
+    return () => clearTimeout(clear);
+  }, [text, setMeActivity]);
 
   // Audio recording. Recording shows a live timer; stopping produces a preview
   // the user can play, then send or discard — it is NOT sent automatically.
@@ -3190,6 +3207,23 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
             </div>
           ) : null}
 
+          {erasingUsers.length > 0 && (
+            <div className="ml-2 flex items-center gap-2">
+              <div className="flex items-center rounded-2xl rounded-bl-md bg-slate-800 px-3 py-2">
+                <span className="toky-eraser" aria-hidden="true">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path d="M16.2 3.8a2 2 0 0 1 2.8 0l1.2 1.2a2 2 0 0 1 0 2.8L10 18H5.5L3.8 16.3a2 2 0 0 1 0-2.8z"
+                      fill="#f9a8d4" stroke="#be185d" strokeWidth="1.3" strokeLinejoin="round" />
+                    <path d="M12.5 7.5 16.5 11.5" stroke="#be185d" strokeWidth="1.3" strokeLinecap="round" />
+                  </svg>
+                  <span className="toky-eraser-crumbs" />
+                </span>
+              </div>
+              <span className="text-xs text-slate-400">
+                {erasingUsers.map((id) => usernameById.get(id) || t('chat.someone')).join(', ')} {t('chat.erasingSuffix')}
+              </span>
+            </div>
+          )}
           {typingUsers.length > 0 && (
             <div className="ml-2 flex items-center gap-2">
               <div className="flex items-center gap-1 rounded-2xl rounded-bl-md bg-slate-800 px-3 py-2.5">
@@ -3343,7 +3377,8 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
                   el.style.height = `${Math.min(el.scrollHeight, 128)}px`;
                 }}
                 placeholder={t('chat.composerPlaceholder')}
-                onFocus={() => setEmojiOpen(false)}
+                onFocus={() => { composerFocusedRef.current = true; setEmojiOpen(false); }}
+                onBlur={() => { composerFocusedRef.current = false; setMeActivity(null); }}
                 onPaste={onComposerPaste}
                 onKeyDown={(e) => {
                   // Enter sends; Shift+Enter inserts a newline.
