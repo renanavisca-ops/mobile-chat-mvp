@@ -196,6 +196,7 @@ const en = {
     previewVideo: 'Video preview:',
     typingSuffix: 'is typing…',
     erasingSuffix: 'is erasing…',
+    recordingSuffix: 'is recording audio…',
     someone: 'Someone',
     deletedUser: 'Deleted user',
     editingMessage: '✏️ Editing message',

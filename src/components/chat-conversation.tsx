@@ -144,7 +144,7 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
 
   const supabase = browserSupabase();
   const { startCall, busy: callBusy } = useCall();
-  const { messages, loading: msgLoading, appendLocal, clearMessages, loadMore, hasMore, loadingMore, typingUsers, erasingUsers, setMeActivity, reactions, pollVotes, hiddenIds } = useChatRealtime(chatId);
+  const { messages, loading: msgLoading, appendLocal, clearMessages, loadMore, hasMore, loadingMore, typingUsers, erasingUsers, recordingUsers, setMeActivity, reactions, pollVotes, hiddenIds } = useChatRealtime(chatId);
 
   // chat details
   const [chat, setChat] = useState<ChatSummary | null>(null);
@@ -1100,6 +1100,13 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
     const clear = setTimeout(() => setMeActivity(null), 2000);
     return () => clearTimeout(clear);
   }, [text, setMeActivity]);
+
+  // Broadcast "recording a voice note" while the mic is active, so the other side
+  // sees a live recording indicator (like typing/erasing).
+  useEffect(() => {
+    if (isRecording) setMeActivity('recording');
+    else setMeActivity((a) => (a === 'recording' ? null : a));
+  }, [isRecording, setMeActivity]);
 
   // Audio recording. Recording shows a live timer; stopping produces a preview
   // the user can play, then send or discard — it is NOT sent automatically.
@@ -3221,6 +3228,25 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
               </div>
               <span className="text-xs text-slate-400">
                 {erasingUsers.map((id) => usernameById.get(id) || t('chat.someone')).join(', ')} {t('chat.erasingSuffix')}
+              </span>
+            </div>
+          )}
+          {recordingUsers.length > 0 && (
+            <div className="ml-2 flex items-center gap-2">
+              <div className="flex items-center gap-2 rounded-2xl rounded-bl-md bg-slate-800 px-3 py-2">
+                <span className="toky-rec-mic" aria-hidden="true">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <rect x="9" y="3" width="6" height="11" rx="3" fill="#f87171" />
+                    <path d="M6 11a6 6 0 0 0 12 0" stroke="#f87171" strokeWidth="1.6" strokeLinecap="round" />
+                    <path d="M12 17v3" stroke="#f87171" strokeWidth="1.6" strokeLinecap="round" />
+                  </svg>
+                </span>
+                <span className="toky-rec-wave" aria-hidden="true">
+                  <span /><span /><span /><span /><span />
+                </span>
+              </div>
+              <span className="text-xs text-slate-400">
+                {recordingUsers.map((id) => usernameById.get(id) || t('chat.someone')).join(', ')} {t('chat.recordingSuffix')}
               </span>
             </div>
           )}
