@@ -45,6 +45,11 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	<!-- Export compliance: the app only uses standard encryption (HTTPS/TLS and
+	     standard AES via the platform's crypto), which is exempt. Declaring this
+	     lets TestFlight/App Store builds skip the per-upload encryption question. -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<!-- WebRTC audio/video calls -->
 	<key>NSCameraUsageDescription</key>
 	<string>Toky uses your camera for video calls and sharing photos.</string>
