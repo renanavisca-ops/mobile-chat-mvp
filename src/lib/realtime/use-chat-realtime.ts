@@ -39,9 +39,11 @@ export function useChatRealtime(chatId: string) {
 
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const [erasingUsers, setErasingUsers] = useState<string[]>([]);
+  const [recordingUsers, setRecordingUsers] = useState<string[]>([]);
   // What THIS user is doing in the composer right now: adding text ('typing'),
-  // removing text ('erasing'), or nothing (null). Broadcast via presence.
-  const [meActivity, setMeActivity] = useState<'typing' | 'erasing' | null>(null);
+  // removing text ('erasing'), recording a voice note ('recording'), or nothing
+  // (null). Broadcast via presence.
+  const [meActivity, setMeActivity] = useState<'typing' | 'erasing' | 'recording' | null>(null);
   const [channelPresence, setChannelPresence] = useState<any>(null);
 
   const [reactions, setReactions] = useState<MessageReaction[]>([]);
@@ -299,10 +301,11 @@ export function useChatRealtime(chatId: string) {
       .on('presence', { event: 'sync' }, () => {
         const state = channel.presenceState() as Record<
           string,
-          Array<{ typing?: boolean; activity?: 'typing' | 'erasing' | null; userId: string }>
+          Array<{ typing?: boolean; activity?: 'typing' | 'erasing' | 'recording' | null; userId: string }>
         >;
         const typing: string[] = [];
         const erasing: string[] = [];
+        const recording: string[] = [];
         for (const id in state) {
           const presences = state[id];
           for (const p of presences) {
@@ -311,10 +314,12 @@ export function useChatRealtime(chatId: string) {
             const act = p.activity ?? (p.typing ? 'typing' : null);
             if (act === 'typing') typing.push(p.userId);
             else if (act === 'erasing') erasing.push(p.userId);
+            else if (act === 'recording') recording.push(p.userId);
           }
         }
         setTypingUsers(Array.from(new Set(typing)));
         setErasingUsers(Array.from(new Set(erasing)));
+        setRecordingUsers(Array.from(new Set(recording)));
       })
       .subscribe(async (status: REALTIME_SUBSCRIBE_STATES) => {
         if (status === 'SUBSCRIBED') {
@@ -366,6 +371,7 @@ export function useChatRealtime(chatId: string) {
     loadingMore,
     typingUsers,
     erasingUsers,
+    recordingUsers,
     setMeActivity,
     reactions,
     pollVotes,
