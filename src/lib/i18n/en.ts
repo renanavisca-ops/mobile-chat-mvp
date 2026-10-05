@@ -195,6 +195,7 @@ const en = {
     previewImages: 'Image preview:',
     previewVideo: 'Video preview:',
     typingSuffix: 'is typing…',
+    erasingSuffix: 'is erasing…',
     someone: 'Someone',
     deletedUser: 'Deleted user',
     editingMessage: '✏️ Editing message',

@@ -38,7 +38,10 @@ export function useChatRealtime(chatId: string) {
   const [hasMore, setHasMore] = useState(true);
 
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
-  const [meTyping, setMeTyping] = useState(false);
+  const [erasingUsers, setErasingUsers] = useState<string[]>([]);
+  // What THIS user is doing in the composer right now: adding text ('typing'),
+  // removing text ('erasing'), or nothing (null). Broadcast via presence.
+  const [meActivity, setMeActivity] = useState<'typing' | 'erasing' | null>(null);
   const [channelPresence, setChannelPresence] = useState<any>(null);
 
   const [reactions, setReactions] = useState<MessageReaction[]>([]);
@@ -294,21 +297,28 @@ export function useChatRealtime(chatId: string) {
         }
       )
       .on('presence', { event: 'sync' }, () => {
-        const state = channel.presenceState() as Record<string, Array<{ typing: boolean; userId: string }>>;
+        const state = channel.presenceState() as Record<
+          string,
+          Array<{ typing?: boolean; activity?: 'typing' | 'erasing' | null; userId: string }>
+        >;
         const typing: string[] = [];
+        const erasing: string[] = [];
         for (const id in state) {
           const presences = state[id];
           for (const p of presences) {
-            if (p.typing && p.userId !== userId) {
-              typing.push(p.userId);
-            }
+            if (p.userId === userId) continue;
+            // Prefer the richer `activity`; fall back to the old boolean `typing`.
+            const act = p.activity ?? (p.typing ? 'typing' : null);
+            if (act === 'typing') typing.push(p.userId);
+            else if (act === 'erasing') erasing.push(p.userId);
           }
         }
         setTypingUsers(Array.from(new Set(typing)));
+        setErasingUsers(Array.from(new Set(erasing)));
       })
       .subscribe(async (status: REALTIME_SUBSCRIBE_STATES) => {
         if (status === 'SUBSCRIBED') {
-          await channel.track({ typing: false, userId });
+          await channel.track({ typing: false, activity: null, userId });
           // Catch up on anything missed before/while (re)subscribing.
           refetch();
         }
@@ -322,18 +332,21 @@ export function useChatRealtime(chatId: string) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chatId, notify]);
 
-  // Update presence typing status
+  // Broadcast this user's composer activity (typing / erasing / idle) via presence.
   useEffect(() => {
     if (!channelPresence) return;
-    const updateTyping = async () => {
+    const updateActivity = async () => {
       const supabase = browserSupabase();
       const { data } = await supabase.auth.getUser();
       if (data.user) {
-        await channelPresence.track({ typing: meTyping, userId: data.user.id }).catch(console.error);
+        await channelPresence
+          // Keep `typing` for any peer still on older code.
+          .track({ typing: meActivity === 'typing', activity: meActivity, userId: data.user.id })
+          .catch(console.error);
       }
     };
-    updateTyping();
-  }, [meTyping, channelPresence]);
+    updateActivity();
+  }, [meActivity, channelPresence]);
 
   // para pintar “optimista” al enviar (sin esperar realtime)
   function appendLocal(row: MessageRow) {
@@ -352,7 +365,8 @@ export function useChatRealtime(chatId: string) {
     hasMore,
     loadingMore,
     typingUsers,
-    setMeTyping,
+    erasingUsers,
+    setMeActivity,
     reactions,
     pollVotes,
     hiddenIds,

@@ -197,6 +197,7 @@ const es: Dictionary = {
     previewImages: 'Vista previa de imágenes:',
     previewVideo: 'Vista previa de video:',
     typingSuffix: 'escribiendo…',
+    erasingSuffix: 'borrando…',
     someone: 'Alguien',
     deletedUser: 'Usuario eliminado',
     editingMessage: '✏️ Editando mensaje',
