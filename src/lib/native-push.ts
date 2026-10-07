@@ -230,6 +230,42 @@ async function doRegisterNativePush(userId: string): Promise<void> {
   await withTimeout(storeToken(userId, token), 8000, 'saving token to database');
 }
 
+/**
+ * Silently refresh this device's FCM token on app launch — ONLY if notification
+ * permission is already granted. Never prompts (the Settings toggle owns opt-in).
+ *
+ * Why this exists: the token is otherwise stored only when the user toggles
+ * notifications on in Settings. If a previously-enabled device loses its token
+ * — FCM rotates it, the app is reinstalled, or the server prunes a token that
+ * briefly looked stale (a 404/410 from FCM deletes it in /api/push/send) — the
+ * user gets NO push until they revisit Settings. With no push, a backgrounded
+ * app only picks up new messages when it's reopened, which is why a message
+ * could arrive on the web right away but land late on the phone. Re-storing the
+ * current token on every launch keeps device_tokens fresh for opted-in users.
+ */
+export async function refreshNativePushToken(): Promise<void> {
+  if (!isNativeApp()) return;
+  try {
+    if (!FirebaseMessaging || typeof FirebaseMessaging.checkPermissions !== 'function') return;
+    const perm = await withTimeout(
+      FirebaseMessaging.checkPermissions(),
+      8000,
+      'checking notification permission'
+    );
+    if (perm.receive !== 'granted') return; // respect opt-out — do NOT prompt here
+    const { data } = await browserSupabase().auth.getUser();
+    const userId = data.user?.id;
+    if (!userId) return;
+    currentUserId = userId;
+    await withTimeout(setupListeners(), 8000, 'addListeners');
+    const result = await withTimeout(FirebaseMessaging.getToken(), 15000, 'getting the notification token');
+    const token = result?.token;
+    if (token) await withTimeout(storeToken(userId, token), 8000, 'saving token to database');
+  } catch {
+    // Best effort — token refresh must never throw into app startup.
+  }
+}
+
 /** Stop delivery to this device by deleting its token (server + FCM). */
 export async function unregisterNativePush(): Promise<void> {
   if (!isNativeApp()) return;
