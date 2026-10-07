@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import type { RealtimePostgresChangesPayload, REALTIME_SUBSCRIBE_STATES } from '@supabase/supabase-js';
 import { browserSupabase } from '@/lib/supabase/client';
 import { listMessages, listMessagesSince, markMessagesAsRead, listReactions, listPollVotes, listHiddenMessages, decryptRow } from '@/lib/db/chats';
@@ -45,6 +45,13 @@ export function useChatRealtime(chatId: string) {
   // (null). Broadcast via presence.
   const [meActivity, setMeActivity] = useState<'typing' | 'erasing' | 'recording' | null>(null);
   const [channelPresence, setChannelPresence] = useState<any>(null);
+  // This user's id, resolved once. Using a ref (instead of awaiting getUser on
+  // every presence write) keeps activity updates in order: an awaited getUser
+  // made rapid typing/erasing/idle writes land out of order, so "typing" could
+  // overwrite a later "erasing"/idle — which left the indicator stuck on
+  // "typing" and hid "erasing". It also fixes the self-filter below racing an
+  // empty id on first sync.
+  const userIdRef = useRef('');
 
   const [reactions, setReactions] = useState<MessageReaction[]>([]);
   const [pollVotes, setPollVotes] = useState<PollVote[]>([]);
@@ -176,7 +183,14 @@ export function useChatRealtime(chatId: string) {
     let userId = '';
     
     supabase.auth.getUser().then((res: { data: any }) => {
-      if (res.data.user) userId = res.data.user.id;
+      if (res.data.user) {
+        userId = res.data.user.id;
+        userIdRef.current = userId;
+        // Announce our presence with the correct id as soon as we know it, so a
+        // first sync that happened before getUser resolved is corrected and the
+        // current activity (if any) is attributed to us.
+        channel.track({ typing: meActivity === 'typing', activity: meActivity, userId }).catch(() => {});
+      }
     });
 
     const channel = supabase
@@ -306,10 +320,11 @@ export function useChatRealtime(chatId: string) {
         const typing: string[] = [];
         const erasing: string[] = [];
         const recording: string[] = [];
+        const me = userIdRef.current || userId;
         for (const id in state) {
           const presences = state[id];
           for (const p of presences) {
-            if (p.userId === userId) continue;
+            if (p.userId === me) continue;
             // Prefer the richer `activity`; fall back to the old boolean `typing`.
             const act = p.activity ?? (p.typing ? 'typing' : null);
             if (act === 'typing') typing.push(p.userId);
@@ -338,19 +353,19 @@ export function useChatRealtime(chatId: string) {
   }, [chatId, notify]);
 
   // Broadcast this user's composer activity (typing / erasing / idle) via presence.
+  // Synchronous on purpose: no awaited getUser() here, so consecutive activity
+  // changes are tracked in the exact order they happen and the latest state
+  // always wins (fixes "typing" sticking and "erasing" never showing). The id
+  // is resolved once into userIdRef; if it isn't ready yet, the getUser callback
+  // above emits the initial track as soon as it is.
   useEffect(() => {
     if (!channelPresence) return;
-    const updateActivity = async () => {
-      const supabase = browserSupabase();
-      const { data } = await supabase.auth.getUser();
-      if (data.user) {
-        await channelPresence
-          // Keep `typing` for any peer still on older code.
-          .track({ typing: meActivity === 'typing', activity: meActivity, userId: data.user.id })
-          .catch(console.error);
-      }
-    };
-    updateActivity();
+    const uid = userIdRef.current;
+    if (!uid) return;
+    // Keep `typing` for any peer still on older code.
+    channelPresence
+      .track({ typing: meActivity === 'typing', activity: meActivity, userId: uid })
+      .catch(console.error);
   }, [meActivity, channelPresence]);
 
   // para pintar “optimista” al enviar (sin esperar realtime)

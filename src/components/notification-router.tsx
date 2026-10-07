@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { isNativeApp, initNativeNotifications, initForegroundPush, clearDeliveredNotifications } from '@/lib/native-push';
+import { isNativeApp, initNativeNotifications, initForegroundPush, clearDeliveredNotifications, refreshNativePushToken } from '@/lib/native-push';
 import { App } from '@capacitor/app';
 
 /**
@@ -40,6 +40,10 @@ export function NotificationRouter() {
     // Foreground pushes: chime + in-app banner (the OS won't show them while the
     // app is open).
     void initForegroundPush();
+    // Keep this device's FCM token fresh for already-opted-in users (never
+    // prompts). Without this, a token lost to rotation/reinstall/stale-pruning
+    // leaves the phone with no push, so backgrounded messages arrive late.
+    void refreshNativePushToken();
   }, [router]);
 
   // Once the user is in the app, the per-message notifications are effectively
