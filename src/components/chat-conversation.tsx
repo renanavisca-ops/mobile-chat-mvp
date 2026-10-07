@@ -398,6 +398,13 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
 
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
+  // Synchronous re-entrancy lock for onSend. `busy` is React state and updates
+  // only on the next render, so holding Enter (keyboard auto-repeat) or a fast
+  // double-tap can re-enter onSend many times before the button is disabled —
+  // each re-entry re-uploads the still-pending image and inserts another row,
+  // which is how a single image got sent ~10 times. This ref flips
+  // synchronously, so the second call bails immediately.
+  const sendingRef = useRef(false);
 
   // Turn a send failure into a clear, localized message. A fail-closed E2EE
   // chat (peer hasn't set up encryption) surfaces an actionable explanation
@@ -1218,6 +1225,9 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
   }, []);
 
   async function sendAudioMessage(blob: Blob) {
+    // Same re-entrancy lock as onSend: never let a double-tap send the clip twice.
+    if (sendingRef.current) return;
+    sendingRef.current = true;
     setBusy(true);
     try {
       const encMode = await chatMustEncrypt(chatId);
@@ -1243,6 +1253,7 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
       setErr(e.message);
     } finally {
       setBusy(false);
+      sendingRef.current = false;
     }
   }
 
@@ -1955,12 +1966,15 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
 
   // -------- Send
   async function onSend() {
+    // Re-entrancy guard: bail if a send is already in flight (see sendingRef).
+    if (sendingRef.current) return;
     setErr('');
     const t2 = text.trim();
     if (t2) tap();
 
     if (editingId) {
       if (!t2) return;
+      sendingRef.current = true;
       setBusy(true);
       try {
         await editMessage(editingId, t2);
@@ -1970,12 +1984,14 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
         setErr(sendErrorMessage(e));
       } finally {
         setBusy(false);
+        sendingRef.current = false;
       }
       return;
     }
 
     if (!t2 && pendingImages.length === 0 && !pendingVideo) return;
 
+    sendingRef.current = true;
     setBusy(true);
 
     try {
@@ -2070,6 +2086,7 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
       setErr(sendErrorMessage(e));
     } finally {
       setBusy(false);
+      sendingRef.current = false;
     }
   }
 
@@ -3408,8 +3425,12 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
                 onPaste={onComposerPaste}
                 onKeyDown={(e) => {
                   // Enter sends; Shift+Enter inserts a newline.
+                  // Ignore keyboard auto-repeat (e.repeat) and in-flight sends so
+                  // that holding Enter can't fire onSend dozens of times and send
+                  // the same image/message repeatedly.
                   if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
+                    if (e.repeat || busy || sendingRef.current) return;
                     onSend();
                   }
                 }}
