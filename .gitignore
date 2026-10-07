@@ -10,3 +10,6 @@ build/
 /out/
 /.mobile-export-stash/
 /mobile/www/
+
+# Supabase CLI scratch (local tooling state, not part of the project)
+supabase/.temp/
