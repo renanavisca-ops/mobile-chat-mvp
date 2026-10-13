@@ -12,14 +12,14 @@ import { ChatListSkeleton } from '@/components/skeleton';
 import { useRequireAuth } from '@/lib/auth/use-require-auth';
 import { ensureIdentity } from '@/lib/crypto/keystore';
 import { browserSupabase } from '@/lib/supabase/client';
-import { listChats, markIncomingDelivered, setChatArchived, getOrCreateSelfChat } from '@/lib/db/chats';
+import { listChats, markIncomingDelivered, setChatArchived, getOrCreateSelfChat, searchAllMessages } from '@/lib/db/chats';
 import { getCached, setCached } from '@/lib/cache';
 import { tap, impact } from '@/lib/haptics';
 import { useIsOnline } from '@/components/presence-provider';
 import { useLanguage } from '@/lib/i18n/context';
 import { avatarBg, initials } from '@/lib/ui/avatar';
 
-import type { ChatSummary } from '@/lib/db/types';
+import type { ChatSummary, MessageRow } from '@/lib/db/types';
 
 // Compact, chat-list-style timestamp: "now", "8m", "3h", "Mon", or a short
 // date once it's older than a week — instead of a noisy full locale datetime.
@@ -38,6 +38,28 @@ function fmt(ts: string | null, locale: string) {
   }
   if (diff < 7 * day) return d.toLocaleDateString(locale, { weekday: 'short' });
   return d.toLocaleDateString(locale, { day: 'numeric', month: 'short' });
+}
+
+// Build a short preview around the matched text for a global-search result,
+// with the matched part highlighted. Collapses whitespace so a multi-line
+// message shows as one tidy line.
+function highlightSnippet(text: string | null | undefined, q: string) {
+  const s = (text || '').replace(/\s+/g, ' ').trim();
+  if (!s) return '';
+  const idx = s.toLowerCase().indexOf(q.toLowerCase());
+  if (idx < 0) return s.length > 120 ? `${s.slice(0, 120)}…` : s;
+  const start = Math.max(0, idx - 24);
+  const pre = (start > 0 ? '…' : '') + s.slice(start, idx);
+  const match = s.slice(idx, idx + q.length);
+  const postEnd = idx + q.length + 80;
+  const post = s.slice(idx + q.length, postEnd) + (s.length > postEnd ? '…' : '');
+  return (
+    <>
+      {pre}
+      <mark className="rounded bg-amber-400/25 px-0.5 text-amber-200">{match}</mark>
+      {post}
+    </>
+  );
 }
 
 function Avatar({
@@ -132,6 +154,13 @@ export default function ChatsPage() {
   const [openedWhileUnread, setOpenedWhileUnread] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [search, setSearch] = useState('');
+  // Global message search (across ALL chats, not just the open one). Results are
+  // messages whose text matches; tapping one opens that chat at that message.
+  const [msgResults, setMsgResults] = useState<MessageRow[]>([]);
+  const [msgSearching, setMsgSearching] = useState(false);
+  // When opening a chat at a specific message in the embedded (wide-screen)
+  // pane, this carries the target message id so the conversation can jump to it.
+  const [focusMsgId, setFocusMsgId] = useState<string | null>(null);
   const [, setUnreadCount] = useState(0);
   const [showArchived, setShowArchived] = useState(false);
   const [rowMenuChat, setRowMenuChat] = useState<ChatSummary | null>(null);
@@ -177,6 +206,25 @@ export default function ChatsPage() {
     document.addEventListener('pointerdown', onDown);
     return () => document.removeEventListener('pointerdown', onDown);
   }, [menuOpen]);
+
+  // Debounced global message search: when the query has 2+ chars, look for
+  // matching messages across every chat (RLS keeps it to the user's own).
+  useEffect(() => {
+    const q = search.trim();
+    if (q.length < 2) {
+      setMsgResults([]);
+      setMsgSearching(false);
+      return;
+    }
+    setMsgSearching(true);
+    const id = window.setTimeout(() => {
+      searchAllMessages(q)
+        .then(setMsgResults)
+        .catch(() => setMsgResults([]))
+        .finally(() => setMsgSearching(false));
+    }, 250);
+    return () => window.clearTimeout(id);
+  }, [search]);
 
   const reloadChats = () => {
     listChats()
@@ -239,8 +287,19 @@ export default function ChatsPage() {
   // On wide screens, open a chat in the right pane; on phones, navigate to the
   // full-page conversation.
   function openChat(id: string) {
+    setFocusMsgId(null);
     if (isWide()) setSelectedId(id);
     else router.push(`/chats/view?c=${id}`);
+  }
+
+  // Open a chat scrolled to a specific message (from the global search).
+  function openChatAtMessage(chatId: string, messageId: string) {
+    if (isWide()) {
+      setFocusMsgId(messageId);
+      setSelectedId(chatId);
+    } else {
+      router.push(`/chats/view?c=${chatId}&m=${messageId}`);
+    }
   }
 
   useEffect(() => {
@@ -506,10 +565,11 @@ export default function ChatsPage() {
                   <UserPlusIcon size={18} /> {t('chatsList.goToContacts')}
                 </Link>
               </div>
-            ) : chats.filter((c) => (c.title || '').toLowerCase().includes(search.trim().toLowerCase())).length === 0 ? (
-              <p className="p-3 text-sm text-slate-400">{t('emoji.noMatches')}</p>
             ) : (() => {
-              const searched = chats.filter((c) => (c.title || '').toLowerCase().includes(search.trim().toLowerCase()));
+              const q = search.trim();
+              const isSearching = q.length > 0;
+              const chatById = new Map(chats.map((c) => [c.id, c] as const));
+              const searched = chats.filter((c) => (c.title || '').toLowerCase().includes(q.toLowerCase()));
               const archivedList = searched.filter((c) => c.archived);
               // Unread chats stay pinned above read ones; within each group the
               // most recent is first. The chat you're currently viewing HOLDS its
@@ -535,7 +595,16 @@ export default function ChatsPage() {
                 .slice()
                 .sort(byUnreadThenRecent);
               return (
-              <ul className="space-y-0.5">
+              <>
+                {isSearching && visible.length > 0 && (
+                  <div className="px-3 pb-1 pt-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                    {t('chatsList.sectionChats')}
+                  </div>
+                )}
+                {visible.length === 0 && isSearching ? (
+                  <p className="px-3 py-1 text-[13px] text-slate-500">{t('chatsList.noChatNameMatches')}</p>
+                ) : (
+                <ul className="space-y-0.5">
                 {showArchived ? (
                   <li>
                     <button
@@ -621,6 +690,53 @@ export default function ChatsPage() {
                   );
                 })}
               </ul>
+                )}
+                {isSearching && q.length >= 2 && (
+                  <div className="mt-2">
+                    <div className="px-3 pb-1 pt-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                      {t('chatsList.sectionMessages')}
+                    </div>
+                    {msgSearching && msgResults.length === 0 ? (
+                      <p className="px-3 py-1 text-[13px] text-slate-500">{t('chatsList.searchingMessages')}</p>
+                    ) : msgResults.length === 0 ? (
+                      <p className="px-3 py-1 text-[13px] text-slate-500">{t('chatsList.noMessageMatches')}</p>
+                    ) : (
+                      <ul className="space-y-0.5">
+                        {msgResults.map((r) => {
+                          const chat = chatById.get(r.chat_id);
+                          return (
+                            <li key={r.id}>
+                              <button
+                                onClick={() => openChatAtMessage(r.chat_id, r.id)}
+                                className="flex w-full items-start gap-3 rounded-2xl p-2.5 text-left hover:bg-slate-900/70 active:bg-slate-900"
+                              >
+                                {chat ? (
+                                  <ChatAvatar chat={chat} />
+                                ) : (
+                                  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-slate-800 text-slate-400">
+                                    <ChatBubbleIcon size={18} />
+                                  </span>
+                                )}
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center justify-between gap-3">
+                                    <span className="truncate text-sm font-semibold">
+                                      {chat?.title || t('chatsList.directChat')}
+                                    </span>
+                                    <span className="shrink-0 text-xs text-slate-500">{fmt(r.created_at, lang)}</span>
+                                  </div>
+                                  <div className="mt-0.5 truncate text-[13px] text-slate-400">
+                                    {highlightSnippet(r.content, q)}
+                                  </div>
+                                </div>
+                              </button>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+                  </div>
+                )}
+              </>
               );
             })()}
           </div>
@@ -629,7 +745,7 @@ export default function ChatsPage() {
         {/* RIGHT — conversation pane (wide screens only) */}
         <section className="hidden min-w-0 flex-1 lg:flex">
           {selectedId ? (
-            <ChatConversation key={selectedId} chatId={selectedId} embedded />
+            <ChatConversation key={selectedId} chatId={selectedId} embedded focusMessageId={focusMsgId} />
           ) : (
             <div className="grid flex-1 place-items-center px-6 text-center text-sm text-slate-500">
               {t('chatsList.pickChat')}

@@ -851,6 +851,34 @@ export async function searchMessages(chatId: string, query: string, limit = 30):
 }
 
 /**
+ * Global message search across EVERY chat the user belongs to (no chat_id
+ * filter — RLS scopes the result to the caller's own chats). Matches on the
+ * server-readable `content` column, same as the per-chat search; messages that
+ * are truly end-to-end sealed have `content = null` and are not searchable
+ * server-side by design. Results are newest-first and carry their `chat_id` so
+ * the caller can show which conversation each hit belongs to and jump to it.
+ */
+export async function searchAllMessages(query: string, limit = 40): Promise<MessageRow[]> {
+  const q = query.trim();
+  if (!q) return [];
+
+  // Escape LIKE wildcards so a literal % or _ in the query doesn't match
+  // everything. ESCAPE '\' is PostgREST's default for ilike.
+  const safe = q.replace(/[\\%_]/g, (m) => `\\${m}`);
+
+  const supabase = browserSupabase();
+  const { data, error } = await supabase
+    .from('messages')
+    .select('id, chat_id, sender_device_id, ciphertext, nonce, message_type, created_at, read, content, sender_type, sender_id, delivery_status, edited_at')
+    .ilike('content', `%${safe}%`)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+
+  if (error) throw error;
+  return (data ?? []) as unknown as MessageRow[];
+}
+
+/**
  * Mark every incoming (not-mine) message across all my chats as "delivered".
  * Row-level security scopes the UPDATE to chats I'm a member of, so a single
  * statement safely fans out. Only bumps messages still at 'sent' — 'read' and

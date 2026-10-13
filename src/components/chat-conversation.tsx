@@ -133,7 +133,7 @@ function sanitizeFilename(name: string) {
   return name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 120);
 }
 
-export function ChatConversation({ chatId, embedded = false }: { chatId: string; embedded?: boolean }) {
+export function ChatConversation({ chatId, embedded = false, focusMessageId = null }: { chatId: string; embedded?: boolean; focusMessageId?: string | null }) {
   const { loading: authLoading, user } = useRequireAuth();
   const { t, lang } = useLanguage();
   const myId = user?.id ?? null;
@@ -357,6 +357,37 @@ export function ChatConversation({ chatId, embedded = false }: { chatId: string;
       toast(t('chat.messageNotLoaded'));
     }
   }
+
+  // Deep-link to a specific message (e.g. opened from the global search on the
+  // chat list). The target may be older than the first loaded page, so if it's
+  // not in the DOM yet we pull older pages — bounded — until it appears, then
+  // scroll to and briefly highlight it. focusDoneRef makes it fire once per
+  // requested id, so a later scroll/refetch can't yank the view back.
+  const focusTargetRef = useRef<string | null>(null);
+  const focusTriesRef = useRef(0);
+  useEffect(() => {
+    focusTargetRef.current = focusMessageId || null;
+    focusTriesRef.current = 0;
+  }, [focusMessageId]);
+  useEffect(() => {
+    const target = focusTargetRef.current;
+    if (!target || msgLoading) return;
+    const el = document.getElementById(`msg-${target}`);
+    if (el) {
+      stickBottomRef.current = false;
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.classList.add('ring-2', 'ring-amber-400');
+      setTimeout(() => el.classList.remove('ring-2', 'ring-amber-400'), 1800);
+      focusTargetRef.current = null;
+      return;
+    }
+    // Not loaded yet — page back through history until we find it (bounded so a
+    // message that was deleted/hidden can't loop forever).
+    if (hasMore && !loadingMore && focusTriesRef.current < 12) {
+      focusTriesRef.current += 1;
+      loadMore();
+    }
+  }, [focusMessageId, messages, msgLoading, hasMore, loadingMore, loadMore]);
 
   const [isRecording, setIsRecording] = useState(false);
   const [recSeconds, setRecSeconds] = useState(0);
