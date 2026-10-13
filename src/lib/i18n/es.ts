@@ -153,6 +153,7 @@ const es: Dictionary = {
     searchPlaceholder: 'Buscar chats y mensajes…',
     sectionChats: 'Chats',
     sectionMessages: 'Mensajes',
+    you: 'Tú',
     noChatNameMatches: 'Ningún chat con ese nombre',
     searchingMessages: 'Buscando mensajes…',
     noMessageMatches: 'Ningún mensaje coincide',

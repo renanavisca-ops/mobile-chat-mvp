@@ -151,6 +151,7 @@ const en = {
     searchPlaceholder: 'Search chats and messages…',
     sectionChats: 'Chats',
     sectionMessages: 'Messages',
+    you: 'You',
     noChatNameMatches: 'No chats match that name',
     searchingMessages: 'Searching messages…',
     noMessageMatches: 'No messages match',
