@@ -42,6 +42,7 @@ import { useCall } from '@/lib/call/call-provider';
 import { VideoTrimmer, TrimmedVideo } from '@/components/video-trimmer';
 import { suggestReplies, translateText } from '@/lib/ai';
 import { avatarBg, initials } from '@/lib/ui/avatar';
+import { highlightSnippet } from '@/lib/ui/highlight';
 import { PhoneIcon, VideoIcon, PlusIcon, SmileIcon, MicIcon, PencilIcon, ReplyIcon, ForwardIcon, CopyIcon, DownloadIcon, EyeOffIcon, TrashIcon, PinIcon, FlagIcon, PaperclipIcon, SparklesIcon, GlobeIcon, SendIcon, CheckIcon, ExternalLinkIcon } from '@/components/icons';
 import { canNativeFiles, shareNativeFile, saveNativeFile, saveMediaToGallery } from '@/lib/native-files';
 import { isAutoSaveOn, setAutoSaveOn, isMediaSaved, markMediaSaved } from '@/lib/media-autosave';
@@ -2804,7 +2805,7 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
                         onClick={() => scrollToMessage(r.id)}
                         className="block w-full truncate rounded px-2 py-1.5 text-left text-sm text-slate-200 hover:bg-slate-900"
                       >
-                        {r.content}
+                        {highlightSnippet(r.content, searchQuery)}
                         <span className="ml-2 text-xs text-slate-500">{fmtTime(r.created_at)}</span>
                       </button>
                     </li>

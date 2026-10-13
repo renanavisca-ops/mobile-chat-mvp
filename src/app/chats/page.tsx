@@ -18,6 +18,7 @@ import { tap, impact } from '@/lib/haptics';
 import { useIsOnline } from '@/components/presence-provider';
 import { useLanguage } from '@/lib/i18n/context';
 import { avatarBg, initials } from '@/lib/ui/avatar';
+import { highlightSnippet } from '@/lib/ui/highlight';
 
 import type { ChatSummary, MessageRow } from '@/lib/db/types';
 
@@ -38,28 +39,6 @@ function fmt(ts: string | null, locale: string) {
   }
   if (diff < 7 * day) return d.toLocaleDateString(locale, { weekday: 'short' });
   return d.toLocaleDateString(locale, { day: 'numeric', month: 'short' });
-}
-
-// Build a short preview around the matched text for a global-search result,
-// with the matched part highlighted. Collapses whitespace so a multi-line
-// message shows as one tidy line.
-function highlightSnippet(text: string | null | undefined, q: string) {
-  const s = (text || '').replace(/\s+/g, ' ').trim();
-  if (!s) return '';
-  const idx = s.toLowerCase().indexOf(q.toLowerCase());
-  if (idx < 0) return s.length > 120 ? `${s.slice(0, 120)}…` : s;
-  const start = Math.max(0, idx - 24);
-  const pre = (start > 0 ? '…' : '') + s.slice(start, idx);
-  const match = s.slice(idx, idx + q.length);
-  const postEnd = idx + q.length + 80;
-  const post = s.slice(idx + q.length, postEnd) + (s.length > postEnd ? '…' : '');
-  return (
-    <>
-      {pre}
-      <mark className="rounded bg-amber-400/25 px-0.5 text-amber-200">{match}</mark>
-      {post}
-    </>
-  );
 }
 
 function Avatar({
