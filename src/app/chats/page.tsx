@@ -158,6 +158,8 @@ export default function ChatsPage() {
   // messages whose text matches; tapping one opens that chat at that message.
   const [msgResults, setMsgResults] = useState<MessageRow[]>([]);
   const [msgSearching, setMsgSearching] = useState(false);
+  // sender id -> display name, for labelling who sent each global-search hit.
+  const [senderNames, setSenderNames] = useState<Record<string, string>>({});
   // When opening a chat at a specific message in the embedded (wide-screen)
   // pane, this carries the target message id so the conversation can jump to it.
   const [focusMsgId, setFocusMsgId] = useState<string | null>(null);
@@ -225,6 +227,32 @@ export default function ChatsPage() {
     }, 250);
     return () => window.clearTimeout(id);
   }, [search]);
+
+  // Resolve the display name of each sender appearing in the message results,
+  // so a hit can show WHO sent it (not just which chat).
+  useEffect(() => {
+    const ids = Array.from(new Set(msgResults.map((r) => r.sender_id).filter(Boolean))) as string[];
+    if (ids.length === 0) {
+      setSenderNames({});
+      return;
+    }
+    let alive = true;
+    browserSupabase()
+      .from('profiles')
+      .select('id, display_name, username')
+      .in('id', ids)
+      .then(({ data }) => {
+        if (!alive || !data) return;
+        const map: Record<string, string> = {};
+        for (const p of data as Array<{ id: string; display_name: string | null; username: string | null }>) {
+          map[p.id] = p.display_name || p.username || '';
+        }
+        setSenderNames(map);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [msgResults]);
 
   const reloadChats = () => {
     listChats()
@@ -704,6 +732,10 @@ export default function ChatsPage() {
                       <ul className="space-y-0.5">
                         {msgResults.map((r) => {
                           const chat = chatById.get(r.chat_id);
+                          const senderLabel =
+                            r.sender_id && user && r.sender_id === user.id
+                              ? t('chatsList.you')
+                              : (r.sender_id && senderNames[r.sender_id]) || t('chat.someone');
                           return (
                             <li key={r.id}>
                               <button
@@ -725,6 +757,7 @@ export default function ChatsPage() {
                                     <span className="shrink-0 text-xs text-slate-500">{fmt(r.created_at, lang)}</span>
                                   </div>
                                   <div className="mt-0.5 truncate text-[13px] text-slate-400">
+                                    <span className="font-medium text-slate-300">{senderLabel}: </span>
                                     {highlightSnippet(r.content, q)}
                                   </div>
                                 </div>
