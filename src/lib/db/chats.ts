@@ -138,12 +138,12 @@ export async function listChats(): Promise<ChatSummary[]> {
   // (this module isn't a component and can't call the i18n hook).
   const latestByChat = new Map<
     string,
-    { created_at: string; content: string | null; kind: 'text' | 'photo' | 'video' | 'audio' | 'gif' | 'poll' | 'file' | 'deleted' | null }
+    { created_at: string; content: string | null; kind: 'text' | 'photo' | 'video' | 'audio' | 'gif' | 'poll' | 'file' | 'call' | 'deleted' | null }
   >();
   for (const m of latestRows) {
     if (latestByChat.has(m.chat_id)) continue;
     let content = m.content || '';
-    let kind: 'text' | 'photo' | 'video' | 'audio' | 'gif' | 'poll' | 'file' | 'deleted' | null = content ? 'text' : null;
+    let kind: 'text' | 'photo' | 'video' | 'audio' | 'gif' | 'poll' | 'file' | 'call' | 'deleted' | null = content ? 'text' : null;
     if (!content && m.ciphertext) {
       try {
         const parsed = JSON.parse(m.ciphertext);
@@ -165,6 +165,8 @@ export async function listChats(): Promise<ChatSummary[]> {
           kind = 'file';
         } else if (parsed.poll) {
           kind = 'poll';
+        } else if (parsed.call) {
+          kind = 'call';
         } else if (parsed.is_deleted) {
           kind = 'deleted';
         }
@@ -552,6 +554,42 @@ export async function sendMessage(chatId: string, payload: MessagePayload) {
     expires_at: expiresAt,
   });
 
+  if (error) throw error;
+}
+
+export type CallEvent = {
+  video: boolean;
+  outcome: 'answered' | 'no_answer' | 'declined' | 'cancelled';
+  /** Talk time in seconds, for an answered call. */
+  duration?: number;
+};
+
+/**
+ * Record a call in the chat thread (like WhatsApp): both sides see that a call
+ * happened, how long it lasted, or that it went unanswered. The caller writes
+ * this when the call ends.
+ *
+ * message_type 'system' makes the new-message push trigger skip it (the call
+ * already alerted the callee, so a "new message" push would be noise), while
+ * sender_type stays 'agent' so it renders as a normal aligned bubble (not a
+ * centered system line). The payload lives in ciphertext as { v:1, call }.
+ */
+export async function logCallEvent(chatId: string, ev: CallEvent): Promise<void> {
+  const supabase = browserSupabase();
+  const { data: me } = await supabase.auth.getUser();
+  if (!me.user) return;
+  const deviceId = await ensureLocalDevice(me.user.id);
+  const nonce = crypto.randomUUID();
+  const { error } = await supabase.from('messages').insert({
+    chat_id: chatId,
+    sender_device_id: deviceId,
+    sender_id: me.user.id,
+    message_type: 'system',
+    sender_type: 'agent',
+    ciphertext: JSON.stringify({ v: 1, call: ev }),
+    content: null,
+    nonce,
+  });
   if (error) throw error;
 }
 
