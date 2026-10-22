@@ -64,6 +64,9 @@ export async function POST(req: Request) {
     const title = callerName;
     const text = video ? '📹 Incoming video call' : '📞 Incoming voice call';
     const url = chatId ? `/chats/view?c=${chatId}` : '/chats';
+    // A call alert is only useful while the call is still ringing. Expire it fast
+    // so a push delayed by the network doesn't buzz for a call that's long over.
+    const CALL_TTL_SECONDS = 45;
 
     let webSent = 0;
     if (hasWeb) {
@@ -76,7 +79,8 @@ export async function POST(req: Request) {
           try {
             await webpush.sendNotification(
               { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
-              payload
+              payload,
+              { TTL: CALL_TTL_SECONDS }
             );
           } catch (e: any) {
             if (e?.statusCode === 404 || e?.statusCode === 410) staleIds.push(sub.id);
@@ -90,7 +94,7 @@ export async function POST(req: Request) {
     let nativeSent = 0;
     if (hasNative) {
       const tokens = deviceTokens!.map((d) => d.token);
-      const { staleTokens, sent } = await sendToTokens(tokens, { title, body: text, url });
+      const { staleTokens, sent } = await sendToTokens(tokens, { title, body: text, url }, CALL_TTL_SECONDS);
       nativeSent = sent;
       if (staleTokens.length > 0) {
         await supabaseAdmin.from('device_tokens').delete().in('token', staleTokens);
