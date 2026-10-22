@@ -562,6 +562,8 @@ export type CallEvent = {
   outcome: 'answered' | 'no_answer' | 'declined' | 'cancelled';
   /** Talk time in seconds, for an answered call. */
   duration?: number;
+  /** True for a group call (changes the label shown in the thread). */
+  isGroup?: boolean;
 };
 
 /**

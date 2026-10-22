@@ -496,6 +496,8 @@ const en = {
     rejected: 'Call rejected',
     logCall: 'Call',
     logVideoCall: 'Video call',
+    logGroupCall: 'Group call',
+    logGroupVideoCall: 'Group video call',
     logMissed: 'Missed call',
     logNoAnswer: 'No answer',
     logDeclined: 'Call declined',
