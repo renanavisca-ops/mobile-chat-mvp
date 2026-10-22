@@ -471,6 +471,8 @@ export default function ChatsPage() {
         return t('chatsList.poll');
       case 'file':
         return t('chatsList.file');
+      case 'call':
+        return t('chatsList.call');
       case 'deleted':
         return t('chatsList.deletedMessage');
       default:
