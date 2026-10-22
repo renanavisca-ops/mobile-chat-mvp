@@ -68,7 +68,7 @@ type Payload = {
   is_deleted?: boolean;
   poll?: { question: string; options: string[] };
   /** In-chat call log entry (WhatsApp-style). */
-  call?: { video: boolean; outcome: 'answered' | 'no_answer' | 'declined' | 'cancelled'; duration?: number };
+  call?: { video: boolean; outcome: 'answered' | 'no_answer' | 'declined' | 'cancelled'; duration?: number; isGroup?: boolean };
   /** Per-path media encryption metadata (toky-media-v1) for encrypted chats. */
   enc?: Record<string, MediaEnc>;
 };
@@ -2956,7 +2956,9 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
                         const answered = call.outcome === 'answered';
                         const missed = !answered && !outgoing; // incoming + unanswered = missed
                         const label = answered
-                          ? (call.video ? t('call.logVideoCall') : t('call.logCall'))
+                          ? call.isGroup
+                            ? (call.video ? t('call.logGroupVideoCall') : t('call.logGroupCall'))
+                            : (call.video ? t('call.logVideoCall') : t('call.logCall'))
                           : call.outcome === 'declined'
                           ? t('call.logDeclined')
                           : outgoing

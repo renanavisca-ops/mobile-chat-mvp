@@ -498,6 +498,8 @@ const es: Dictionary = {
     rejected: 'Llamada rechazada',
     logCall: 'Llamada',
     logVideoCall: 'Videollamada',
+    logGroupCall: 'Llamada grupal',
+    logGroupVideoCall: 'Videollamada grupal',
     logMissed: 'Llamada perdida',
     logNoAnswer: 'Llamada sin respuesta',
     logDeclined: 'Llamada rechazada',

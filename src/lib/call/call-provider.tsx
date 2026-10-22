@@ -259,6 +259,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
   const shouldLogCallRef = useRef(false); // 1:1 outgoing calls only (set after invite)
   const callChatIdRef = useRef<string | null>(null);
   const callVideoRef = useRef(false);
+  const callIsGroupRef = useRef(false);
   const callAnsweredAtRef = useRef<number | null>(null);
   const callOutcomeRef = useRef<'no_answer' | 'answered' | 'declined' | 'cancelled'>('no_answer');
   const iceServersRef = useRef<RTCIceServer[]>([{ urls: 'stun:stun.cloudflare.com:3478' }]);
@@ -422,11 +423,13 @@ export function CallProvider({ children }: { children: ReactNode }) {
       const outcome = callOutcomeRef.current === 'cancelled' ? 'no_answer' : callOutcomeRef.current;
       void logCallEvent(callChatIdRef.current, {
         video: callVideoRef.current,
+        isGroup: callIsGroupRef.current,
         outcome,
         duration: outcome === 'answered' && answeredAt ? Math.round((Date.now() - answeredAt) / 1000) : undefined,
       }).catch(() => {});
     }
     shouldLogCallRef.current = false;
+    callIsGroupRef.current = false;
     callChatIdRef.current = null;
     callAnsweredAtRef.current = null;
     callOutcomeRef.current = 'no_answer';
@@ -763,15 +766,15 @@ export function CallProvider({ children }: { children: ReactNode }) {
           });
         }
 
-        // Arm the in-chat call log for this 1:1 outgoing call. Done only after
-        // media + invite succeeded, so a failed getUserMedia logs nothing.
-        if (!opts.isGroup) {
-          callChatIdRef.current = opts.chatId;
-          callVideoRef.current = opts.video;
-          callAnsweredAtRef.current = null;
-          callOutcomeRef.current = 'no_answer';
-          shouldLogCallRef.current = true;
-        }
+        // Arm the in-chat call log (1:1 AND group). The initiator writes one
+        // entry when the call ends. Done only after media + invite succeeded, so
+        // a failed getUserMedia logs nothing.
+        callChatIdRef.current = opts.chatId;
+        callVideoRef.current = opts.video;
+        callIsGroupRef.current = opts.isGroup;
+        callAnsweredAtRef.current = null;
+        callOutcomeRef.current = 'no_answer';
+        shouldLogCallRef.current = true;
 
         // Also push a notification so callees with the app closed get alerted.
         try {
