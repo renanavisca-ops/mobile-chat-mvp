@@ -713,9 +713,12 @@ export function CallProvider({ children }: { children: ReactNode }) {
         localStreamRef.current = stream;
         setLocalHasVideo(opts.video);
         if (localVideoRef.current) localVideoRef.current.srcObject = stream;
-        // Enter native voice mode and honor the default speaker-on state.
+        // Enter native voice mode. Default the output to the EARPIECE for a voice
+        // call (like a normal phone call) and only to the loudspeaker for a video
+        // call; the user can still toggle the speaker during the call.
         await nativeStartCallAudio();
-        await applySpeaker(true); // speaker defaults on at call start
+        setSpeakerOn(opts.video);
+        await applySpeaker(opts.video);
         iceServersRef.current = await getIceServers();
 
         await joinCall(callId);
@@ -772,9 +775,11 @@ export function CallProvider({ children }: { children: ReactNode }) {
       localStreamRef.current = stream;
       setLocalHasVideo(inv.video);
       if (localVideoRef.current) localVideoRef.current.srcObject = stream;
-      // Enter native voice mode and honor the default speaker-on state.
+      // Enter native voice mode. Earpiece by default for a voice call, speaker
+      // for a video call; the user can toggle the speaker during the call.
       await nativeStartCallAudio();
-      await applySpeaker(true); // speaker defaults on at call start
+      setSpeakerOn(inv.video);
+      await applySpeaker(inv.video);
       iceServersRef.current = await getIceServers();
       await joinCall(inv.callId);
     } catch (e: any) {
@@ -885,6 +890,10 @@ export function CallProvider({ children }: { children: ReactNode }) {
       setCameraOff(false);
       setLocalHasVideo(true);
       setIsVideo(true);
+      // Upgrading a voice call to video means you're now looking at the screen —
+      // move audio to the loudspeaker (hands-free), like a video call starts.
+      setSpeakerOn(true);
+      void applySpeaker(true);
     } catch (e: any) {
       setErrText(e?.message ?? String(e));
     }
