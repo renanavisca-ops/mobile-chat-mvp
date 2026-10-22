@@ -14,7 +14,7 @@ import type { RealtimeChannel } from '@supabase/supabase-js';
 import { browserSupabase } from '@/lib/supabase/client';
 import { logCallStart, logCallAnswered, logCallEnded } from '@/lib/db/calls';
 import { isBlockedWith } from '@/lib/db/safety';
-import { startRingtone, stopRingtone } from '@/lib/call/ringtone';
+import { startRingtone, stopRingtone, startRingback, primeRingAudio } from '@/lib/call/ringtone';
 import {
   hasNativeAudioRoute,
   nativeStartCallAudio,
@@ -1095,12 +1095,34 @@ export function CallProvider({ children }: { children: ReactNode }) {
     incomingCallIdRef.current = incoming?.callId ?? null;
   }, [incoming]);
 
-  // Ring (sound + vibration) while an incoming call is waiting to be answered.
+  // Unlock the ring AudioContext on the first user gesture so an incoming ring
+  // (or ringback) is actually audible on mobile, where a fresh AudioContext
+  // created at call time stays 'suspended' and plays nothing.
   useEffect(() => {
-    if (phase === 'ringing' && incoming) startRingtone();
+    primeRingAudio();
+  }, []);
+
+  // Single source of truth for call tones (one shared timer, so the two cases
+  // never fight over it):
+  //   - callee, phase 'ringing'  -> incoming ringtone + vibration
+  //   - caller, phase 'incall' and nobody answered yet -> ringback tone
+  // A mode guard means we only (re)start when the tone actually changes, so a
+  // presence update mid-ringback doesn't restart the burst.
+  const ringModeRef = useRef<'none' | 'ring' | 'ringback'>('none');
+  useEffect(() => {
+    const anyAnswered = Array.from(participants.values()).some((p) => p.stream);
+    let mode: 'none' | 'ring' | 'ringback' = 'none';
+    if (phase === 'ringing' && incoming) mode = 'ring';
+    else if (phase === 'incall' && wasCallerRef.current && !anyAnswered) mode = 'ringback';
+    if (mode === ringModeRef.current) return;
+    ringModeRef.current = mode;
+    if (mode === 'ring') startRingtone();
+    else if (mode === 'ringback') startRingback();
     else stopRingtone();
-    return () => stopRingtone();
-  }, [phase, incoming]);
+  }, [phase, incoming, participants]);
+
+  // Stop any tone if the provider ever unmounts.
+  useEffect(() => () => stopRingtone(), []);
 
   const remoteList = Array.from(participants.values());
   const totalTiles = remoteList.length + 1; // + me
