@@ -13,6 +13,7 @@ import {
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { browserSupabase } from '@/lib/supabase/client';
 import { logCallStart, logCallAnswered, logCallEnded } from '@/lib/db/calls';
+import { logCallEvent } from '@/lib/db/chats';
 import { isBlockedWith } from '@/lib/db/safety';
 import { startRingtone, stopRingtone, startRingback, primeRingAudio } from '@/lib/call/ringtone';
 import {
@@ -253,6 +254,13 @@ export function CallProvider({ children }: { children: ReactNode }) {
   // True when *this* device started the call, so only the caller stamps the
   // call log's end time (the caller owns the row).
   const wasCallerRef = useRef(false);
+  // In-chat call log (WhatsApp-style): the caller records one message when the
+  // call ends. These track what to write.
+  const shouldLogCallRef = useRef(false); // 1:1 outgoing calls only (set after invite)
+  const callChatIdRef = useRef<string | null>(null);
+  const callVideoRef = useRef(false);
+  const callAnsweredAtRef = useRef<number | null>(null);
+  const callOutcomeRef = useRef<'no_answer' | 'answered' | 'declined' | 'cancelled'>('no_answer');
   const iceServersRef = useRef<RTCIceServer[]>([{ urls: 'stun:stun.cloudflare.com:3478' }]);
   const incomingCallIdRef = useRef<string | null>(null);
   const facingRef = useRef<'user' | 'environment'>('user');
@@ -408,6 +416,20 @@ export function CallProvider({ children }: { children: ReactNode }) {
   const cleanup = useCallback(() => {
     // Caller stamps the end time before we clear the call id.
     if (wasCallerRef.current && callIdRef.current) void logCallEnded(callIdRef.current);
+    // Caller writes the in-chat call log (both sides see it via realtime).
+    if (wasCallerRef.current && shouldLogCallRef.current && callChatIdRef.current) {
+      const answeredAt = callAnsweredAtRef.current;
+      const outcome = callOutcomeRef.current === 'cancelled' ? 'no_answer' : callOutcomeRef.current;
+      void logCallEvent(callChatIdRef.current, {
+        video: callVideoRef.current,
+        outcome,
+        duration: outcome === 'answered' && answeredAt ? Math.round((Date.now() - answeredAt) / 1000) : undefined,
+      }).catch(() => {});
+    }
+    shouldLogCallRef.current = false;
+    callChatIdRef.current = null;
+    callAnsweredAtRef.current = null;
+    callOutcomeRef.current = 'no_answer';
     wasCallerRef.current = false;
     for (const pid of Array.from(pcsRef.current.keys())) {
       try {
@@ -531,6 +553,12 @@ export function CallProvider({ children }: { children: ReactNode }) {
     pc.ontrack = (e) => {
       const [stream] = e.streams;
       hadPeersRef.current = true;
+      // First media from a peer = the call was answered (caller-side), which the
+      // in-chat call log uses to show it as answered + start the talk timer.
+      if (wasCallerRef.current && callAnsweredAtRef.current === null) {
+        callAnsweredAtRef.current = Date.now();
+        callOutcomeRef.current = 'answered';
+      }
       // If a peer starts sending video (e.g. they upgraded a voice call), flip
       // this side into the video UI so the remote video shows and the "switch
       // to video" control appears for us too.
@@ -733,6 +761,16 @@ export function CallProvider({ children }: { children: ReactNode }) {
             isGroup: opts.isGroup,
             label: opts.label,
           });
+        }
+
+        // Arm the in-chat call log for this 1:1 outgoing call. Done only after
+        // media + invite succeeded, so a failed getUserMedia logs nothing.
+        if (!opts.isGroup) {
+          callChatIdRef.current = opts.chatId;
+          callVideoRef.current = opts.video;
+          callAnsweredAtRef.current = null;
+          callOutcomeRef.current = 'no_answer';
+          shouldLogCallRef.current = true;
         }
 
         // Also push a notification so callees with the app closed get alerted.
@@ -1087,6 +1125,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
         pcsRef.current.size === 0 &&
         callIdRef.current === payload.callId
       ) {
+        if (callOutcomeRef.current !== 'answered') callOutcomeRef.current = 'declined';
         setEndedNote(t('call.rejected'));
         window.setTimeout(() => setEndedNote(''), 3500);
         cleanup();

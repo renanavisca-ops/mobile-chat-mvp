@@ -221,7 +221,7 @@ export function useChatRealtime(chatId: string) {
                 return [...withoutEcho, newMsg];
               });
               // Notificar si la app está en background y el mensaje no es mío
-              if (document.hidden && newMsg.sender_id && newMsg.sender_id !== userId) {
+              if (document.hidden && newMsg.sender_id && newMsg.sender_id !== userId && newMsg.message_type !== 'system') {
                 try {
                   let txt = 'Nuevo mensaje';
                   if (newMsg.content) {

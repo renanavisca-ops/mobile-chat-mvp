@@ -67,6 +67,8 @@ type Payload = {
   reply_to?: string;
   is_deleted?: boolean;
   poll?: { question: string; options: string[] };
+  /** In-chat call log entry (WhatsApp-style). */
+  call?: { video: boolean; outcome: 'answered' | 'no_answer' | 'declined' | 'cancelled'; duration?: number };
   /** Per-path media encryption metadata (toky-media-v1) for encrypted chats. */
   enc?: Record<string, MediaEnc>;
 };
@@ -98,6 +100,17 @@ function parseCipher(ciphertext: string | undefined | null): Payload {
     if (obj && typeof obj === 'object') return obj as Payload;
   } catch {}
   return {};
+}
+
+/** Compact talk-time for a call log: "45s", "9:05", "1:02:30". */
+function formatCallDuration(sec: number): string {
+  const s = Math.max(0, Math.round(sec));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const r = s % 60;
+  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(r).padStart(2, '0')}`;
+  if (m > 0) return `${m}:${String(r).padStart(2, '0')}`;
+  return `${r}s`;
 }
 
 function getMessagePayload(message: MessageRow): Payload {
@@ -2937,7 +2950,31 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
                         ) : null}
                       </div>
 
-                      {m.body.is_deleted ? (
+                      {m.body.call ? (() => {
+                        const call = m.body.call;
+                        const outgoing = isMine(m);
+                        const answered = call.outcome === 'answered';
+                        const missed = !answered && !outgoing; // incoming + unanswered = missed
+                        const label = answered
+                          ? (call.video ? t('call.logVideoCall') : t('call.logCall'))
+                          : call.outcome === 'declined'
+                          ? t('call.logDeclined')
+                          : outgoing
+                          ? t('call.logNoAnswer')
+                          : t('call.logMissed');
+                        const dur = answered && call.duration ? formatCallDuration(call.duration) : '';
+                        return (
+                          <div className="mt-0.5 flex items-center gap-2.5 py-0.5">
+                            <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-full ${missed ? 'bg-rose-500/15 text-rose-400' : 'bg-slate-700/60 text-slate-100'}`}>
+                              {call.video ? <VideoIcon size={16} /> : <PhoneIcon size={16} />}
+                            </span>
+                            <div className="min-w-0 text-left">
+                              <div className={`text-sm font-medium ${missed ? 'text-rose-300' : 'text-slate-100'}`}>{label}</div>
+                              {dur ? <div className="text-xs text-slate-400">{dur}</div> : null}
+                            </div>
+                          </div>
+                        );
+                      })() : m.body.is_deleted ? (
                         <div className="text-sm text-slate-500 italic mt-1 flex items-center gap-1">
                           <span>🚫</span> {t('chat.deletedMessage')}
                         </div>
