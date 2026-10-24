@@ -243,6 +243,27 @@ export default function ChatsPage() {
       .catch((e) => setErr(e?.message ?? String(e)));
   };
 
+  // Ensure every user has their "Notes to self" chat automatically — created on
+  // first load if they don't have one yet, so it just appears (pinned at the
+  // top) without having to open "Notas personales" by hand. Idempotent:
+  // getOrCreateSelfChat reuses an existing self-chat, and this only fires when
+  // none is present. Runs once per session.
+  const selfEnsuredRef = useRef(false);
+  useEffect(() => {
+    if (!user || !chatsLoaded || selfEnsuredRef.current) return;
+    if (chats.some((c) => c.is_self)) {
+      selfEnsuredRef.current = true;
+      return;
+    }
+    selfEnsuredRef.current = true;
+    getOrCreateSelfChat(t('chatsList.selfNotes'))
+      .then(() => reloadChats())
+      .catch(() => {
+        selfEnsuredRef.current = false; // allow a retry on a later render
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, chatsLoaded, chats]);
+
   // Paint the last-known chat list instantly from cache, then refresh in the
   // background (below). Skips the skeleton on repeat/cold visits.
   useEffect(() => {

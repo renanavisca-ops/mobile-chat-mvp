@@ -304,6 +304,36 @@ export async function getOrCreateSelfChat(title: string): Promise<string> {
   } catch {
     /* ignore */
   }
+  // Idempotent: reuse an existing self-chat (a group I created with no OTHER
+  // members) instead of always making a new one. Without this, a cleared
+  // localStorage / new device / the auto-create below would spawn duplicates.
+  try {
+    const { data: created } = await supabase
+      .from('chats')
+      .select('id')
+      .eq('kind', 'group')
+      .eq('created_by', uid);
+    const ids = (created ?? []).map((c) => c.id as string);
+    if (ids.length) {
+      const { data: mems } = await supabase
+        .from('chat_members')
+        .select('chat_id, user_id')
+        .in('chat_id', ids);
+      const hasOther = new Set<string>();
+      const seen = new Set<string>();
+      for (const m of mems ?? []) {
+        seen.add(m.chat_id as string);
+        if ((m.user_id as string) !== uid) hasOther.add(m.chat_id as string);
+      }
+      const existing = ids.find((id) => seen.has(id) && !hasOther.has(id));
+      if (existing) {
+        try { localStorage.setItem(key, existing); } catch { /* ignore */ }
+        return existing;
+      }
+    }
+  } catch {
+    /* fall through to create */
+  }
   const chatId = await createGroupChat(title, [uid]);
   // Encrypt notes to yourself (best effort; never block opening the chat).
   try {
