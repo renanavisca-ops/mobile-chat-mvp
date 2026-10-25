@@ -138,12 +138,12 @@ export async function listChats(): Promise<ChatSummary[]> {
   // (this module isn't a component and can't call the i18n hook).
   const latestByChat = new Map<
     string,
-    { created_at: string; content: string | null; kind: 'text' | 'photo' | 'video' | 'audio' | 'gif' | 'poll' | 'file' | 'call' | 'deleted' | null }
+    { created_at: string; content: string | null; kind: 'text' | 'photo' | 'video' | 'audio' | 'gif' | 'sticker' | 'poll' | 'file' | 'call' | 'deleted' | null }
   >();
   for (const m of latestRows) {
     if (latestByChat.has(m.chat_id)) continue;
     let content = m.content || '';
-    let kind: 'text' | 'photo' | 'video' | 'audio' | 'gif' | 'poll' | 'file' | 'call' | 'deleted' | null = content ? 'text' : null;
+    let kind: 'text' | 'photo' | 'video' | 'audio' | 'gif' | 'sticker' | 'poll' | 'file' | 'call' | 'deleted' | null = content ? 'text' : null;
     if (!content && m.ciphertext) {
       try {
         const parsed = JSON.parse(m.ciphertext);
@@ -161,6 +161,8 @@ export async function listChats(): Promise<ChatSummary[]> {
           kind = 'audio';
         } else if (parsed.gifUrl) {
           kind = 'gif';
+        } else if (parsed.stickerUrl) {
+          kind = 'sticker';
         } else if (parsed.filePath) {
           kind = 'file';
         } else if (parsed.poll) {
@@ -522,6 +524,8 @@ export type MessagePayload = {
   videoTrimEnd?: number;
   audioPath?: string;
   gifUrl?: string;
+  /** Public URL of a sticker (transparent PNG), rendered without a bubble. */
+  stickerUrl?: string;
   filePath?: string;
   fileName?: string;
   fileSize?: number;
