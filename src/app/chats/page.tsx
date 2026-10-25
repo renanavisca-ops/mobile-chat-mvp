@@ -488,6 +488,8 @@ export default function ChatsPage() {
         return t('chatsList.audio');
       case 'gif':
         return t('chatsList.gif');
+      case 'sticker':
+        return t('chatsList.sticker');
       case 'poll':
         return t('chatsList.poll');
       case 'file':

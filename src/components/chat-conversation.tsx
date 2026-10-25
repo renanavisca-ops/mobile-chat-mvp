@@ -37,6 +37,7 @@ import { starMessage, unstarMessage, getStarredIdsForChat } from '@/lib/db/stars
 import { ImageEditor } from '@/components/image-editor';
 import { MessageEffects, detectEffect } from '@/components/message-effects';
 import { GifPicker } from '@/components/gif-picker';
+import { StickerPicker } from '@/components/sticker-picker';
 import type { Gif } from '@/lib/giphy';
 import { useCall } from '@/lib/call/call-provider';
 import { VideoTrimmer, TrimmedVideo } from '@/components/video-trimmer';
@@ -60,6 +61,7 @@ type Payload = {
   videoTrimEnd?: number;
   audioPath?: string;
   gifUrl?: string;
+  stickerUrl?: string;
   filePath?: string;
   fileName?: string;
   fileSize?: number;
@@ -552,6 +554,8 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
 
   // GIF picker
   const [gifPickerOpen, setGifPickerOpen] = useState(false);
+  // Sticker picker (collection + create)
+  const [stickerPickerOpen, setStickerPickerOpen] = useState(false);
 
   // AI: smart replies + translation
   const [suggestions, setSuggestions] = useState<string[]>([]);
@@ -879,6 +883,29 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
       toast(t('ai.failed'));
     } finally {
       setTranslatingId(null);
+    }
+  }
+
+  async function onPickSticker(url: string) {
+    setStickerPickerOpen(false);
+    const payload: Payload = { stickerUrl: url };
+    if (replyingTo) payload.reply_to = replyingTo.id;
+    const temp: MessageRow = {
+      id: `local-${crypto.randomUUID()}`,
+      chat_id: chatId,
+      sender_device_id: 'local',
+      ciphertext: JSON.stringify({ v: 1, ...payload }),
+      nonce: `local-${crypto.randomUUID()}`,
+      message_type: 'whisper',
+      created_at: new Date().toISOString(),
+    };
+    appendLocal(temp);
+    setReplyingTo(null);
+    try {
+      await sendMessage(chatId, payload as any);
+      setErr('');
+    } catch (e: any) {
+      setErr(sendErrorMessage(e));
     }
   }
 
@@ -2642,6 +2669,10 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
           setEmojiOpen(false);
           setGifPickerOpen(true);
         }}
+        onSticker={() => {
+          setEmojiOpen(false);
+          setStickerPickerOpen(true);
+        }}
         onSchedule={() => {
           setEmojiOpen(false);
           setAttachOpen(false);
@@ -2657,6 +2688,8 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
       />
 
       <GifPicker open={gifPickerOpen} onClose={() => setGifPickerOpen(false)} onPick={onPickGif} />
+
+      <StickerPicker open={stickerPickerOpen} onClose={() => setStickerPickerOpen(false)} onPick={onPickSticker} />
 
       <VideoTrimmer
         open={trimmerOpen}
@@ -2893,6 +2926,7 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
                         selectMode && selectedIds.has(m.id) ? 'ring-2 ring-blue-400 ring-offset-2 ring-offset-slate-950' : ''
                       } ${
                         m.sender_type === 'system' ? 'mx-auto bg-slate-800/80 text-center text-xs text-slate-400' :
+                        m.body.stickerUrl ? `${isMine(m) ? 'ml-auto' : 'mr-auto'} !p-0 bg-transparent shadow-none text-slate-300` :
                         isMine(m) ? `ml-auto toky-grad text-white shadow-[0_4px_14px_-6px_rgba(79,70,229,0.7)] ${grouped ? 'rounded-tr-md rounded-br-md' : 'rounded-br-md'}` :
                         `mr-auto bg-slate-800 text-slate-100 shadow-sm ${grouped ? 'rounded-tl-md rounded-bl-md' : 'rounded-bl-md'}`
                       }`}
@@ -3035,6 +3069,11 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
                       {m.body.gifUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={m.body.gifUrl} alt="GIF" className="mt-2 max-h-72 w-auto rounded-lg border border-slate-900" />
+                      ) : null}
+
+                      {m.body.stickerUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={m.body.stickerUrl} alt="sticker" className="max-h-40 w-auto select-none" draggable={false} />
                       ) : null}
 
                       {m.message_type === 'poll' && m.body.poll ? (
