@@ -5,6 +5,7 @@ import { searchUsers } from '@/lib/db/contacts';
 import { updateGroupInfo, addGroupMembers, removeGroupMember, leaveChat, getChatMuted, setChatMuteUntil, setDisappearingMessages } from '@/lib/db/chats';
 import { uploadGroupAvatar } from '@/lib/db/groupAvatar';
 import { useT } from '@/lib/i18n/context';
+import { ImageLightbox } from '@/components/image-lightbox';
 import type { ProfileLite } from '@/lib/db/types';
 
 const DISAPPEARING_OPTIONS: { seconds: number; labelKey: string }[] = [
@@ -65,6 +66,7 @@ export function GroupInfoModal({
   const [err, setErr] = useState('');
 
   const [avatarBusy, setAvatarBusy] = useState(false);
+  const [photoOpen, setPhotoOpen] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement | null>(null);
 
   const [muted, setMuted] = useState(false);
@@ -225,6 +227,7 @@ export function GroupInfoModal({
   }
 
   return (
+    <>
     <div
       className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
       onMouseDown={(e) => {
@@ -243,8 +246,10 @@ export function GroupInfoModal({
 
         <div className="mt-4 flex items-center gap-4">
           {avatarUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={avatarUrl} alt="" className="h-16 w-16 rounded-full border border-slate-800 object-cover" />
+            <button type="button" onClick={() => setPhotoOpen(true)} className="rounded-full focus:outline-none" aria-label={t('chat.viewPhoto')}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={avatarUrl} alt="" className="h-16 w-16 cursor-zoom-in rounded-full border border-slate-800 object-cover" />
+            </button>
           ) : (
             <span className="grid h-16 w-16 place-items-center rounded-full bg-slate-800 text-lg font-semibold text-slate-300">
               {(title || '?').trim().charAt(0).toUpperCase()}
@@ -555,5 +560,10 @@ export function GroupInfoModal({
         </div>
       </div>
     </div>
+
+    {photoOpen && avatarUrl && (
+      <ImageLightbox url={avatarUrl} onClose={() => setPhotoOpen(false)} />
+    )}
+    </>
   );
 }

@@ -246,6 +246,7 @@ const es: Dictionary = {
     savedToDevice: 'Guardado en tus archivos.',
     openNeedsDownload: 'Para abrir este archivo, descárgalo primero.',
     savedToGallery: 'Guardado en tu galería.',
+    viewPhoto: 'Ver foto',
     mediaRetry: 'Toca para reintentar',
     forwardMediaUnavailable: 'No se pudo cargar el contenido original para reenviar.',
     edited: '(editado)',

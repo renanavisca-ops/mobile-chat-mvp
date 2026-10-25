@@ -244,6 +244,7 @@ const en = {
     savedToDevice: 'Saved to your files.',
     openNeedsDownload: 'To open this file, download it first.',
     savedToGallery: 'Saved to your gallery.',
+    viewPhoto: 'View photo',
     mediaRetry: 'Tap to retry',
     forwardMediaUnavailable: "Couldn't load the original media to forward.",
     edited: '(edited)',
