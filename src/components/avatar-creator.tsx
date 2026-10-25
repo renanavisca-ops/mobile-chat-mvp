@@ -77,19 +77,50 @@ function fileFromCanvas(canvas: HTMLCanvasElement): Promise<File> {
   });
 }
 
+function CameraIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+      <circle cx="12" cy="13" r="4" />
+    </svg>
+  );
+}
+
+function GalleryIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+      <circle cx="8.5" cy="8.5" r="1.5" />
+      <path d="M21 15l-5-5L5 21" />
+    </svg>
+  );
+}
+
+function RotateIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M23 4v6h-6" />
+      <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+    </svg>
+  );
+}
+
 export function AvatarCreator({
   open,
   userId,
+  initialMode = 'emoji',
   onClose,
   onSaved,
 }: {
   open: boolean;
   userId: string;
+  /** Which tab to open on. "photo" is used by the "Change photo" entry point. */
+  initialMode?: 'emoji' | 'photo';
   onClose: () => void;
   onSaved: (url: string) => void;
 }) {
   const t = useT();
-  const [mode, setMode] = useState<'emoji' | 'photo'>('emoji');
+  const [mode, setMode] = useState<'emoji' | 'photo'>(initialMode);
   const [emoji, setEmoji] = useState(EMOJIS[0]);
   const [gradIndex, setGradIndex] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -99,17 +130,34 @@ export function AvatarCreator({
   // Photo-crop state
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const imgRef = useRef<HTMLImageElement | null>(null);
-  const photoInputRef = useRef<HTMLInputElement | null>(null);
+  const galleryInputRef = useRef<HTMLInputElement | null>(null);
+  const cameraInputRef = useRef<HTMLInputElement | null>(null);
   const drag = useRef({ active: false, sx: 0, sy: 0, ox: 0, oy: 0 });
   const [hasPhoto, setHasPhoto] = useState(false);
   const [zoom, setZoom] = useState(1);
+  const [rot, setRot] = useState(0); // quarter-turns clockwise: 0..3
   const [off, setOff] = useState({ x: 0, y: 0 });
 
-  const baseScale = (img: HTMLImageElement) => Math.max(OUT / img.naturalWidth, OUT / img.naturalHeight);
+  // Re-sync the opening tab each time the dialog is (re)opened.
+  useEffect(() => {
+    if (open) setMode(initialMode);
+  }, [open, initialMode]);
+
+  // Natural dimensions as seen after the current rotation (width/height swap on quarter turns).
+  const rotatedDims = (img: HTMLImageElement) =>
+    rot % 2 === 0
+      ? { w: img.naturalWidth, h: img.naturalHeight }
+      : { w: img.naturalHeight, h: img.naturalWidth };
+
+  const baseScale = (img: HTMLImageElement) => {
+    const d = rotatedDims(img);
+    return Math.max(OUT / d.w, OUT / d.h);
+  };
 
   function clampOff(o: { x: number; y: number }, eff: number, img: HTMLImageElement) {
-    const mx = Math.max(0, (img.naturalWidth * eff - OUT) / 2);
-    const my = Math.max(0, (img.naturalHeight * eff - OUT) / 2);
+    const d = rotatedDims(img);
+    const mx = Math.max(0, (d.w * eff - OUT) / 2);
+    const my = Math.max(0, (d.h * eff - OUT) / 2);
     return { x: Math.max(-mx, Math.min(mx, o.x)), y: Math.max(-my, Math.min(my, o.y)) };
   }
 
@@ -120,20 +168,25 @@ export function AvatarCreator({
     const ctx = c.getContext('2d');
     if (!ctx) return;
     const eff = baseScale(img) * zoom;
-    const drawW = img.naturalWidth * eff;
-    const drawH = img.naturalHeight * eff;
     const o = clampOff(off, eff, img);
     ctx.clearRect(0, 0, OUT, OUT);
     ctx.fillStyle = '#0b1222';
     ctx.fillRect(0, 0, OUT, OUT);
-    ctx.drawImage(img, (OUT - drawW) / 2 + o.x, (OUT - drawH) / 2 + o.y, drawW, drawH);
+    ctx.save();
+    // Place the image centre at the crop centre (+ pan), then rotate around it.
+    ctx.translate(OUT / 2 + o.x, OUT / 2 + o.y);
+    ctx.rotate((rot * Math.PI) / 2);
+    const w = img.naturalWidth * eff;
+    const h = img.naturalHeight * eff;
+    ctx.drawImage(img, -w / 2, -h / 2, w, h);
+    ctx.restore();
   }
 
   // Redraw whenever the crop changes or the photo tab becomes visible.
   useEffect(() => {
     if (open && mode === 'photo') draw();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [zoom, off, hasPhoto, mode, open]);
+  }, [zoom, off, rot, hasPhoto, mode, open]);
 
   if (!open) return null;
 
@@ -146,15 +199,22 @@ export function AvatarCreator({
     img.onload = () => {
       imgRef.current = img;
       setZoom(1);
+      setRot(0);
       setOff({ x: 0, y: 0 });
       setHasPhoto(true);
       URL.revokeObjectURL(url);
     };
     img.onerror = () => {
-      setErr('Could not load that image.');
+      setErr(t('avatarCreator.loadError'));
       URL.revokeObjectURL(url);
     };
     img.src = url;
+  }
+
+  function resetCrop() {
+    setZoom(1);
+    setRot(0);
+    setOff({ x: 0, y: 0 });
   }
 
   function onPointerDown(e: React.PointerEvent<HTMLCanvasElement>) {
@@ -301,15 +361,24 @@ export function AvatarCreator({
                 style={{ background: '#0b1222' }}
               />
               {!hasPhoto && (
-                <button
-                  type="button"
-                  onClick={() => photoInputRef.current?.click()}
-                  className="absolute inset-0 grid place-items-center rounded-full text-center text-sm text-slate-300"
-                >
-                  <span className="toky-grad rounded-full px-4 py-2 font-semibold text-white">
+                <div className="absolute inset-0 grid place-items-center gap-2 rounded-full p-6 text-center">
+                  <button
+                    type="button"
+                    onClick={() => cameraInputRef.current?.click()}
+                    className="toky-grad flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold text-white"
+                  >
+                    <CameraIcon />
+                    {t('avatarCreator.takePhoto')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => galleryInputRef.current?.click()}
+                    className="flex items-center gap-2 rounded-full bg-slate-800 px-4 py-2 text-sm font-semibold text-slate-100 hover:bg-slate-700"
+                  >
+                    <GalleryIcon />
                     {t('avatarCreator.choosePhoto')}
-                  </span>
-                </button>
+                  </button>
+                </div>
               )}
             </div>
 
@@ -328,17 +397,53 @@ export function AvatarCreator({
                   />
                 </div>
                 <p className="mt-2 text-center text-[11px] text-slate-500">{t('avatarCreator.dragHint')}</p>
-                <button
-                  type="button"
-                  onClick={() => photoInputRef.current?.click()}
-                  className="mt-2 text-xs font-medium text-blue-400 hover:text-blue-300"
-                >
-                  {t('avatarCreator.chooseAnother')}
-                </button>
+
+                {/* Edit toolbar: rotate, reset, change source */}
+                <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRot((r) => (r + 1) % 4);
+                      setOff({ x: 0, y: 0 });
+                    }}
+                    className="flex items-center gap-1.5 rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-medium text-slate-200 hover:bg-slate-700"
+                  >
+                    <RotateIcon />
+                    {t('avatarCreator.rotate')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={resetCrop}
+                    className="rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-medium text-slate-200 hover:bg-slate-700"
+                  >
+                    {t('avatarCreator.reset')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => galleryInputRef.current?.click()}
+                    className="rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-medium text-slate-200 hover:bg-slate-700"
+                  >
+                    {t('avatarCreator.chooseAnother')}
+                  </button>
+                </div>
               </>
             )}
 
-            <input ref={photoInputRef} type="file" hidden accept="image/*" onChange={onPickPhoto} />
+            <input
+              ref={galleryInputRef}
+              type="file"
+              hidden
+              accept="image/*"
+              onChange={onPickPhoto}
+            />
+            <input
+              ref={cameraInputRef}
+              type="file"
+              hidden
+              accept="image/*"
+              capture="user"
+              onChange={onPickPhoto}
+            />
           </div>
         )}
 

@@ -12,7 +12,6 @@ import { validatePassword } from '@/lib/password';
 import { isMfaEnabled, enrollTotp, verifyEnroll, disableTotp, generateRecoveryCodes } from '@/lib/auth/mfa';
 import { WALLPAPERS, CUSTOM_WALLPAPER_ID, getWallpaperId, setWallpaperId as saveWallpaperId, uploadCustomWallpaper, getCustomWallpaperUrl } from '@/lib/wallpaper';
 import { NOTIF_SOUNDS, getNotifSound, setNotifSound as saveNotifSound, playNotifSound, type NotifSoundId } from '@/lib/notification-sound';
-import { uploadAvatar } from '@/lib/db/avatar';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import { subscribeToPush, unsubscribeFromPush, isPushSubscribed, pushSupported } from '@/lib/push';
 import { isNativeApp } from '@/lib/native-push';
@@ -75,10 +74,9 @@ export default function SettingsPage() {
   const [displayName, setDisplayName] = useState('');
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [savingProfile, setSavingProfile] = useState(false);
-  const [avatarBusy, setAvatarBusy] = useState(false);
   const [avatarCreatorOpen, setAvatarCreatorOpen] = useState(false);
+  const [avatarCreatorMode, setAvatarCreatorMode] = useState<'emoji' | 'photo'>('photo');
   const [photoOpen, setPhotoOpen] = useState(false);
-  const avatarInputRef = useRef<HTMLInputElement | null>(null);
   const { permission } = useNotifications();
   const [pushBusy, setPushBusy] = useState(false);
   const [pushErr, setPushErr] = useState('');
@@ -401,25 +399,6 @@ export default function SettingsPage() {
     }
   }
 
-  async function onAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    e.target.value = '';
-    if (!file || !user) return;
-    setAvatarBusy(true);
-    setStatus('');
-    try {
-      const url = await uploadAvatar(user.id, file);
-      const { error } = await supabase.from('profiles').update({ avatar_url: url }).eq('id', user.id);
-      if (error) throw error;
-      setAvatarUrl(url);
-      setStatus(`✅ ${t('settings.photoUpdated')}`);
-    } catch (e: any) {
-      setStatus(`❌ ${e?.message ?? String(e)}`);
-    } finally {
-      setAvatarBusy(false);
-    }
-  }
-
   useEffect(() => {
     let mounted = true;
 
@@ -663,21 +642,24 @@ export default function SettingsPage() {
                 <div className="flex flex-wrap gap-2">
                   <button
                     type="button"
-                    onClick={() => avatarInputRef.current?.click()}
-                    disabled={avatarBusy}
+                    onClick={() => {
+                      setAvatarCreatorMode('photo');
+                      setAvatarCreatorOpen(true);
+                    }}
                     className="rounded-lg bg-slate-800 px-3 py-1.5 text-sm text-slate-200 hover:bg-slate-700 disabled:opacity-50"
                   >
-                    {avatarBusy ? t('settings.uploading') : t('settings.changePhoto')}
+                    {t('settings.changePhoto')}
                   </button>
                   <button
                     type="button"
-                    onClick={() => setAvatarCreatorOpen(true)}
-                    disabled={avatarBusy}
-                    className="rounded-lg bg-slate-800 px-3 py-1.5 text-sm text-slate-200 hover:bg-slate-700 disabled:opacity-50"
+                    onClick={() => {
+                      setAvatarCreatorMode('emoji');
+                      setAvatarCreatorOpen(true);
+                    }}
+                    className="rounded-lg bg-slate-800 px-3 py-1.5 text-sm text-slate-200 hover:bg-slate-700"
                   >
                     {t('settings.createAvatar')}
                   </button>
-                  <input ref={avatarInputRef} type="file" hidden accept="image/*" onChange={onAvatarChange} />
                 </div>
               </div>
 
@@ -1314,6 +1296,7 @@ export default function SettingsPage() {
         <AvatarCreator
           open={avatarCreatorOpen}
           userId={user.id}
+          initialMode={avatarCreatorMode}
           onClose={() => setAvatarCreatorOpen(false)}
           onSaved={(url) => {
             setAvatarUrl(url);
