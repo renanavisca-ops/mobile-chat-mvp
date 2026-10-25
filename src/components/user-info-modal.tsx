@@ -10,6 +10,7 @@ import { shareText } from '@/lib/native-files';
 import { listBroadcastLists, saveBroadcastList, createBroadcastList, type BroadcastList } from '@/lib/broadcast-lists';
 import { avatarBg, initials } from '@/lib/ui/avatar';
 import { PhoneIcon, VideoIcon, ChatBubbleIcon, XIcon, SearchIcon } from '@/components/icons';
+import { ImageLightbox } from '@/components/image-lightbox';
 
 const DISAPPEARING_OPTIONS: { seconds: number; labelKey: string }[] = [
   { seconds: 0, labelKey: 'chat.disappearingOff' },
@@ -94,6 +95,7 @@ export function UserInfoModal({
   const { t, lang } = useLanguage();
   const router = useRouter();
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [photoOpen, setPhotoOpen] = useState(false);
   const [fingerprint, setFingerprint] = useState<string | null>(null);
   const [blocked, setBlocked] = useState(false);
   const [blockBusy, setBlockBusy] = useState(false);
@@ -173,6 +175,7 @@ export function UserInfoModal({
   const online = !!profile?.show_online && !!profile?.last_seen && Date.now() - new Date(profile.last_seen).getTime() < 60_000;
 
   return (
+    <>
     <div
       className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
       onMouseDown={(e) => {
@@ -204,8 +207,15 @@ export function UserInfoModal({
             {/* Identity */}
             <div className="mt-4 flex flex-col items-center text-center">
               {profile?.avatar_url ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={profile.avatar_url} alt="" className="h-24 w-24 rounded-full border border-slate-800 object-cover" />
+                <button
+                  type="button"
+                  onClick={() => setPhotoOpen(true)}
+                  className="rounded-full focus:outline-none"
+                  aria-label={t('chat.viewPhoto')}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={profile.avatar_url} alt="" className="h-24 w-24 cursor-zoom-in rounded-full border border-slate-800 object-cover" />
+                </button>
               ) : (
                 <span
                   className="grid h-24 w-24 place-items-center rounded-full text-2xl font-bold text-white ring-1 ring-white/20"
@@ -572,6 +582,11 @@ export function UserInfoModal({
         )}
       </div>
     </div>
+
+    {photoOpen && profile?.avatar_url && (
+      <ImageLightbox url={profile.avatar_url} onClose={() => setPhotoOpen(false)} />
+    )}
+    </>
   );
 }
 
