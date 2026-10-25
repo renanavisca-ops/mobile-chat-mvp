@@ -30,6 +30,7 @@ import {
 import { useLanguage, TransBold, type LangPreference } from '@/lib/i18n/context';
 import { useTheme, type Accent } from '@/lib/theme';
 import { AvatarCreator } from '@/components/avatar-creator';
+import { ImageLightbox } from '@/components/image-lightbox';
 
 export default function SettingsPage() {
   const supabase = browserSupabase();
@@ -76,6 +77,7 @@ export default function SettingsPage() {
   const [savingProfile, setSavingProfile] = useState(false);
   const [avatarBusy, setAvatarBusy] = useState(false);
   const [avatarCreatorOpen, setAvatarCreatorOpen] = useState(false);
+  const [photoOpen, setPhotoOpen] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement | null>(null);
   const { permission } = useNotifications();
   const [pushBusy, setPushBusy] = useState(false);
@@ -621,8 +623,10 @@ export default function SettingsPage() {
             <div className="toky-grad h-24" />
             <div className="-mt-10 flex flex-col items-center px-4 pb-5 text-center">
               {avatarUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={avatarUrl} alt="" className="h-20 w-20 rounded-3xl object-cover ring-4 ring-slate-950" />
+                <button type="button" onClick={() => setPhotoOpen(true)} className="rounded-3xl focus:outline-none" aria-label={t('chat.viewPhoto')}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={avatarUrl} alt="" className="h-20 w-20 cursor-zoom-in rounded-3xl object-cover ring-4 ring-slate-950" />
+                </button>
               ) : (
                 <span className="grid h-20 w-20 place-items-center rounded-3xl bg-slate-800 text-2xl font-bold text-white ring-4 ring-slate-950">
                   {(displayName || profile?.username || '?').trim().charAt(0).toUpperCase()}
@@ -1316,6 +1320,10 @@ export default function SettingsPage() {
             setStatus(`✅ ${t('settings.photoUpdated')}`);
           }}
         />
+      )}
+
+      {photoOpen && avatarUrl && (
+        <ImageLightbox url={avatarUrl} onClose={() => setPhotoOpen(false)} />
       )}
 
       {deleteOpen && (
