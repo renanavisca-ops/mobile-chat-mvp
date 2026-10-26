@@ -54,3 +54,67 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     }
 
 }
+
+// MARK: - Native printing (TokyPrint)
+//
+// Opens the real iOS print sheet (UIPrintInteractionController) with AirPrint
+// printer selection and "Save to Files" as PDF — the WKWebView can't print on
+// its own. Defined in this already-compiled file so no Xcode project edit is
+// needed; Capacitor discovers the plugin at runtime via the Objective-C runtime.
+//   - printHtml({html}): rendered content (image wrapped in HTML, or a parsed
+//     spreadsheet / Word document) via a markup print formatter.
+//   - printPdf({base64}): a PDF printed as-is.
+@objc(PrintPlugin)
+public class PrintPlugin: CAPPlugin, CAPBridgedPlugin {
+    public let identifier = "PrintPlugin"
+    public let jsName = "TokyPrint"
+    public let pluginMethods: [CAPPluginMethod] = [
+        CAPPluginMethod(name: "printHtml", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "printPdf", returnType: CAPPluginReturnPromise)
+    ]
+
+    private func present(_ controller: UIPrintInteractionController, _ call: CAPPluginCall) {
+        controller.present(animated: true) { (_, completed, error) in
+            if let error = error {
+                call.reject("print failed: \(error.localizedDescription)")
+            } else {
+                call.resolve()
+            }
+        }
+    }
+
+    private func printInfo(_ name: String) -> UIPrintInfo {
+        let info = UIPrintInfo(dictionary: nil)
+        info.outputType = .general
+        info.jobName = name
+        return info
+    }
+
+    @objc func printHtml(_ call: CAPPluginCall) {
+        guard let html = call.getString("html") else {
+            call.reject("Missing html")
+            return
+        }
+        let name = call.getString("name") ?? "Documento"
+        DispatchQueue.main.async {
+            let pic = UIPrintInteractionController.shared
+            pic.printInfo = self.printInfo(name)
+            pic.printFormatter = UIMarkupTextPrintFormatter(markupText: html)
+            self.present(pic, call)
+        }
+    }
+
+    @objc func printPdf(_ call: CAPPluginCall) {
+        guard let base64 = call.getString("base64"), let data = Data(base64Encoded: base64) else {
+            call.reject("Missing base64")
+            return
+        }
+        let name = call.getString("name") ?? "Documento"
+        DispatchQueue.main.async {
+            let pic = UIPrintInteractionController.shared
+            pic.printInfo = self.printInfo(name)
+            pic.printingItem = data
+            self.present(pic, call)
+        }
+    }
+}

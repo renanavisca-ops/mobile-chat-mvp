@@ -10,6 +10,7 @@ public class MainActivity extends BridgeActivity {
         // Must be registered before super.onCreate() so the bridge picks it up.
         registerPlugin(AudioRoutePlugin.class);
         registerPlugin(ScreenSharePlugin.class);
+        registerPlugin(PrintPlugin.class);
         super.onCreate(savedInstanceState);
     }
 }
