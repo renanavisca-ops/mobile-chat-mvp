@@ -14,6 +14,36 @@ import { useEffect, useState } from 'react';
  * it still falls back to download.
  */
 
+/** Escape a cell value for safe inclusion in the print HTML. */
+function esc(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+/** Build a standalone printable HTML document for a set of parsed sheets. */
+function sheetsToPrintHtml(sheets: { name: string; rows: string[][] }[]): string {
+  const tables = sheets
+    .map((s) => {
+      const body = s.rows
+        .map(
+          (r, ri) =>
+            `<tr${ri === 0 ? ' class="h"' : ''}>${r
+              .map((c) => `<td>${esc(c)}</td>`)
+              .join('')}</tr>`,
+        )
+        .join('');
+      const title = sheets.length > 1 ? `<h2>${esc(s.name)}</h2>` : '';
+      return `${title}<table>${body}</table>`;
+    })
+    .join('');
+  return `<style>
+    body{font-family:system-ui,-apple-system,sans-serif;color:#0f172a;margin:16px}
+    h2{font-size:14px;margin:18px 0 6px}
+    table{border-collapse:collapse;font-size:11px;width:100%}
+    td{border:1px solid #cbd5e1;padding:3px 6px;white-space:pre-wrap;vertical-align:top}
+    tr.h td{background:#f1f5f9;font-weight:600}
+  </style>${tables}`;
+}
+
 function parseCsv(text: string): string[][] {
   const rows: string[][] = [];
   let row: string[] = [];
@@ -41,7 +71,19 @@ function parseCsv(text: string): string[][] {
 }
 
 /** Renders a spreadsheet (xlsx/csv) as scrollable tables, one tab per sheet. */
-export function SpreadsheetView({ blob, csv }: { blob: Blob; csv?: boolean }) {
+export function SpreadsheetView({
+  blob,
+  csv,
+  onHtml,
+  onError,
+}: {
+  blob: Blob;
+  csv?: boolean;
+  /** Printable HTML for the parsed sheets, reported once parsing succeeds. */
+  onHtml?: (html: string) => void;
+  /** Called when the bytes can't be parsed, so the caller can offer a fallback. */
+  onError?: () => void;
+}) {
   const [sheets, setSheets] = useState<{ name: string; rows: string[][] }[] | null>(null);
   const [active, setActive] = useState(0);
   const [err, setErr] = useState(false);
@@ -52,7 +94,12 @@ export function SpreadsheetView({ blob, csv }: { blob: Blob; csv?: boolean }) {
       try {
         if (csv) {
           const text = await blob.text();
-          if (!cancelled) setSheets([{ name: 'CSV', rows: parseCsv(text) }]);
+          const rows = parseCsv(text);
+          if (!cancelled) {
+            const out = [{ name: 'CSV', rows }];
+            setSheets(out);
+            onHtml?.(sheetsToPrintHtml(out));
+          }
           return;
         }
         const mod = await import('exceljs');
@@ -74,12 +121,20 @@ export function SpreadsheetView({ blob, csv }: { blob: Blob; csv?: boolean }) {
           });
           out.push({ name: ws.name || `Sheet ${out.length + 1}`, rows });
         });
-        if (!cancelled) setSheets(out.length ? out : [{ name: 'Sheet', rows: [] }]);
+        if (!cancelled) {
+          const safe = out.length ? out : [{ name: 'Sheet', rows: [] }];
+          setSheets(safe);
+          onHtml?.(sheetsToPrintHtml(safe));
+        }
       } catch {
-        if (!cancelled) setErr(true);
+        if (!cancelled) {
+          setErr(true);
+          onError?.();
+        }
       }
     })();
     return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [blob, csv]);
 
   if (err) return <p className="text-sm text-red-300">No se pudo abrir la hoja de cálculo.</p>;
@@ -125,7 +180,15 @@ export function SpreadsheetView({ blob, csv }: { blob: Blob; csv?: boolean }) {
 }
 
 /** Renders a Word document (.docx) as formatted HTML via mammoth. */
-export function DocxView({ blob }: { blob: Blob }) {
+export function DocxView({
+  blob,
+  onHtml,
+  onError,
+}: {
+  blob: Blob;
+  onHtml?: (html: string) => void;
+  onError?: () => void;
+}) {
   const [html, setHtml] = useState<string | null>(null);
   const [err, setErr] = useState(false);
 
@@ -139,12 +202,22 @@ export function DocxView({ blob }: { blob: Blob }) {
         const res = await (mammoth as unknown as {
           convertToHtml: (i: { arrayBuffer: ArrayBuffer }) => Promise<{ value: string }>;
         }).convertToHtml({ arrayBuffer: buf });
-        if (!cancelled) setHtml(res.value || '<p>(Documento vacío)</p>');
+        if (!cancelled) {
+          const value = res.value || '<p>(Documento vacío)</p>';
+          setHtml(value);
+          onHtml?.(
+            `<style>body{font-family:system-ui,-apple-system,sans-serif;color:#0f172a;margin:24px;font-size:13px;line-height:1.5}table{border-collapse:collapse}td{border:1px solid #cbd5e1;padding:3px 6px}img{max-width:100%}</style>${value}`,
+          );
+        }
       } catch {
-        if (!cancelled) setErr(true);
+        if (!cancelled) {
+          setErr(true);
+          onError?.();
+        }
       }
     })();
     return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [blob]);
 
   if (err) return <p className="text-sm text-red-300">No se pudo abrir el documento.</p>;
