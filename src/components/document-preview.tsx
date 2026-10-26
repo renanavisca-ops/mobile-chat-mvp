@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { useLanguage } from '@/lib/i18n/context';
-import { canNativeFiles, openNativeFile, saveNativeFile } from '@/lib/native-files';
+import { canNativeFiles, openNativeFile, saveNativeFile, saveMediaToGallery, shareNativeFile } from '@/lib/native-files';
 import { PdfCanvas } from '@/components/pdf-canvas';
 import { SpreadsheetView, DocxView } from '@/components/office-view';
 import {
@@ -132,6 +132,11 @@ export function DocumentPreview({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  // Printable HTML reported by the inline Office renderer, and a flag set when
+  // the bytes can't be parsed inline so we can offer a fallback instead of a
+  // dead error.
+  const [printHtml, setPrintHtml] = useState<string | null>(null);
+  const [inlineFailed, setInlineFailed] = useState(false);
   const printFrameRef = useRef<HTMLIFrameElement | null>(null);
 
   const native = Capacitor.isNativePlatform();
@@ -152,10 +157,14 @@ export function DocumentPreview({
   const isCsv = e === 'csv' || mime === 'text/csv';
   const isXlsx = ['xlsx', 'xlsm'].includes(e) || mime.includes('spreadsheetml');
   const isDocx = e === 'docx' || mime.includes('wordprocessingml');
-  // Only render Office inline when there's NO public URL (encrypted chats): the
-  // Microsoft/Google online viewers can't reach an encrypted blob, so we parse
-  // the bytes ourselves. Non-encrypted files keep using the lighter online viewer.
-  const officeInline = (isXlsx || isCsv || isDocx) && !httpUrl;
+  // Render Office docs (Excel/CSV/Word) IN-APP from their bytes, which is far
+  // more reliable than the Microsoft/Google online viewers — those fetch the
+  // signed URL server-side and frequently fail or get blocked inside a mobile
+  // WebView, which is why Excel files showed "can't be opened". We skip inline
+  // only for very large non-encrypted files (a heavy client-side parse), which
+  // keep the online-viewer fallback. If the inline parse fails we also fall back.
+  const bigFile = (fileSize ?? 0) > 20 * 1024 * 1024;
+  const officeInline = (isXlsx || isCsv || isDocx) && !(bigFile && !!httpUrl) && !inlineFailed;
   const previewable = isImage || canInlinePdf || officeInline;
   // We only need to fetch (and decrypt) the bytes when we'll actually show them
   // inline, or when there's no http URL to hand off to (encrypted chats). A
@@ -188,6 +197,8 @@ export function DocumentPreview({
     setNotice(null);
     setBlob(null);
     setObjUrl(null);
+    setPrintHtml(null);
+    setInlineFailed(false);
     setLoading(true);
     (async () => {
       try {
@@ -216,12 +227,19 @@ export function DocumentPreview({
   if (!open) return null;
 
   async function handleDownload() {
-    // Native: write the decrypted bytes to the device's Documents.
+    // Native: write the decrypted bytes to the device. Photos/videos go to the
+    // gallery (camera roll) so they show up like any other saved image; other
+    // documents go to the Documents folder.
     if (nativeFiles && blob) {
       setError(null);
       try {
-        await saveNativeFile(blob, name);
-        setNotice(t('chat.savedToDevice'));
+        if (isImage || mime.startsWith('video/')) {
+          await saveMediaToGallery(blob, name);
+          setNotice(t('chat.savedToGallery'));
+        } else {
+          await saveNativeFile(blob, name);
+          setNotice(t('chat.savedToDevice'));
+        }
       } catch {
         setError(t('chat.downloadFailed'));
       }
@@ -267,19 +285,63 @@ export function DocumentPreview({
     }, 4000);
   }
 
+  // Print the RENDERED document, not its raw bytes. Feeding a raw .xlsx/.docx to
+  // an <iframe> can't render (it either shows nothing or triggers a download) —
+  // which is why "Print" used to just open the Excel file. We print: the image
+  // itself, the parsed spreadsheet/Word HTML, or a PDF the browser can render.
   function handlePrint() {
-    if (!objUrl) return;
     const frame = printFrameRef.current;
     if (!frame) return;
-    frame.onload = () => {
-      try {
-        frame.contentWindow?.focus();
-        frame.contentWindow?.print();
-      } catch {
-        window.open(objUrl, '_blank', 'noopener,noreferrer');
-      }
+
+    const printViaDoc = (docHtml: string) => {
+      frame.onload = () => {
+        try {
+          frame.contentWindow?.focus();
+          frame.contentWindow?.print();
+        } catch {
+          /* ignore — nothing sensible to fall back to on the web */
+        }
+      };
+      frame.srcdoc = docHtml;
     };
-    frame.src = objUrl;
+
+    if (isImage && objUrl) {
+      printViaDoc(
+        `<style>@page{margin:12mm}html,body{margin:0;height:100%}body{display:flex;align-items:center;justify-content:center}img{max-width:100%;max-height:100%}</style><img src="${objUrl}" alt="">`,
+      );
+      return;
+    }
+    if (printHtml) {
+      printViaDoc(printHtml);
+      return;
+    }
+    // PDF (and anything else with a renderable object URL): load it directly.
+    if (objUrl) {
+      frame.onload = () => {
+        try {
+          frame.contentWindow?.focus();
+          frame.contentWindow?.print();
+        } catch {
+          window.open(objUrl, '_blank', 'noopener,noreferrer');
+        }
+      };
+      frame.removeAttribute('srcdoc');
+      frame.src = objUrl;
+    }
+  }
+
+  // Native printing: a stock Capacitor WebView can't drive the OS printer from
+  // window.print(), so hand the file to the system share sheet, which offers
+  // "Print" and "Save as PDF" on both Android and iOS — real print options,
+  // instead of silently opening the document in another app.
+  async function handleNativePrint() {
+    if (!blob) return;
+    setError(null);
+    try {
+      await shareNativeFile(blob, name, t('chat.print'));
+    } catch {
+      setError(t('chat.downloadFailed'));
+    }
   }
 
   // Open the file in a public web document viewer (works for anyone, even with
@@ -364,6 +426,11 @@ export function DocumentPreview({
   // Open/Download work as soon as we can produce a URL — an http URL needs no
   // byte fetch, so they light up even while the inline preview is still loading.
   const canOpen = ready || !!httpUrl;
+  const isOffice = isXlsx || isCsv || isDocx;
+  // Web print needs the rendered output ready: the image/PDF object URL, or the
+  // parsed Office HTML. Native print just shares the bytes to the OS printer.
+  const canPrintWeb = ready && previewable && (!isOffice || !!printHtml);
+  const canPrintNative = !!blob;
 
   return (
     <div
@@ -409,9 +476,9 @@ export function DocumentPreview({
         ) : ready && canInlinePdf ? (
           <PdfCanvas blob={blob!} fileName={name} />
         ) : ready && officeInline && (isXlsx || isCsv) ? (
-          <SpreadsheetView blob={blob!} csv={isCsv} />
+          <SpreadsheetView blob={blob!} csv={isCsv} onHtml={setPrintHtml} onError={() => setInlineFailed(true)} />
         ) : ready && officeInline && isDocx ? (
-          <DocxView blob={blob!} />
+          <DocxView blob={blob!} onHtml={setPrintHtml} onError={() => setInlineFailed(true)} />
         ) : (
           <div className="flex max-w-sm flex-col items-center gap-4 text-center">
             <button
@@ -465,11 +532,11 @@ export function DocumentPreview({
         />
         <ActionButton
           label={t('chat.print')}
-          // On the web we print the inline preview; natively (no WebView print)
-          // we hand off to the system browser, which can print — so enable it
-          // whenever we can open the file.
-          disabled={native ? !canOpen : (!ready || !previewable)}
-          onClick={native ? handleOpenExternal : handlePrint}
+          // Web: print the rendered preview (image / parsed sheet / Word / PDF).
+          // Native: hand the file to the OS share sheet, which exposes real
+          // "Print" and "Save as PDF" options on Android and iOS.
+          disabled={native ? !canPrintNative : !canPrintWeb}
+          onClick={native ? handleNativePrint : handlePrint}
           icon={<PrinterIcon size={22} />}
         />
         <ActionButton
