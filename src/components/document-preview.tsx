@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { useLanguage } from '@/lib/i18n/context';
 import { canNativeFiles, openNativeFile, saveNativeFile, saveMediaToGallery, shareNativeFile } from '@/lib/native-files';
+import { canNativePrint, nativePrintHtml, nativePrintPdf, nativePrintImage } from '@/lib/native-print';
 import { PdfCanvas } from '@/components/pdf-canvas';
 import { SpreadsheetView, DocxView } from '@/components/office-view';
 import {
@@ -330,14 +331,21 @@ export function DocumentPreview({
     }
   }
 
-  // Native printing: a stock Capacitor WebView can't drive the OS printer from
-  // window.print(), so hand the file to the system share sheet, which offers
-  // "Print" and "Save as PDF" on both Android and iOS — real print options,
-  // instead of silently opening the document in another app.
+  // Native printing: open the real OS print dialog (printer list, Save as PDF,
+  // copies, paper size) via the TokyPrint plugin — printing the RENDERED
+  // document, not the raw bytes. If the app was built without the plugin (an
+  // older .aab/.ipa), fall back to the system share sheet, which still exposes
+  // Print / Save as PDF.
   async function handleNativePrint() {
     if (!blob) return;
     setError(null);
     try {
+      if (canNativePrint()) {
+        if (isPdf) { await nativePrintPdf(blob, name); return; }
+        if (isImage) { await nativePrintImage(blob, name); return; }
+        if (printHtml) { await nativePrintHtml(printHtml, name); return; }
+        // A document with no rendered form (e.g. PowerPoint): fall through to share.
+      }
       await shareNativeFile(blob, name, t('chat.print'));
     } catch {
       setError(t('chat.downloadFailed'));
@@ -430,7 +438,9 @@ export function DocumentPreview({
   // Web print needs the rendered output ready: the image/PDF object URL, or the
   // parsed Office HTML. Native print just shares the bytes to the OS printer.
   const canPrintWeb = ready && previewable && (!isOffice || !!printHtml);
-  const canPrintNative = !!blob;
+  // Native: enabled once we hold the bytes; for Office wait until the rendered
+  // HTML is ready so we print the sheet/doc rather than share the raw file.
+  const canPrintNative = !!blob && (!isOffice || !!printHtml);
 
   return (
     <div
