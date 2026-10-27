@@ -4,6 +4,7 @@ import { apiFetch } from '@/lib/api/client';
 import { useEffect, useState, useRef, useMemo } from 'react';
 import { createSignedChatMediaUrl } from '@/lib/storage/upload';
 import { useLanguage } from '@/lib/i18n/context';
+import { Linkify } from '@/components/linkify';
 
 type Payload = { v?: number; text?: string; imagePath?: string; imagePaths?: string[]; videoPath?: string; audioPath?: string; gifUrl?: string; filePath?: string; fileName?: string; reply_to?: string; is_deleted?: boolean; };
 
@@ -227,7 +228,7 @@ export function PublicChatView({ token }: { token: string }) {
                 <div className={`max-w-[85%] rounded-[1.25rem] px-4 py-2 ${
                   isCustomer ? 'toky-grad text-white rounded-br-md shadow-[0_4px_14px_-6px_rgba(79,70,229,0.7)]' : 'bg-slate-800 text-slate-100 border border-slate-800 rounded-bl-md shadow-sm'
                 }`}>
-                  {m.body.text && <div className="text-sm">{m.body.text}</div>}
+                  {m.body.text && <div className="text-sm whitespace-pre-wrap break-words"><Linkify text={m.body.text} /></div>}
 
                   {m.body.gifUrl && (
                     // eslint-disable-next-line @next/next/no-img-element
