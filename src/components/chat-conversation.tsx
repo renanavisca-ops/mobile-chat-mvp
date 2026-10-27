@@ -30,6 +30,7 @@ import { PollComposer } from '@/components/poll-composer';
 import { MessagesSkeleton } from '@/components/skeleton';
 import { ImageLightbox } from '@/components/image-lightbox';
 import { DocumentPreview } from '@/components/document-preview';
+import { Linkify } from '@/components/linkify';
 import { tap, impact } from '@/lib/haptics';
 import { LinkPreview, firstUrl } from '@/components/link-preview';
 import { SafetyNumberModal } from '@/components/safety-number-modal';
@@ -3050,7 +3051,7 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
                               </button>
                             );
                           })()}
-                          {m.body.text ? <div className="text-sm mt-1 whitespace-pre-wrap break-words">{m.body.text}</div> : null}
+                          {m.body.text ? <div className="text-sm mt-1 whitespace-pre-wrap break-words"><Linkify text={m.body.text} /></div> : null}
                           {(() => {
                             const link = m.body.text ? firstUrl(m.body.text) : null;
                             return link ? <LinkPreview url={link} mine={isMine(m)} /> : null;
