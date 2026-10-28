@@ -178,19 +178,18 @@ export async function listChats(): Promise<ChatSummary[]> {
   }
 
   // Per-chat unread count: messages from other people that I haven't read yet.
-  // Queried directly (not derived from the capped preview fetch above) so it
-  // stays accurate even for users active in many busy chats.
+  // Computed via RPC so GROUPS use MY per-member read (message_reads) instead of
+  // the shared `read` flag — in a group that flag only flips once everyone has
+  // read, so using it here would keep a group I've already read marked unread.
+  // 1:1 chats still use the shared flag.
   const unreadByChat = new Map<string, number>();
   {
-    const { data: unreadRows } = await supabase
-      .from('messages')
-      .select('chat_id')
-      .in('chat_id', chatIds)
-      .eq('read', false)
-      .neq('sender_id', user.id)
-      .limit(2000);
-    for (const r of unreadRows ?? []) {
-      unreadByChat.set(r.chat_id, (unreadByChat.get(r.chat_id) ?? 0) + 1);
+    const { data: unreadRows, error: unreadErr } = await (supabase as any).rpc('my_unread_counts', {
+      p_chat_ids: chatIds,
+    });
+    if (unreadErr) console.error(unreadErr);
+    for (const r of (unreadRows ?? []) as { chat_id: string; cnt: number }[]) {
+      unreadByChat.set(r.chat_id, r.cnt);
     }
   }
 
