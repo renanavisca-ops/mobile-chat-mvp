@@ -231,6 +231,18 @@ html[data-theme='light'] body {
   100% { transform: translateY(110vh) rotate(220deg); opacity: 0.9; }
 }
 
+/* Fireworks night-sky dim: fade in, hold, fade out over the burst. */
+.toky-fx-dim {
+  opacity: 0;
+  animation: tokyFxDim 3300ms ease-in-out forwards;
+}
+@keyframes tokyFxDim {
+  0% { opacity: 0; }
+  12% { opacity: 0.5; }
+  82% { opacity: 0.5; }
+  100% { opacity: 0; }
+}
+
 /* =========================================================================
    Theme, accent color, contrast and font-scale.
    The app's dark-mode Tailwind classes are static utility classes (not CSS
