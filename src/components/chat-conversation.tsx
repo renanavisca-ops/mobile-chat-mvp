@@ -37,6 +37,7 @@ import { SafetyNumberModal } from '@/components/safety-number-modal';
 import { starMessage, unstarMessage, getStarredIdsForChat } from '@/lib/db/stars';
 import { ImageEditor } from '@/components/image-editor';
 import { MessageEffects, detectEffect } from '@/components/message-effects';
+import { wasCelebrated, markCelebrated } from '@/lib/effects-seen';
 import { useTheme } from '@/lib/theme';
 import { GifPicker } from '@/components/gif-picker';
 import { StickerPicker } from '@/components/sticker-picker';
@@ -1119,33 +1120,29 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items.length, chatReady, signedUrls]);
 
-  // Fire an animated effect when the newest message contains a festive trigger.
-  // Seeds on first load so old history doesn't replay effects — BUT if the chat
-  // is opened right as a festive message arrives (incoming + just created), we
-  // still play it, so you see the celebration even if you weren't already in the
-  // chat when it came in.
+  // Play a festive celebration the first time you SEE a festive message — i.e.
+  // when you read it (open the chat), or live if you're already in the chat —
+  // and never more than once (deduped per message id, persisted). Your own sent
+  // message celebrates on send. Old history you've already seen doesn't replay.
   useEffect(() => {
-    if (items.length === 0) return;
+    if (items.length === 0 || !effectsEnabled) return;
     const newest = items[items.length - 1];
-    const maybeCelebrate = () => {
-      if (newest.body.is_deleted) return;
-      if (!effectsEnabled) return;
-      const trigger = detectEffect(newest.body.text);
-      if (trigger) setEffectTrigger(trigger);
-    };
-    if (lastEffectMsgId.current === null) {
-      lastEffectMsgId.current = newest.id;
-      const ageMs = Date.now() - new Date(newest.created_at).getTime();
-      const freshIncoming = newest.sender_id !== myId && ageMs >= 0 && ageMs < 30000;
-      if (freshIncoming) maybeCelebrate();
-      return;
-    }
     if (newest.id === lastEffectMsgId.current) return;
+    const firstLoad = lastEffectMsgId.current === null;
     lastEffectMsgId.current = newest.id;
     if (newest.body.is_deleted) return;
-    if (!effectsEnabled) return;
+    if (wasCelebrated(newest.id)) return;
     const trigger = detectEffect(newest.body.text);
-    if (trigger) setEffectTrigger(trigger);
+    if (!trigger) return;
+    const incoming = newest.sender_id !== myId;
+    if (firstLoad) {
+      // Opening the chat: celebrate an incoming festive message you're reading
+      // now, but don't replay your own messages or old history on reopen.
+      const ageMs = Date.now() - new Date(newest.created_at).getTime();
+      if (!incoming || ageMs > 24 * 60 * 60 * 1000) return;
+    }
+    markCelebrated(newest.id);
+    setEffectTrigger(trigger);
   }, [items, effectsEnabled]);
 
   const handleScroll = () => {
