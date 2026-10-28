@@ -1119,13 +1119,25 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items.length, chatReady, signedUrls]);
 
-  // Fire an animated effect when the newest message contains a trigger emoji.
-  // Seeds silently on first load so history doesn't replay effects.
+  // Fire an animated effect when the newest message contains a festive trigger.
+  // Seeds on first load so old history doesn't replay effects — BUT if the chat
+  // is opened right as a festive message arrives (incoming + just created), we
+  // still play it, so you see the celebration even if you weren't already in the
+  // chat when it came in.
   useEffect(() => {
     if (items.length === 0) return;
     const newest = items[items.length - 1];
+    const maybeCelebrate = () => {
+      if (newest.body.is_deleted) return;
+      if (!effectsEnabled) return;
+      const trigger = detectEffect(newest.body.text);
+      if (trigger) setEffectTrigger(trigger);
+    };
     if (lastEffectMsgId.current === null) {
       lastEffectMsgId.current = newest.id;
+      const ageMs = Date.now() - new Date(newest.created_at).getTime();
+      const freshIncoming = newest.sender_id !== myId && ageMs >= 0 && ageMs < 30000;
+      if (freshIncoming) maybeCelebrate();
       return;
     }
     if (newest.id === lastEffectMsgId.current) return;
