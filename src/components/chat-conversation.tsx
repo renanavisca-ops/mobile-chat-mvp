@@ -46,7 +46,8 @@ import { VideoTrimmer, TrimmedVideo } from '@/components/video-trimmer';
 import { suggestReplies, translateText } from '@/lib/ai';
 import { avatarBg, initials } from '@/lib/ui/avatar';
 import { highlightSnippet } from '@/lib/ui/highlight';
-import { PhoneIcon, VideoIcon, PlusIcon, SmileIcon, MicIcon, PencilIcon, ReplyIcon, ForwardIcon, CopyIcon, DownloadIcon, EyeOffIcon, TrashIcon, PinIcon, FlagIcon, PaperclipIcon, SparklesIcon, GlobeIcon, SendIcon, CheckIcon, ExternalLinkIcon } from '@/components/icons';
+import { PhoneIcon, VideoIcon, PlusIcon, SmileIcon, MicIcon, PencilIcon, ReplyIcon, ForwardIcon, CopyIcon, DownloadIcon, EyeIcon, EyeOffIcon, TrashIcon, PinIcon, FlagIcon, PaperclipIcon, SparklesIcon, GlobeIcon, SendIcon, CheckIcon, ExternalLinkIcon } from '@/components/icons';
+import { SeenBySheet } from '@/components/seen-by-sheet';
 import { canNativeFiles, shareNativeFile, saveNativeFile, saveMediaToGallery } from '@/lib/native-files';
 import { isAutoSaveOn, setAutoSaveOn, isMediaSaved, markMediaSaved } from '@/lib/media-autosave';
 import { compressImage } from '@/lib/image-compress';
@@ -541,6 +542,7 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
   // Message Actions Sheet state
   const [actionsOpen, setActionsOpen] = useState(false);
   const [actionsMsg, setActionsMsg] = useState<{ id: string; body: Payload } | null>(null);
+  const [seenByMsgId, setSeenByMsgId] = useState<string | null>(null);
 
   // Attach sheet
   const [attachOpen, setAttachOpen] = useState(false);
@@ -2482,6 +2484,15 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
         } : undefined}
       />
 
+      {seenByMsgId && (
+        <SeenBySheet
+          messageId={seenByMsgId}
+          members={memberProfiles}
+          myId={myId}
+          onClose={() => setSeenByMsgId(null)}
+        />
+      )}
+
       <MessageActionsSheet
         open={actionsOpen}
         onClose={() => setActionsOpen(false)}
@@ -2498,6 +2509,19 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
                   setText(actionsMsg.body.text || '');
                   setReplyingTo(null);
                   textInputRef.current?.focus();
+                },
+              }]
+            : []),
+          ...(actionsMsg && isGroup
+            && items.find((m) => m.id === actionsMsg.id)?.sender_id === myId
+            && items.find((m) => m.id === actionsMsg.id)?.sender_type !== 'system'
+            ? [{
+                key: 'seenBy',
+                label: t('chat.seenBy'),
+                icon: <EyeIcon size={18} />,
+                onClick: () => {
+                  if (actionsMsg) setSeenByMsgId(actionsMsg.id);
+                  setActionsOpen(false);
                 },
               }]
             : []),

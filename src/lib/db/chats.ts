@@ -1005,6 +1005,18 @@ export async function markMessagesAsRead(chatId: string) {
     return;
   }
 
+  // Groups: record a PER-MEMBER read. A DB trigger only flips the message to
+  // "read" once every other member has read it, so the sender's ✓✓ turns green
+  // only when the whole group has seen it (and can list who has).
+  const { data: chat } = await supabase.from('chats').select('kind').eq('id', chatId).maybeSingle();
+  if ((chat as { kind?: string } | null)?.kind === 'group') {
+    // Cast: message_reads / mark_group_read aren't in the generated types yet.
+    const { error } = await (supabase as any).rpc('mark_group_read', { p_chat_id: chatId });
+    if (error) console.error(error);
+    return;
+  }
+
+  // 1:1: the simple shared flag is enough (one reader == read).
   const { error } = await supabase
     .from('messages')
     .update({ read: true, delivery_status: 'read' })
@@ -1013,6 +1025,40 @@ export async function markMessagesAsRead(chatId: string) {
     .neq('sender_id', me.user.id);
 
   if (error) console.error(error);
+}
+
+/**
+ * Who has read a given message, newest first, with their display name/avatar.
+ * RLS limits this to members of the message's chat, so only participants (incl.
+ * the sender) can see the "seen by" list.
+ */
+export async function getMessageReaders(
+  messageId: string,
+): Promise<{ userId: string; readAt: string; name: string; avatarUrl: string | null }[]> {
+  const supabase = browserSupabase();
+  // Cast: message_reads isn't in the generated types yet.
+  const { data: reads, error } = await (supabase as any)
+    .from('message_reads')
+    .select('user_id, read_at')
+    .eq('message_id', messageId)
+    .order('read_at', { ascending: false });
+  if (error || !reads || reads.length === 0) return [];
+
+  const ids = (reads as any[]).map((r) => r.user_id as string);
+  const { data: profiles } = await supabase
+    .from('profiles')
+    .select('id, display_name, username, avatar_url')
+    .in('id', ids);
+  const byId = new Map((profiles ?? []).map((p: any) => [p.id, p]));
+  return reads.map((r: any) => {
+    const p = byId.get(r.user_id);
+    return {
+      userId: r.user_id,
+      readAt: r.read_at,
+      name: p?.display_name || p?.username || '',
+      avatarUrl: p?.avatar_url ?? null,
+    };
+  });
 }
 
 /* ---------------------------- Reactions ---------------------------- */
