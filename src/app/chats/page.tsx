@@ -402,6 +402,21 @@ export default function ChatsPage() {
       })
       .subscribe();
 
+    // Reading a GROUP message records a per-member read (message_reads INSERT)
+    // instead of flipping messages.read, so the messages channel above never
+    // fires for it. Listen to my own reads too, so a group I just read refetches
+    // and drops out of the unread group (and clears across my devices).
+    const readsChannel = supabase
+      .channel('public:message_reads')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'message_reads', filter: `user_id=eq.${user.id}` },
+        () => {
+          scheduleReload();
+        },
+      )
+      .subscribe();
+
     // Catch-up on resume. Realtime (postgres_changes) does NOT replay events
     // missed while the tab was hidden / the phone was backgrounded, so reading a
     // chat on another device wouldn't clear its unread badge here until some new
@@ -421,6 +436,7 @@ export default function ChatsPage() {
       window.removeEventListener('online', onResume);
       void browserSupabase().removeChannel(channel);
       void browserSupabase().removeChannel(messagesChannel);
+      void browserSupabase().removeChannel(readsChannel);
     };
   }, [loading, user, profile]);
 
