@@ -554,6 +554,13 @@ const en = {
     notConfigured: 'GIFs are not set up yet.',
     poweredBy: 'Powered by GIPHY',
   },
+  effectsIntro: {
+    title: 'Festive effects',
+    body: 'When you type things like "Happy New Year", "Happy birthday" or "Congrats", the app celebrates with an animation (and sound for fireworks). Want them on?',
+    preview: 'See example',
+    enable: 'Yes, turn on',
+    disable: 'No, thanks',
+  },
   avatarCreator: {
     title: 'Create your avatar',
     modeEmoji: 'Emoji',
@@ -751,6 +758,8 @@ const en = {
     highContrastDesc: 'Increase text and border contrast for readability.',
     simpleModeLabel: 'Simple mode',
     simpleModeDesc: 'Larger text and bigger buttons that are easier to tap.',
+    effectsLabel: 'Festive effects',
+    effectsDesc: 'Animate the screen (fireworks, confetti, snow…) with phrases like "Happy New Year".',
     fontSizeLabel: 'Font size',
     fontSizeNormal: 'Normal',
     fontSizeLarge: 'Large',

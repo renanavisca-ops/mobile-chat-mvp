@@ -37,6 +37,7 @@ import { SafetyNumberModal } from '@/components/safety-number-modal';
 import { starMessage, unstarMessage, getStarredIdsForChat } from '@/lib/db/stars';
 import { ImageEditor } from '@/components/image-editor';
 import { MessageEffects, detectEffect } from '@/components/message-effects';
+import { useTheme } from '@/lib/theme';
 import { GifPicker } from '@/components/gif-picker';
 import { StickerPicker } from '@/components/sticker-picker';
 import type { Gif } from '@/lib/giphy';
@@ -567,7 +568,8 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
   // Image editor (crop/rotate/filter/draw before sending)
   const [editorIndex, setEditorIndex] = useState<number | null>(null);
 
-  // Animated message effects (iMessage-style emoji burst on trigger emojis)
+  // Animated message effects (iMessage-style burst on festive triggers)
+  const { effects: effectsEnabled } = useTheme();
   const [effectTrigger, setEffectTrigger] = useState<string | null>(null);
   const lastEffectMsgId = useRef<string | null>(null);
 
@@ -1127,9 +1129,10 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
     if (newest.id === lastEffectMsgId.current) return;
     lastEffectMsgId.current = newest.id;
     if (newest.body.is_deleted) return;
+    if (!effectsEnabled) return;
     const trigger = detectEffect(newest.body.text);
     if (trigger) setEffectTrigger(trigger);
-  }, [items]);
+  }, [items, effectsEnabled]);
 
   const handleScroll = () => {
     const el = scrollRef.current;

@@ -14,9 +14,13 @@ type Prefs = {
   highContrast: boolean;
   fontScale: FontScale;
   simpleMode: boolean;
+  /** Festive message effects (fireworks, confetti, …). On by default. */
+  effects: boolean;
+  /** Whether the one-time "try the effects" suggestion has been shown. */
+  effectsIntroSeen: boolean;
 };
 
-const DEFAULTS: Prefs = { theme: 'auto', accent: 'blue', highContrast: false, fontScale: 'normal', simpleMode: false };
+const DEFAULTS: Prefs = { theme: 'auto', accent: 'blue', highContrast: false, fontScale: 'normal', simpleMode: false, effects: true, effectsIntroSeen: false };
 
 function readPrefs(): Prefs {
   try {
@@ -53,6 +57,8 @@ type Ctx = Prefs & {
   setHighContrast: (v: boolean) => void;
   setFontScale: (f: FontScale) => void;
   setSimpleMode: (v: boolean) => void;
+  setEffects: (v: boolean) => void;
+  setEffectsIntroSeen: (v: boolean) => void;
 };
 
 const ThemeContext = createContext<Ctx>({
@@ -62,6 +68,8 @@ const ThemeContext = createContext<Ctx>({
   setHighContrast: () => {},
   setFontScale: () => {},
   setSimpleMode: () => {},
+  setEffects: () => {},
+  setEffectsIntroSeen: () => {},
 });
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
@@ -103,6 +111,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       setHighContrast: (v) => update({ highContrast: v }),
       setFontScale: (f) => update({ fontScale: f }),
       setSimpleMode: (v) => update({ simpleMode: v }),
+      setEffects: (v) => update({ effects: v }),
+      setEffectsIntroSeen: (v) => update({ effectsIntroSeen: v }),
     }),
     [prefs, update]
   );

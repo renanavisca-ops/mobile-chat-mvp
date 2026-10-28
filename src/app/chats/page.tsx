@@ -9,6 +9,7 @@ import { StoriesBar } from '@/components/stories-bar';
 import { ChatConversation } from '@/components/chat-conversation';
 import { PlusIcon, SearchIcon, UsersIcon, UserPlusIcon, HashIcon, ChatBubbleIcon, SpeakerIcon } from '@/components/icons';
 import { ChatListSkeleton } from '@/components/skeleton';
+import { EffectsIntro } from '@/components/effects-intro';
 import { useRequireAuth } from '@/lib/auth/use-require-auth';
 import { ensureIdentity } from '@/lib/crypto/keystore';
 import { browserSupabase } from '@/lib/supabase/client';
@@ -820,6 +821,8 @@ export default function ChatsPage() {
           </div>
         </div>
       )}
+
+      <EffectsIntro />
 
       <BottomNav />
     </div>

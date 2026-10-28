@@ -556,6 +556,13 @@ const es: Dictionary = {
     notConfigured: 'Los GIFs aún no están configurados.',
     poweredBy: 'Con tecnología de GIPHY',
   },
+  effectsIntro: {
+    title: 'Efectos festivos',
+    body: 'Cuando escribas cosas como "Feliz año nuevo", "Feliz cumpleaños" o "Felicidades", la app lo celebra con una animación (y sonido en los fuegos artificiales). ¿Los quieres activos?',
+    preview: 'Ver ejemplo',
+    enable: 'Sí, activar',
+    disable: 'No, gracias',
+  },
   avatarCreator: {
     title: 'Crea tu avatar',
     modeEmoji: 'Emoji',
@@ -753,6 +760,8 @@ const es: Dictionary = {
     highContrastDesc: 'Aumenta el contraste de texto y bordes para mejorar la legibilidad.',
     simpleModeLabel: 'Modo simple',
     simpleModeDesc: 'Texto más grande y botones más grandes, más fáciles de tocar.',
+    effectsLabel: 'Efectos festivos',
+    effectsDesc: 'Anima la pantalla (fuegos artificiales, confeti, nieve…) con frases como "Feliz año nuevo".',
     fontSizeLabel: 'Tamaño de letra',
     fontSizeNormal: 'Normal',
     fontSizeLarge: 'Grande',
