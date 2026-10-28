@@ -5,6 +5,7 @@ import { searchUsers } from '@/lib/db/contacts';
 import { updateGroupInfo, addGroupMembers, removeGroupMember, leaveChat, getChatMuted, setChatMuteUntil, setDisappearingMessages } from '@/lib/db/chats';
 import { uploadGroupAvatar } from '@/lib/db/groupAvatar';
 import { useT } from '@/lib/i18n/context';
+import { useBackClose } from '@/lib/back';
 import { ImageLightbox } from '@/components/image-lightbox';
 import type { ProfileLite } from '@/lib/db/types';
 
@@ -60,6 +61,7 @@ export function GroupInfoModal({
   onToggleAutoSave?: () => void;
 }) {
   const t = useT();
+  useBackClose(open, onClose);
   const [name, setName] = useState(title ?? '');
   const [desc, setDesc] = useState(description ?? '');
   const [savingInfo, setSavingInfo] = useState(false);

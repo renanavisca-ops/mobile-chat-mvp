@@ -6,6 +6,7 @@ import { getMessageReaders } from '@/lib/db/chats';
 import { useLanguage } from '@/lib/i18n/context';
 import { XIcon } from '@/components/icons';
 import { avatarBg, initials } from '@/lib/ui/avatar';
+import { useBackClose } from '@/lib/back';
 
 type Member = { id: string; username: string | null; display_name: string | null; avatar_url: string | null };
 type Reader = { userId: string; readAt: string; name: string; avatarUrl: string | null };
@@ -27,6 +28,7 @@ export function SeenBySheet({
   onClose: () => void;
 }) {
   const { t, lang } = useLanguage();
+  useBackClose(true, onClose);
   const [readers, setReaders] = useState<Reader[] | null>(null);
 
   useEffect(() => {

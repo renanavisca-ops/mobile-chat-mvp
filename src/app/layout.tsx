@@ -30,6 +30,7 @@ import { PasswordRecoveryRouter } from '@/components/password-recovery-router';
 import { ScheduledSender } from '@/components/scheduled-sender';
 import { PushBanner } from '@/components/push-banner';
 import { ServiceWorkerRegister } from '@/components/sw-register';
+import { BackButtonHandler } from '@/components/back-button-handler';
 
 export const metadata: Metadata = {
   title: 'Toky Chat',
@@ -69,6 +70,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ThemeProvider>
           <LanguageProvider>
             <ServiceWorkerRegister />
+            <BackButtonHandler />
             <ConsentGate />
             <NotificationRouter />
             <PushBanner />

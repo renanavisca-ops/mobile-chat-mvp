@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { searchGifs, trendingGifs, giphyConfigured, type Gif } from '@/lib/giphy';
 import { useT } from '@/lib/i18n/context';
+import { useBackClose } from '@/lib/back';
 
 export function GifPicker({
   open,
@@ -14,6 +15,7 @@ export function GifPicker({
   onPick: (gif: Gif) => void;
 }) {
   const t = useT();
+  useBackClose(open, onClose);
   const [query, setQuery] = useState('');
   const [gifs, setGifs] = useState<Gif[]>([]);
   const [loading, setLoading] = useState(false);

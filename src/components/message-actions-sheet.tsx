@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useT } from '@/lib/i18n/context';
+import { useBackClose } from '@/lib/back';
 
 type Action = {
   key: string;
@@ -22,6 +23,7 @@ export function MessageActionsSheet(props: {
 }) {
   const { open, onClose, actions, moreActions, title } = props;
   const t = useT();
+  useBackClose(open, onClose);
 
   const [mode, setMode] = useState<Mode>('main');
 

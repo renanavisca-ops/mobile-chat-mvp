@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLanguage } from '@/lib/i18n/context';
 import { uploadSticker } from '@/lib/db/stickers';
 import { XIcon } from '@/components/icons';
+import { useBackClose } from '@/lib/back';
 
 const MAX_DIM = 512; // working/output resolution cap
 const MAX_HISTORY = 12;
@@ -154,6 +155,7 @@ export function StickerCreator({
   onCreated: (url: string) => void;
 }) {
   const { t } = useLanguage();
+  useBackClose(open, onClose);
   const fileRef = useRef<HTMLInputElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const stageRef = useRef<HTMLDivElement | null>(null);

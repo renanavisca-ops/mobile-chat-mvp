@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { XIcon, DownloadIcon, ExternalLinkIcon } from '@/components/icons';
 import { canNativeFiles, shareNativeFile, saveMediaToGallery } from '@/lib/native-files';
 import { useT } from '@/lib/i18n/context';
+import { useBackClose } from '@/lib/back';
 
 /**
  * Full-screen image viewer with pinch-to-zoom, drag-to-pan and double-tap zoom.
@@ -25,6 +26,7 @@ export function ImageLightbox({
   onClose: () => void;
 }) {
   const t = useT();
+  useBackClose(true, onClose);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [scale, setScale] = useState(1);
   const [tx, setTx] = useState(0);
