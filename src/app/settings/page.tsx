@@ -45,6 +45,8 @@ export default function SettingsPage() {
     setFontScale,
     simpleMode,
     setSimpleMode,
+    effects,
+    setEffects,
   } = useTheme();
 
   const [user, setUser] = useState<any>(null);
@@ -789,6 +791,28 @@ export default function SettingsPage() {
                   <span
                     className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
                       simpleMode ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-sm font-medium text-slate-200">{t('settings.effectsLabel')}</div>
+                  <div className="mt-1 text-xs text-slate-400">{t('settings.effectsDesc')}</div>
+                </div>
+                <button
+                  onClick={() => setEffects(!effects)}
+                  role="switch"
+                  aria-checked={effects}
+                  aria-label={t('settings.effectsLabel')}
+                  className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
+                    effects ? 'bg-emerald-600' : 'bg-slate-700'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      effects ? 'translate-x-6' : 'translate-x-1'
                     }`}
                   />
                 </button>

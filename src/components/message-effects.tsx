@@ -27,22 +27,92 @@ interface EffectDef {
 const EFFECTS: Record<string, EffectDef> = {
   fireworks: { kind: 'fireworks', sound: 'fireworks' },
   confetti: { kind: 'rain', emojis: ['🎉', '🎊', '✨', '🥳'] },
-  balloons: { kind: 'rain', emojis: ['🎈', '🎉', '🎊'] },
+  balloons: { kind: 'rain', emojis: ['🎈', '🎉', '🎊', '🎂'] },
   snow: { kind: 'rain', emojis: ['❄️', '🎄', '⛄', '✨'], slow: true },
   hearts: { kind: 'rain', emojis: ['❤️', '💕', '💖', '😍'] },
+  spooky: { kind: 'rain', emojis: ['🎃', '👻', '🦇', '🕸️'], slow: true },
   fire: { kind: 'rain', emojis: ['🔥', '🔥', '✨'] },
   thumbs: { kind: 'rain', emojis: ['👍', '👍', '✨'] },
   laugh: { kind: 'rain', emojis: ['😂', '😂', '😆'] },
 };
 
-// Festive phrases (accent- and case-insensitive) → effect id. Checked before
-// the emoji triggers so "¡Feliz año nuevo! 🎉" still plays fireworks.
-const PHRASES: { re: RegExp; effect: string }[] = [
-  { re: /(feliz\s+a(?:n|ñ)o\s+nuevo|pr(?:o|ó)spero\s+a(?:n|ñ)o|happy\s+new\s+year|a(?:n|ñ)o\s+nuevo|fuegos\s+artificiales|fireworks)/i, effect: 'fireworks' },
-  { re: /(feliz\s+cumplea(?:n|ñ)os|feliz\s+cumple|happy\s+birthday)/i, effect: 'balloons' },
-  { re: /(felicidades|felicitaciones|congrats|congratulations)/i, effect: 'confetti' },
-  { re: /(feliz\s+navidad|merry\s+christmas|felices\s+fiestas|happy\s+holidays)/i, effect: 'snow' },
-  { re: /(te\s+amo|te\s+quiero\s+mucho|i\s+love\s+you|feliz\s+san\s+valent(?:i|í)n|happy\s+valentine)/i, effect: 'hearts' },
+// Normalize for matching: lowercase and strip accents so "Feliz Año" and
+// "feliz ano" both match the same ASCII phrase.
+function normalize(s: string): string {
+  return s
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '');
+}
+
+// Festive phrases → effect id, checked (in order) before the emoji triggers so
+// "¡Feliz año nuevo! 🎉" still plays fireworks. Matched against the normalized
+// (accent-free, lowercase) text as plain substrings. Order matters: more
+// specific holidays come before the generic "celebration" catch-all.
+const PHRASE_EFFECTS: { effect: string; phrases: string[] }[] = [
+  {
+    effect: 'fireworks',
+    phrases: [
+      'feliz ano nuevo', 'prospero ano nuevo', 'prospero ano', 'feliz ano', 'feliz anio',
+      'ano nuevo', 'anio nuevo', 'nochevieja', 'noche vieja', 'fin de ano', 'ano viejo',
+      'happy new year', 'happy new years', 'new year', 'new years', 'happy nye',
+      'feliz 2027', 'feliz 2028', 'happy 2027', 'happy 2028',
+      'fuegos artificiales', 'fuegos pirotecnicos', 'pirotecnia', 'fireworks',
+    ],
+  },
+  {
+    effect: 'spooky',
+    phrases: [
+      'feliz halloween', 'happy halloween', 'noche de brujas',
+      'feliz dia de muertos', 'dia de los muertos', 'dia de muertos',
+      'trick or treat', 'dulce o truco', 'truco o trato',
+    ],
+  },
+  {
+    effect: 'snow',
+    phrases: [
+      'feliz navidad', 'feliz noche buena', 'feliz nochebuena', 'noche buena', 'nochebuena',
+      'felices fiestas', 'feliz pascua navidena', 'merry christmas', 'happy christmas',
+      'merry xmas', 'happy holidays', 'season greetings', 'seasons greetings',
+      'santa claus', 'papa noel', 'esta nevando', 'is snowing', 'snowing',
+    ],
+  },
+  {
+    effect: 'balloons',
+    phrases: [
+      'feliz cumpleanos', 'feliz cumple', 'feliz cumpli', 'cumpleanos feliz', 'cumpleanos',
+      'happy birthday', 'happy bday', 'happy b-day', 'its my birthday', 'it is my birthday',
+      'es mi cumple', 'hoy es mi cumple', 'estoy de cumple', 'bday',
+    ],
+  },
+  {
+    effect: 'hearts',
+    phrases: [
+      'te amo', 'te amo mucho', 'te adoro', 'te quiero muchisimo',
+      'i love you', 'love you so much', 'love u so much',
+      'feliz san valentin', 'happy valentine', 'dia del amor', 'dia de san valentin',
+      'eres el amor de mi vida', 'mi amor eres',
+      'nos casamos', 'me caso', 'quieres casarte', 'sera mi esposa', 'sera mi esposo',
+      'getting married', 'we are getting married', 'she said yes', 'he said yes', 'marry me',
+      'nos comprometimos', 'we got engaged',
+    ],
+  },
+  {
+    effect: 'confetti',
+    phrases: [
+      'felicidades', 'felicitaciones', 'enhorabuena', 'te felicito', 'muchas felicidades',
+      'congrats', 'congratulations', 'well done', 'good job', 'great job', 'way to go',
+      'lo lograste', 'lo lograron', 'lo logramos', 'lo conseguiste', 'conseguiste',
+      'gran logro', 'que logro', 'bien hecho', 'excelente trabajo', 'buen trabajo',
+      'me gradue', 'nos graduamos', 'graduation', 'graduated', 'me ascendieron', 'me promovieron',
+      'conseguiste el trabajo', 'got the job', 'nuevo trabajo', 'new job',
+      'vamos a celebrar', 'hay que celebrar', 'a celebrar', 'celebremos', 'to celebrate',
+      'lets party', 'let us party', 'party time', 'de fiesta', 'salud', 'cheers', 'brindis',
+      'ganamos', 'ganaste', 'campeones', 'we won', 'we did it', 'lo hicimos',
+      'es nina', 'es nino', 'its a girl', 'its a boy', 'estoy embarazada', 'vamos a ser papas',
+      'feliz pascua', 'happy easter',
+    ],
+  },
 ];
 
 // Emoji → effect id (first match wins).
@@ -50,6 +120,9 @@ const EMOJI_EFFECTS: { emoji: string; effect: string }[] = [
   { emoji: '🎆', effect: 'fireworks' },
   { emoji: '🎇', effect: 'fireworks' },
   { emoji: '🧨', effect: 'fireworks' },
+  { emoji: '🎃', effect: 'spooky' },
+  { emoji: '👻', effect: 'spooky' },
+  { emoji: '🦇', effect: 'spooky' },
   { emoji: '🎉', effect: 'confetti' },
   { emoji: '🎊', effect: 'confetti' },
   { emoji: '🥳', effect: 'confetti' },
@@ -69,8 +142,9 @@ const EMOJI_EFFECTS: { emoji: string; effect: string }[] = [
 
 export function detectEffect(text: string | undefined | null): string | null {
   if (!text) return null;
-  for (const { re, effect } of PHRASES) {
-    if (re.test(text)) return effect;
+  const norm = normalize(text);
+  for (const { effect, phrases } of PHRASE_EFFECTS) {
+    if (phrases.some((p) => norm.includes(p))) return effect;
   }
   for (const { emoji, effect } of EMOJI_EFFECTS) {
     if (text.includes(emoji)) return effect;
