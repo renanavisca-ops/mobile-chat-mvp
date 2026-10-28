@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { useLanguage } from '@/lib/i18n/context';
 import { canNativeFiles, openNativeFile, saveNativeFile, saveMediaToGallery, shareNativeFile } from '@/lib/native-files';
+import { useBackClose } from '@/lib/back';
 import { canNativePrint, nativePrintHtml, nativePrintPdf, nativePrintImage } from '@/lib/native-print';
 import { PdfCanvas } from '@/components/pdf-canvas';
 import { SpreadsheetView, DocxView } from '@/components/office-view';
@@ -126,6 +127,7 @@ export function DocumentPreview({
   onResend?: () => void;
 }) {
   const { t } = useLanguage();
+  useBackClose(open, onClose);
   const loadRef = useRef(load);
   loadRef.current = load;
   const [objUrl, setObjUrl] = useState<string | null>(null);

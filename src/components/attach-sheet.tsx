@@ -2,6 +2,7 @@
 
 import { useEffect, type ReactNode } from 'react';
 import { useT } from '@/lib/i18n/context';
+import { useBackClose } from '@/lib/back';
 import { ImageIcon, FilmIcon, CameraIcon, VideoIcon, GifIcon, BarChartIcon, PaperclipIcon } from '@/components/icons';
 
 export function AttachSheet(props: {
@@ -18,6 +19,7 @@ export function AttachSheet(props: {
   onSchedule?: () => void;
 }) {
   const { open, onClose, onPickPhotos, onPickVideo, onCameraPhoto, onCameraVideo, onPickFile, onPoll, onGif, onSticker, onSchedule } = props;
+  useBackClose(open, onClose);
   const t = useT();
 
   useEffect(() => {

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useLanguage } from '@/lib/i18n/context';
 import { listMyStickers, deleteSticker, type Sticker } from '@/lib/db/stickers';
 import { StickerCreator } from '@/components/sticker-creator';
+import { useBackClose } from '@/lib/back';
 import { XIcon, PlusIcon, TrashIcon } from '@/components/icons';
 
 export function StickerPicker({
@@ -16,6 +17,7 @@ export function StickerPicker({
   onPick: (url: string) => void;
 }) {
   const { t } = useLanguage();
+  useBackClose(open, onClose);
   const [stickers, setStickers] = useState<Sticker[]>([]);
   const [loading, setLoading] = useState(false);
   const [creatorOpen, setCreatorOpen] = useState(false);

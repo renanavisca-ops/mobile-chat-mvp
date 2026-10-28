@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useT } from '@/lib/i18n/context';
+import { useBackClose } from '@/lib/back';
 import { EMOJI_CATEGORIES, ALL_EMOJIS } from '@/lib/emoji-data';
 
 const RECENTS_KEY = 'tokychat:emoji_recents:v1';
@@ -42,6 +43,7 @@ export function EmojiPicker(props: {
   anchor?: 'left' | 'right';
 }) {
   const { open, onClose, onPick, onGif, anchor = 'left' } = props;
+  useBackClose(open, onClose);
   const t = useT();
 
   const [q, setQ] = useState('');

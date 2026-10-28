@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { uploadAvatar } from '@/lib/db/avatar';
 import { browserSupabase } from '@/lib/supabase/client';
 import { useT } from '@/lib/i18n/context';
+import { useBackClose } from '@/lib/back';
 
 const EMOJIS = [
   // Expressive faces
@@ -120,6 +121,7 @@ export function AvatarCreator({
   onSaved: (url: string) => void;
 }) {
   const t = useT();
+  useBackClose(open, onClose);
   const [mode, setMode] = useState<'emoji' | 'photo'>(initialMode);
   const [emoji, setEmoji] = useState(EMOJIS[0]);
   const [gradIndex, setGradIndex] = useState(0);

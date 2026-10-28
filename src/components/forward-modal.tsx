@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useT } from '@/lib/i18n/context';
+import { useBackClose } from '@/lib/back';
 import type { ChatSummary } from '@/lib/db/types';
 
 export function ForwardModal(props: {
@@ -13,6 +14,7 @@ export function ForwardModal(props: {
 }) {
   const { open, chats, loading, onClose, onConfirm } = props;
   const t = useT();
+  useBackClose(open, onClose);
 
   const [q, setQ] = useState('');
   const [selected, setSelected] = useState<Record<string, boolean>>({});

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useLanguage } from '@/lib/i18n/context';
+import { useBackClose } from '@/lib/back';
 import { browserSupabase } from '@/lib/supabase/client';
 import { peerFingerprint } from '@/lib/crypto/keystore';
 import { blockUser, unblockUser, isBlockedByMe } from '@/lib/db/safety';
@@ -93,6 +94,7 @@ export function UserInfoModal({
   onClearChat?: () => void;
 }) {
   const { t, lang } = useLanguage();
+  useBackClose(open, onClose);
   const router = useRouter();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [photoOpen, setPhotoOpen] = useState(false);
