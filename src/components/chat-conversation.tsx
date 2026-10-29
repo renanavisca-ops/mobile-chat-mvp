@@ -43,6 +43,7 @@ import { useTheme } from '@/lib/theme';
 import { GifPicker } from '@/components/gif-picker';
 import { StickerPicker } from '@/components/sticker-picker';
 import { ContactPicker } from '@/components/contact-picker';
+import { getCurrentLocation, mapsUrlFor } from '@/lib/geolocation';
 import type { Gif } from '@/lib/giphy';
 import { useCall } from '@/lib/call/call-provider';
 import { VideoTrimmer, TrimmedVideo } from '@/components/video-trimmer';
@@ -79,6 +80,8 @@ type Payload = {
   poll?: { question: string; options: string[] };
   /** A shared contact card. */
   contact?: { userId: string; name: string; username: string | null; avatarUrl: string | null };
+  /** A shared one-time location. */
+  location?: { lat: number; lng: number };
   /** In-chat call log entry (WhatsApp-style). */
   call?: { video: boolean; outcome: 'answered' | 'no_answer' | 'declined' | 'cancelled'; duration?: number; isGroup?: boolean };
   /** Per-path media encryption metadata (toky-media-v1) for encrypted chats. */
@@ -935,6 +938,36 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
         avatarUrl: c.avatar_url ?? null,
       },
     };
+    if (replyingTo) payload.reply_to = replyingTo.id;
+    const temp: MessageRow = {
+      id: `local-${crypto.randomUUID()}`,
+      chat_id: chatId,
+      sender_device_id: 'local',
+      ciphertext: JSON.stringify({ v: 1, ...payload }),
+      nonce: `local-${crypto.randomUUID()}`,
+      message_type: 'whisper',
+      created_at: new Date().toISOString(),
+    };
+    appendLocal(temp);
+    setReplyingTo(null);
+    try {
+      await sendMessage(chatId, payload as any);
+      setErr('');
+    } catch (e: any) {
+      setErr(sendErrorMessage(e));
+    }
+  }
+
+  async function onShareLocation() {
+    setAttachOpen(false);
+    let loc: { lat: number; lng: number };
+    try {
+      loc = await getCurrentLocation();
+    } catch {
+      setErr(t('chat.locationError'));
+      return;
+    }
+    const payload: Payload = { location: loc };
     if (replyingTo) payload.reply_to = replyingTo.id;
     const temp: MessageRow = {
       id: `local-${crypto.randomUUID()}`,
@@ -2820,6 +2853,10 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
           setAttachOpen(false);
           setContactPickerOpen(true);
         }}
+        onLocation={() => {
+          setEmojiOpen(false);
+          onShareLocation();
+        }}
         onSchedule={() => {
           setEmojiOpen(false);
           setAttachOpen(false);
@@ -3246,6 +3283,23 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
                             <span className="min-w-0 flex-1">
                               <span className="block truncate text-sm font-medium">{ct.name}</span>
                               <span className="block truncate text-xs opacity-70">{t('chat.viewContact')}</span>
+                            </span>
+                          </button>
+                        );
+                      })() : null}
+
+                      {m.body.location ? (() => {
+                        const loc = m.body.location;
+                        return (
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); window.open(mapsUrlFor(loc.lat, loc.lng), '_blank', 'noopener,noreferrer'); }}
+                            className="mt-1 flex w-56 max-w-full items-center gap-3 rounded-xl border border-white/10 bg-black/10 p-2 text-left hover:bg-black/20"
+                          >
+                            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-rose-500/20 text-xl">📍</span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate text-sm font-medium">{t('chat.locationShared')}</span>
+                              <span className="block truncate text-xs opacity-70">{t('chat.openInMaps')}</span>
                             </span>
                           </button>
                         );
