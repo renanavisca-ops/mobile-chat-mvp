@@ -13,7 +13,7 @@ import { EffectsIntro } from '@/components/effects-intro';
 import { useRequireAuth } from '@/lib/auth/use-require-auth';
 import { ensureIdentity } from '@/lib/crypto/keystore';
 import { browserSupabase } from '@/lib/supabase/client';
-import { listChats, markIncomingDelivered, setChatArchived, getOrCreateSelfChat, searchAllMessages } from '@/lib/db/chats';
+import { listChats, markIncomingDelivered, setChatArchived, setChatFavorite, getOrCreateSelfChat, searchAllMessages } from '@/lib/db/chats';
 import { getCached, setCached } from '@/lib/cache';
 import { tap, impact } from '@/lib/haptics';
 import { useIsOnline } from '@/components/presence-provider';
@@ -134,7 +134,7 @@ export default function ChatsPage() {
   const [openedWhileUnread, setOpenedWhileUnread] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [search, setSearch] = useState('');
-  const [filter, setFilter] = useState<'all' | 'unread' | 'groups'>('all');
+  const [filter, setFilter] = useState<'all' | 'unread' | 'favorites' | 'groups'>('all');
   // Global message search (across ALL chats, not just the open one). Results are
   // messages whose text matches; tapping one opens that chat at that message.
   const [msgResults, setMsgResults] = useState<MessageRow[]>([]);
@@ -300,6 +300,18 @@ export default function ChatsPage() {
       reloadChats();
     } catch (e: any) {
       setErr(e?.message ?? String(e));
+    }
+  }
+  async function toggleFavorite(c: ChatSummary) {
+    setRowMenuChat(null);
+    tap();
+    const next = !c.favorite;
+    setChats((prev) => prev.map((x) => (x.id === c.id ? { ...x, favorite: next } : x)));
+    try {
+      await setChatFavorite(c.id, next);
+    } catch (e: any) {
+      setErr(e?.message ?? String(e));
+      reloadChats();
     }
   }
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -607,6 +619,7 @@ export default function ChatsPage() {
                 {([
                   ['all', 'chatsList.filterAll'],
                   ['unread', 'chatsList.filterUnread'],
+                  ['favorites', 'chatsList.filterFavorites'],
                   ['groups', 'chatsList.filterGroups'],
                 ] as const).map(([key, labelKey]) => (
                   <button
@@ -671,6 +684,7 @@ export default function ChatsPage() {
               // Filter chips apply only to the normal (non-search, non-archived) list.
               const matchesFilter = (c: ChatSummary) => {
                 if (filter === 'unread') return (c.unread_count ?? 0) > 0 || (c.id === selectedId && openedWhileUnread);
+                if (filter === 'favorites') return !!c.favorite;
                 if (filter === 'groups') return c.kind === 'group' && !c.is_self;
                 return true;
               };
@@ -744,6 +758,7 @@ export default function ChatsPage() {
                               <span className={`truncate ${unread > 0 ? 'font-extrabold text-white' : 'font-semibold'}`}>
                                 {c.kind === 'group' ? c.title ?? t('chatsList.group') : c.title ?? t('chatsList.directChat')}
                               </span>
+                              {c.favorite && <span className="shrink-0 text-xs text-amber-300" title={t('chatsList.favorite')}>★</span>}
                               {c.encrypted && <LockGlyph />}
                               {!!c.disappearing_seconds && <TimerGlyph />}
                               {c.store_id && c.status && (
@@ -854,6 +869,14 @@ export default function ChatsPage() {
             <div className="px-3 pb-2 pt-3 text-sm font-semibold text-slate-300 truncate">
               {rowMenuChat.title || t('chatsList.directChat')}
             </div>
+            <button
+              type="button"
+              onClick={() => toggleFavorite(rowMenuChat)}
+              className="flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left text-sm text-slate-200 hover:bg-slate-800/60"
+            >
+              <span className={rowMenuChat.favorite ? 'text-amber-300' : 'text-slate-400'}>★</span>
+              {rowMenuChat.favorite ? t('chatsList.unfavorite') : t('chatsList.favorite')}
+            </button>
             <button
               type="button"
               onClick={() => toggleArchive(rowMenuChat)}
