@@ -62,7 +62,7 @@ Alto valor, bajo riesgo, sin dependencias externas.
 - [x] **Historial de grupo**: mensajes de sistema para creación, altas, bajas, salidas, uniones por enlace y cambios de admin
 - [x] **Pantalla de guardados/destacados**: lista central de mensajes destacados (Ajustes → Mensajes destacados)
 - [x] **Compartir ficha de contacto** dentro del chat (enviar un contacto como mensaje, tocar para ver/añadir)
-- [ ] **Compartir ubicación** puntual y en tiempo real por duración limitada 🔒 (mapa/geocoder)
+- [x] **Compartir ubicación puntual** (GPS → tarjeta que abre Google Maps) · en tiempo real: pendiente 🔒 (API de mapas)
 - [ ] **Listas/filtros de chats** personalizados (no leídos, grupos, favoritos)
 - [ ] **Contactos favoritos** y acceso directo a frecuentes
 
