@@ -55,7 +55,7 @@ import { PhoneIcon, VideoIcon, PlusIcon, SmileIcon, MicIcon, PencilIcon, ReplyIc
 import { SeenBySheet } from '@/components/seen-by-sheet';
 import { canNativeFiles, shareNativeFile, saveNativeFile, saveMediaToGallery } from '@/lib/native-files';
 import { isAutoSaveOn, setAutoSaveOn, isMediaSaved, markMediaSaved } from '@/lib/media-autosave';
-import { compressImage } from '@/lib/image-compress';
+import { compressImageForSend, type SendQuality } from '@/lib/image-compress';
 import type { ChatSummary, MessageRow } from '@/lib/db/types';
 
 type Payload = {
@@ -526,6 +526,18 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
     return { path };
   }
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  // Per-send image quality (remembered across sends).
+  const [sendQuality, setSendQuality] = useState<SendQuality>('standard');
+  useEffect(() => {
+    try {
+      const v = localStorage.getItem('toky.sendQuality');
+      if (v === 'standard' || v === 'high' || v === 'original') setSendQuality(v);
+    } catch {}
+  }, []);
+  function chooseSendQuality(q: SendQuality) {
+    setSendQuality(q);
+    try { localStorage.setItem('toky.sendQuality', q); } catch {}
+  }
   // "Ver una vez": compose toggle + who has opened which one-time message.
   const [composeViewOnce, setComposeViewOnce] = useState(false);
   const [myViewedIds, setMyViewedIds] = useState<Set<string>>(new Set());
@@ -2113,12 +2125,14 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
     if (files.length === 0) return;
 
     const allowed = new Set(['image/jpeg', 'image/png', 'image/webp']);
-    const maxSize = 5 * 1024 * 1024;
+    // Generous cap on the picked original: 'standard'/'high' downscale well
+    // under this, and 'original' uploads up to the storage image limit.
+    const maxSize = 16 * 1024 * 1024;
     const MAX_FILES = 6;
 
     const picked = files.slice(0, MAX_FILES);
 
-    // Validate the picked types up front (the compressed output is always JPEG).
+    // Validate the picked types up front.
     for (const f of picked) {
       if (!allowed.has(f.type)) {
         setErr(t('chat.onlyJpgPngWebp'));
@@ -2133,22 +2147,22 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
     // shortly after the picker returns — later reads (preview, encrypt, upload)
     // then fail with "The requested file could not be read…". Reading the bytes
     // now, into a stable in-memory File, sidesteps that for preview + send.
+    // We keep the ORIGINAL bytes here; the chosen send quality is applied at
+    // send time, so the per-send quality toggle stays instant and lossless
+    // until the user actually sends.
     const inMemory: File[] = [];
     for (const f of picked) {
       try {
         const buf = await f.arrayBuffer();
-        inMemory.push(new File([buf], f.name || `image_${Date.now()}.jpg`, { type: f.type || 'image/jpeg' }));
+        const safe = sanitizeFilename(f.name) || `image_${Date.now()}.jpg`;
+        inMemory.push(new File([buf], safe, { type: f.type || 'image/jpeg' }));
       } catch {
         setErr(t('chat.imageReadFailed'));
       }
     }
     if (inMemory.length === 0) return;
 
-    // Downscale/compress so previews render fast, uploads are small, and large
-    // phone photos aren't rejected. Falls back to the in-memory copy on failure.
-    const compressed = await Promise.all(inMemory.map((f) => compressImage(f)));
-
-    for (const f of compressed) {
+    for (const f of inMemory) {
       if (f.size > maxSize) {
         setErr(t('chat.maxImageSize'));
         return;
@@ -2157,13 +2171,9 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
 
     if (pendingVideo) clearPendingVideo();
 
-    const normalized = compressed.map((f) => {
-      const safe = sanitizeFilename(f.name) || `image_${Date.now()}.jpg`;
-      return new File([f], safe, { type: f.type });
-    });
-    const urls = normalized.map((f) => URL.createObjectURL(f));
+    const urls = inMemory.map((f) => URL.createObjectURL(f));
 
-    setPendingImages((prev) => [...prev, ...normalized].slice(0, MAX_FILES));
+    setPendingImages((prev) => [...prev, ...inMemory].slice(0, MAX_FILES));
     setPreviewImages((prev) => [...prev, ...urls].slice(0, MAX_FILES));
   }
 
@@ -2336,8 +2346,13 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
       // IMAGES (multi)
       if (pendingImages.length > 0) {
         const encMode = await chatMustEncrypt(chatId);
+        // Apply the chosen send quality just before upload (originals are kept
+        // in pendingImages so the toggle stays lossless until send).
+        const toSend = await Promise.all(
+          pendingImages.map((file) => compressImageForSend(file, sendQuality)),
+        );
         const results = await Promise.all(
-          pendingImages.map((file) => putMedia(file, encMode, () => uploadChatImage(chatId, file))),
+          toSend.map((file) => putMedia(file, encMode, () => uploadChatImage(chatId, file))),
         );
         const paths = results.map((r) => r.path);
 
@@ -3657,6 +3672,22 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
                       <PencilIcon size={14} />
                     </button>
                   </div>
+                ))}
+              </div>
+              {/* Per-send quality */}
+              <div className="mt-2 flex items-center gap-1.5">
+                <span className="text-[11px] text-slate-500">{t('sendQuality.label')}</span>
+                {(['standard', 'high', 'original'] as SendQuality[]).map((q) => (
+                  <button
+                    key={q}
+                    type="button"
+                    onClick={() => chooseSendQuality(q)}
+                    aria-pressed={sendQuality === q}
+                    title={t(`sendQuality.${q}Hint`)}
+                    className={`rounded px-2.5 py-1 text-xs ${sendQuality === q ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+                  >
+                    {t(`sendQuality.${q}`)}
+                  </button>
                 ))}
               </div>
               <div className="mt-2 flex items-center justify-between gap-2">

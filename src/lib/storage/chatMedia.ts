@@ -7,7 +7,9 @@ import { getCachedMedia, putCachedMedia } from '@/lib/storage/media-cache';
 const IMAGE_MIME = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const IMAGE_EXT = new Set(['jpg', 'jpeg', 'png', 'webp']);
 
-const MAX_IMAGE_BYTES = 5 * 1024 * 1024; // 5MB
+// Raised from 5MB so "original"/"high" send quality can go through; standard
+// quality still downscales well under this.
+const MAX_IMAGE_BYTES = 16 * 1024 * 1024; // 16MB
 const MAX_VIDEO_BYTES = 200 * 1024 * 1024; // 200MB
 
 // Attachments live at an immutable, content-addressed path (timestamp + uuid),
@@ -151,7 +153,7 @@ export async function uploadChatMedia(input: {
     const okByMime = IMAGE_MIME.has(mimeRaw);
     const okByExt = IMAGE_EXT.has(ext);
     if (!okByMime && !okByExt) throw new Error(`Mime type ${mimeRaw || '(unknown)'} is not supported`);
-    if (file.size > MAX_IMAGE_BYTES) throw new Error('Máximo 5MB por imagen.');
+    if (file.size > MAX_IMAGE_BYTES) throw new Error('Máximo 16MB por imagen.');
   } else if (kind === 'video') {
     // Video: NO allowlist estricta (codec no se puede validar aquí)
     if (mimeRaw && !mimeRaw.startsWith('video/')) {

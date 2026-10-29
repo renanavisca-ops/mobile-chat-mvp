@@ -36,3 +36,24 @@ export async function compressImage(file: File, maxDim = 1920, quality = 0.82): 
     return file;
   }
 }
+
+/** Per-send image quality the user can pick before sending. */
+export type SendQuality = 'standard' | 'high' | 'original';
+
+const QUALITY_PRESETS: Record<'standard' | 'high', { maxDim: number; quality: number }> = {
+  // Data-friendly default (same as the historical auto-compress).
+  standard: { maxDim: 1920, quality: 0.82 },
+  // Sharper: bigger long edge and higher JPEG quality for text/detail.
+  high: { maxDim: 2560, quality: 0.92 },
+};
+
+/**
+ * Re-encode a picked image for sending at the chosen quality. 'original' sends
+ * the file untouched (no downscale, EXIF preserved); 'standard'/'high' downscale
+ * and re-encode to JPEG. Always falls back to the input on any failure.
+ */
+export async function compressImageForSend(file: File, quality: SendQuality): Promise<File> {
+  if (quality === 'original') return file;
+  const p = QUALITY_PRESETS[quality];
+  return compressImage(file, p.maxDim, p.quality);
+}
