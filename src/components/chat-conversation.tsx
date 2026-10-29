@@ -3043,7 +3043,7 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
                         : { transition: 'transform .18s ease-out' }}
                       onContextMenu={(e) => {
                         e.preventDefault();
-                        if (!selectMode && !m.body.is_deleted) openActions(m.id, m.body);
+                        if (!selectMode && !m.body.is_deleted && m.sender_type !== 'system') openActions(m.id, m.body);
                       }}
                       onClick={() => {
                         if (selectMode && m.sender_type !== 'system') toggleSelect(m.id);
@@ -3053,7 +3053,7 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
                       onPointerUp={(e) => onMsgPointerUp(e, m)}
                       onPointerCancel={onMsgPointerCancel}
                       onDoubleClick={() => {
-                        if (!selectMode && !m.body.is_deleted) openActions(m.id, m.body);
+                        if (!selectMode && !m.body.is_deleted && m.sender_type !== 'system') openActions(m.id, m.body);
                       }}
                     >
                       {selectMode && m.sender_type !== 'system' && (
@@ -3072,6 +3072,7 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
                       {isGroup && !isMine(m) && m.sender_type !== 'system' && !grouped && (
                         <div className="text-[10px] font-semibold text-blue-300 mb-0.5">{senderName(m)}</div>
                       )}
+                      {m.sender_type !== 'system' && (
                       <div className={`text-[10px] flex items-center justify-between mb-1 ${isMine(m) ? 'text-blue-100/70' : 'text-slate-500'}`}>
                         <span className="flex items-center gap-1">
                           {new Date(m.created_at).toLocaleTimeString(lang, { hour: '2-digit', minute: '2-digit' })}
@@ -3091,6 +3092,7 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
                           )
                         ) : null}
                       </div>
+                      )}
 
                       {m.body.call ? (() => {
                         const call = m.body.call;
