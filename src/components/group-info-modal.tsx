@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { searchUsers } from '@/lib/db/contacts';
-import { updateGroupInfo, addGroupMembers, removeGroupMember, leaveChat, getChatMuted, setChatMuteUntil, setDisappearingMessages, getGroupMeta, setGroupRole, setGroupPerms, type GroupMeta, type GroupPerm } from '@/lib/db/chats';
+import { updateGroupInfo, addGroupMembers, removeGroupMember, leaveChat, getChatMuted, setChatMuteUntil, setDisappearingMessages, getGroupMeta, setGroupRole, setGroupPerms, getGroupInvite, rotateGroupInvite, revokeGroupInvite, inviteLinkFor, type GroupMeta, type GroupPerm } from '@/lib/db/chats';
+import { QrCode } from '@/components/qr-code';
 import { uploadGroupAvatar } from '@/lib/db/groupAvatar';
 import { useT } from '@/lib/i18n/context';
 import { useBackClose } from '@/lib/back';
@@ -85,6 +86,10 @@ export function GroupInfoModal({
   const [meta, setMeta] = useState<GroupMeta | null>(null);
   const reloadMeta = () => getGroupMeta(chatId).then(setMeta).catch(() => {});
   const amAdmin = meta?.amAdmin ?? isCreator;
+  const [inviteCode, setInviteCode] = useState<string | null>(null);
+  const [inviteBusy, setInviteBusy] = useState(false);
+  const [showQr, setShowQr] = useState(false);
+  const [copied, setCopied] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const [confirmLeave, setConfirmLeave] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
@@ -101,6 +106,9 @@ export function GroupInfoModal({
       setDisappearing(disappearingSeconds ?? 0);
       getChatMuted(chatId).then(setMuted).catch(() => {});
       reloadMeta();
+      setShowQr(false);
+      setCopied(false);
+      getGroupInvite(chatId).then(setInviteCode).catch(() => {});
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, title, description, chatId, disappearingSeconds]);
@@ -233,6 +241,40 @@ export function GroupInfoModal({
     } finally {
       setBusyMemberId(null);
     }
+  }
+
+  async function createOrRotateInvite() {
+    setInviteBusy(true);
+    setErr('');
+    try {
+      const code = await rotateGroupInvite(chatId);
+      setInviteCode(code);
+    } catch (e: any) {
+      setErr(e?.message ?? String(e));
+    } finally {
+      setInviteBusy(false);
+    }
+  }
+  async function revokeInvite() {
+    setInviteBusy(true);
+    setErr('');
+    try {
+      await revokeGroupInvite(chatId);
+      setInviteCode(null);
+      setShowQr(false);
+    } catch (e: any) {
+      setErr(e?.message ?? String(e));
+    } finally {
+      setInviteBusy(false);
+    }
+  }
+  async function copyInvite() {
+    if (!inviteCode) return;
+    try {
+      await navigator.clipboard.writeText(inviteLinkFor(inviteCode));
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1800);
+    } catch { /* ignore */ }
   }
 
   async function changePerm(key: 'edit' | 'add' | 'send', value: GroupPerm) {
@@ -490,6 +532,47 @@ export function GroupInfoModal({
             })}
           </ul>
         </div>
+
+        {amAdmin && (
+          <div className="mt-4 space-y-2 rounded-xl border border-slate-800 bg-slate-900/40 p-3">
+            <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">{t('groupInfo.inviteLink')}</div>
+            {inviteCode ? (
+              <>
+                <div className="flex items-center gap-2">
+                  <input
+                    readOnly
+                    value={inviteLinkFor(inviteCode)}
+                    onFocus={(e) => e.currentTarget.select()}
+                    className="min-w-0 flex-1 truncate rounded-lg border border-slate-800 bg-slate-950/60 px-2 py-1.5 text-xs text-slate-300"
+                  />
+                  <button type="button" onClick={copyInvite} className="shrink-0 rounded-lg bg-slate-800 px-2.5 py-1.5 text-xs text-slate-200 hover:bg-slate-700">
+                    {copied ? t('groupInfo.inviteCopied') : t('groupInfo.inviteCopy')}
+                  </button>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button type="button" onClick={() => setShowQr((v) => !v)} className="rounded-lg bg-slate-800 px-2.5 py-1.5 text-xs text-slate-200 hover:bg-slate-700">
+                    {t('groupInfo.inviteQr')}
+                  </button>
+                  <button type="button" onClick={createOrRotateInvite} disabled={inviteBusy} className="rounded-lg bg-slate-800 px-2.5 py-1.5 text-xs text-slate-200 hover:bg-slate-700 disabled:opacity-50">
+                    {t('groupInfo.inviteReset')}
+                  </button>
+                  <button type="button" onClick={revokeInvite} disabled={inviteBusy} className="rounded-lg bg-slate-800 px-2.5 py-1.5 text-xs text-rose-300 hover:bg-rose-900/40 disabled:opacity-50">
+                    {t('groupInfo.inviteRevoke')}
+                  </button>
+                </div>
+                {showQr && (
+                  <div className="flex justify-center py-1">
+                    <QrCode value={inviteLinkFor(inviteCode)} />
+                  </div>
+                )}
+              </>
+            ) : (
+              <button type="button" onClick={createOrRotateInvite} disabled={inviteBusy} className="w-full rounded-lg bg-slate-800 px-3 py-2 text-sm text-slate-200 hover:bg-slate-700 disabled:opacity-50">
+                {inviteBusy ? t('groupInfo.saving') : t('groupInfo.inviteCreate')}
+              </button>
+            )}
+          </div>
+        )}
 
         {amAdmin && meta && (
           <div className="mt-4 space-y-2 rounded-xl border border-slate-800 bg-slate-900/40 p-3">
