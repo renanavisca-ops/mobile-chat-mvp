@@ -34,7 +34,7 @@ export async function POST(req: Request) {
 
     const { data: message, error: msgErr } = await supabaseAdmin
       .from('messages')
-      .select('id, chat_id, sender_id, content, message_type')
+      .select('id, chat_id, sender_id, content, message_type, ciphertext')
       .eq('id', message_id)
       .single();
     if (msgErr || !message) return NextResponse.json({ ok: true, skipped: 'message_not_found' });
@@ -51,10 +51,22 @@ export async function POST(req: Request) {
     const now = Date.now();
     const isMutedNow = (m: { muted: boolean; muted_until: string | null }) =>
       m.muted && (!m.muted_until || new Date(m.muted_until).getTime() > now);
+
+    // @mentions (ids live in the message payload) still notify even if the chat
+    // is muted — being mentioned is a direct ping.
+    let mentionedIds: string[] = [];
+    try {
+      const parsed = JSON.parse(message.ciphertext || '{}');
+      if (Array.isArray(parsed?.mentions)) mentionedIds = parsed.mentions.filter((x: unknown) => typeof x === 'string');
+    } catch {
+      /* not JSON / no mentions */
+    }
+    const mentioned = new Set(mentionedIds);
+
     const recipientIds = (members ?? [])
-      .filter((m) => !isMutedNow(m))
-      .map((m) => m.user_id)
-      .filter((id) => id !== message.sender_id);
+      .filter((m) => m.user_id !== message.sender_id)
+      .filter((m) => !isMutedNow(m) || mentioned.has(m.user_id))
+      .map((m) => m.user_id);
     if (recipientIds.length === 0) return NextResponse.json({ ok: true, skipped: 'no_recipients' });
 
     const { data: sender } = await supabaseAdmin

@@ -531,6 +531,8 @@ export type MessagePayload = {
   fileMime?: string;
   reply_to?: string;
   is_deleted?: boolean;
+  /** User ids mentioned in `text` (groups). */
+  mentions?: string[];
 };
 
 export async function sendMessage(chatId: string, payload: MessagePayload) {
