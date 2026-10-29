@@ -837,6 +837,60 @@ export async function removeGroupMember(chatId: string, memberId: string) {
   if (error) throw error;
 }
 
+export type GroupPerm = 'all' | 'admins';
+export type GroupMeta = {
+  myId: string;
+  amAdmin: boolean;
+  createdBy: string | null;
+  roles: Record<string, 'admin' | 'member'>; // userId → role (creator counts as admin)
+  perms: { edit: GroupPerm; add: GroupPerm; send: GroupPerm };
+};
+
+/** Load a group's roles + permissions, and whether I'm an admin. */
+export async function getGroupMeta(chatId: string): Promise<GroupMeta> {
+  const supabase = browserSupabase();
+  const { data: me } = await supabase.auth.getUser();
+  const myId = me.user?.id ?? '';
+  // Cast: perm_* columns and chat_members.role aren't in the generated types yet.
+  const sb = supabase as any;
+  const [{ data: chat }, { data: cms }] = await Promise.all([
+    sb.from('chats').select('created_by, perm_edit, perm_add, perm_send').eq('id', chatId).maybeSingle(),
+    sb.from('chat_members').select('user_id, role').eq('chat_id', chatId),
+  ]);
+  const createdBy = (chat as any)?.created_by ?? null;
+  const roles: Record<string, 'admin' | 'member'> = {};
+  for (const r of (cms ?? []) as any[]) roles[r.user_id] = r.role === 'admin' ? 'admin' : 'member';
+  if (createdBy) roles[createdBy] = 'admin'; // creator is always an admin
+  const amAdmin = !!myId && (myId === createdBy || roles[myId] === 'admin');
+  const perm = (v: unknown): GroupPerm => (v === 'admins' ? 'admins' : 'all');
+  return {
+    myId,
+    amAdmin,
+    createdBy,
+    roles,
+    perms: { edit: perm((chat as any)?.perm_edit), add: perm((chat as any)?.perm_add), send: perm((chat as any)?.perm_send) },
+  };
+}
+
+/** Promote/demote a member (admin only; the creator is always an admin). */
+export async function setGroupRole(chatId: string, memberId: string, role: 'admin' | 'member') {
+  const supabase = browserSupabase();
+  const { error } = await (supabase as any).rpc('set_group_role', { p_chat_id: chatId, p_member_id: memberId, p_role: role });
+  if (error) throw error;
+}
+
+/** Update a group's permissions (admin only). */
+export async function setGroupPerms(chatId: string, perms: { edit: GroupPerm; add: GroupPerm; send: GroupPerm }) {
+  const supabase = browserSupabase();
+  const { error } = await (supabase as any).rpc('set_group_perms', {
+    p_chat_id: chatId,
+    p_edit: perms.edit,
+    p_add: perms.add,
+    p_send: perms.send,
+  });
+  if (error) throw error;
+}
+
 /** Leave a chat (removes yourself from chat_members). */
 export async function leaveChat(chatId: string) {
   const supabase = browserSupabase();

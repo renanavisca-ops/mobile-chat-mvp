@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { searchUsers } from '@/lib/db/contacts';
-import { updateGroupInfo, addGroupMembers, removeGroupMember, leaveChat, getChatMuted, setChatMuteUntil, setDisappearingMessages } from '@/lib/db/chats';
+import { updateGroupInfo, addGroupMembers, removeGroupMember, leaveChat, getChatMuted, setChatMuteUntil, setDisappearingMessages, getGroupMeta, setGroupRole, setGroupPerms, type GroupMeta, type GroupPerm } from '@/lib/db/chats';
 import { uploadGroupAvatar } from '@/lib/db/groupAvatar';
 import { useT } from '@/lib/i18n/context';
 import { useBackClose } from '@/lib/back';
@@ -82,6 +82,9 @@ export function GroupInfoModal({
   const [adding, setAdding] = useState(false);
 
   const [busyMemberId, setBusyMemberId] = useState<string | null>(null);
+  const [meta, setMeta] = useState<GroupMeta | null>(null);
+  const reloadMeta = () => getGroupMeta(chatId).then(setMeta).catch(() => {});
+  const amAdmin = meta?.amAdmin ?? isCreator;
   const [leaving, setLeaving] = useState(false);
   const [confirmLeave, setConfirmLeave] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
@@ -97,7 +100,9 @@ export function GroupInfoModal({
       setConfirmLeave(false);
       setDisappearing(disappearingSeconds ?? 0);
       getChatMuted(chatId).then(setMuted).catch(() => {});
+      reloadMeta();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, title, description, chatId, disappearingSeconds]);
 
   useEffect(() => {
@@ -209,10 +214,36 @@ export function GroupInfoModal({
     try {
       await removeGroupMember(chatId, userId);
       onMembersChanged();
+      reloadMeta();
     } catch (e: any) {
       setErr(e?.message ?? String(e));
     } finally {
       setBusyMemberId(null);
+    }
+  }
+
+  async function changeRole(userId: string, role: 'admin' | 'member') {
+    setBusyMemberId(userId);
+    setErr('');
+    try {
+      await setGroupRole(chatId, userId, role);
+      await reloadMeta();
+    } catch (e: any) {
+      setErr(e?.message ?? String(e));
+    } finally {
+      setBusyMemberId(null);
+    }
+  }
+
+  async function changePerm(key: 'edit' | 'add' | 'send', value: GroupPerm) {
+    if (!meta) return;
+    const next = { ...meta.perms, [key]: value };
+    setMeta({ ...meta, perms: next });
+    try {
+      await setGroupPerms(chatId, next);
+    } catch (e: any) {
+      setErr(e?.message ?? String(e));
+      reloadMeta();
     }
   }
 
@@ -257,7 +288,7 @@ export function GroupInfoModal({
               {(title || '?').trim().charAt(0).toUpperCase()}
             </span>
           )}
-          {isCreator && (
+          {amAdmin && (
             <div>
               <button
                 type="button"
@@ -277,7 +308,7 @@ export function GroupInfoModal({
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            disabled={!isCreator}
+            disabled={!amAdmin}
             maxLength={60}
             className="w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-slate-100 disabled:opacity-60"
           />
@@ -288,15 +319,15 @@ export function GroupInfoModal({
           <textarea
             value={desc}
             onChange={(e) => setDesc(e.target.value)}
-            disabled={!isCreator}
+            disabled={!amAdmin}
             maxLength={500}
             rows={2}
-            placeholder={isCreator ? t('groupInfo.descriptionPlaceholder') : ''}
+            placeholder={amAdmin ? t('groupInfo.descriptionPlaceholder') : ''}
             className="w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-slate-100 disabled:opacity-60"
           />
         </div>
 
-        {isCreator ? (
+        {amAdmin ? (
           <button
             type="button"
             onClick={saveInfo}
@@ -382,7 +413,7 @@ export function GroupInfoModal({
           </div>
         )}
 
-        {isCreator && (
+        {amAdmin && (
           <div className="mt-3 rounded-lg border border-slate-900 bg-slate-950/60 p-3">
             <div className="text-sm font-medium text-slate-200">{t('groupInfo.disappearingTitle')}</div>
             <div className="text-xs text-slate-500">{t('groupInfo.disappearingDesc')}</div>
@@ -408,31 +439,88 @@ export function GroupInfoModal({
         <div className="mt-4">
           <div className="ml-1 text-xs text-slate-400">{t('groupInfo.members')} ({members.length})</div>
           <ul className="mt-2 max-h-40 space-y-1 overflow-auto">
-            {members.map((m) => (
-              <li key={m.id} className="flex items-center justify-between rounded-lg px-2 py-1.5 text-sm text-slate-200 hover:bg-slate-900">
+            {members.map((m) => {
+              const role = meta?.roles[m.id] ?? 'member';
+              const isTheCreator = meta?.createdBy === m.id;
+              const isMe = meta?.myId === m.id;
+              const canManage = amAdmin && !isMe && !isTheCreator;
+              return (
+              <li key={m.id} className="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-sm text-slate-200 hover:bg-slate-900">
                 {onMemberClick ? (
-                  <button type="button" onClick={() => onMemberClick(m.id)} className="flex-1 truncate text-left hover:text-white">
-                    {m.username ?? m.id.slice(0, 8)}
+                  <button type="button" onClick={() => onMemberClick(m.id)} className="flex min-w-0 flex-1 items-center gap-2 truncate text-left hover:text-white">
+                    <span className="truncate">{m.username ?? m.id.slice(0, 8)}</span>
+                    {role === 'admin' && (
+                      <span className="shrink-0 rounded-full bg-emerald-900/50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-300">
+                        {t('groupInfo.admin')}
+                      </span>
+                    )}
                   </button>
                 ) : (
-                  <span>{m.username ?? m.id.slice(0, 8)}</span>
+                  <span className="flex min-w-0 flex-1 items-center gap-2 truncate">
+                    <span className="truncate">{m.username ?? m.id.slice(0, 8)}</span>
+                    {role === 'admin' && (
+                      <span className="shrink-0 rounded-full bg-emerald-900/50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-300">
+                        {t('groupInfo.admin')}
+                      </span>
+                    )}
+                  </span>
                 )}
-                {isCreator && (
-                  <button
-                    type="button"
-                    onClick={() => removeMember(m.id)}
-                    disabled={busyMemberId === m.id}
-                    className="text-xs text-red-400 hover:text-red-300 disabled:opacity-50"
-                  >
-                    {t('groupInfo.remove')}
-                  </button>
+                {canManage && (
+                  <span className="flex shrink-0 items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => changeRole(m.id, role === 'admin' ? 'member' : 'admin')}
+                      disabled={busyMemberId === m.id}
+                      className="text-xs text-emerald-400 hover:text-emerald-300 disabled:opacity-50"
+                    >
+                      {role === 'admin' ? t('groupInfo.demote') : t('groupInfo.makeAdmin')}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => removeMember(m.id)}
+                      disabled={busyMemberId === m.id}
+                      className="text-xs text-red-400 hover:text-red-300 disabled:opacity-50"
+                    >
+                      {t('groupInfo.remove')}
+                    </button>
+                  </span>
                 )}
               </li>
-            ))}
+              );
+            })}
           </ul>
         </div>
 
-        {isCreator && (
+        {amAdmin && meta && (
+          <div className="mt-4 space-y-2 rounded-xl border border-slate-800 bg-slate-900/40 p-3">
+            <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">{t('groupInfo.permissions')}</div>
+            {([
+              ['edit', 'permEdit'],
+              ['add', 'permAdd'],
+              ['send', 'permSend'],
+            ] as const).map(([key, labelKey]) => (
+              <div key={key} className="flex items-center justify-between gap-3">
+                <span className="text-sm text-slate-200">{t(`groupInfo.${labelKey}`)}</span>
+                <div className="flex gap-1 rounded-lg border border-slate-800 bg-slate-950/60 p-0.5">
+                  {(['all', 'admins'] as const).map((v) => (
+                    <button
+                      key={v}
+                      type="button"
+                      onClick={() => changePerm(key, v)}
+                      className={`rounded-md px-2.5 py-1 text-xs font-medium ${
+                        meta.perms[key] === v ? 'toky-grad text-white' : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      {v === 'all' ? t('groupInfo.permAll') : t('groupInfo.permAdmins')}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {amAdmin && (
           <div className="mt-4 space-y-1.5">
             <label className="ml-1 block text-xs text-slate-400">{t('groupInfo.addMembers')}</label>
             <input

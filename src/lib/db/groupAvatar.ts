@@ -2,7 +2,7 @@
 
 import { browserSupabase } from '@/lib/supabase/client';
 
-/** Upload a group photo to the public `group-avatars` bucket. Creator-only (RLS). */
+/** Upload a group photo to the public `group-avatars` bucket. Admin / perm_edit enforced by the RPC. */
 export async function uploadGroupAvatar(chatId: string, file: File): Promise<string> {
   const supabase = browserSupabase();
 
@@ -19,7 +19,8 @@ export async function uploadGroupAvatar(chatId: string, file: File): Promise<str
 
   const { data } = supabase.storage.from('group-avatars').getPublicUrl(path);
 
-  const { error: updErr } = await supabase.from('chats').update({ avatar_url: data.publicUrl }).eq('id', chatId);
+  // Set via RPC so group-edit permissions (admins / perm_edit) are enforced.
+  const { error: updErr } = await (supabase as any).rpc('set_group_avatar', { p_chat_id: chatId, p_url: data.publicUrl });
   if (updErr) throw updErr;
 
   return data.publicUrl;

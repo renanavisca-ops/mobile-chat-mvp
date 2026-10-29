@@ -18,7 +18,7 @@ import { getWallpaperId, wallpaperCss, getCustomWallpaperUrl, CUSTOM_WALLPAPER_I
 import { blockUser, unblockUser, isBlockedByMe } from '@/lib/db/safety';
 import { EmojiPicker } from '@/components/emoji-picker';
 import { useRequireAuth } from '@/lib/auth/use-require-auth';
-import { listChats, sendMessage, deleteMessage, hideMessageForMe, editMessage, pinMessage, unpinMessage, searchMessages, getChatMuted, setChatMuteUntil, toggleReaction, createPoll, votePoll, setDisappearingMessages, enableChatEncryption, chatMustEncrypt, clearChatForMe, EncryptionRequiredError } from '@/lib/db/chats';
+import { listChats, sendMessage, deleteMessage, hideMessageForMe, editMessage, pinMessage, unpinMessage, searchMessages, getChatMuted, setChatMuteUntil, toggleReaction, createPoll, votePoll, setDisappearingMessages, enableChatEncryption, chatMustEncrypt, clearChatForMe, getGroupMeta, EncryptionRequiredError, type GroupMeta } from '@/lib/db/chats';
 import { initKeystore, isUnlocked } from '@/lib/crypto/keystore';
 import { uploadChatImage, uploadChatMedia, uploadChatAudio, uploadChatFile, createSignedChatMediaUrl, fetchCachedMediaUrl, uploadEncryptedChatMedia, fetchDecryptedMediaUrl } from '@/lib/storage/upload';
 import { decryptMedia, type MediaEnc } from '@/lib/crypto/media';
@@ -175,6 +175,7 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
 
   // members
   const [members, setMembers] = useState<string[]>([]);
+  const [groupMeta, setGroupMeta] = useState<GroupMeta | null>(null);
   const [memberProfiles, setMemberProfiles] = useState<{ id: string; username: string | null; display_name: string | null; avatar_url: string | null; last_seen: string | null }[]>([]);
   const [membersLoading, setMembersLoading] = useState(true);
 
@@ -1022,8 +1023,20 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
     ? members.join(', ')
     : '';
   const isGroupCreator = isGroup && chat?.created_by === myId;
-  // In a channel only the owner may post; everyone else is read-only.
-  const canPost = !isChannel || chat?.created_by === myId;
+  // In a channel only the owner may post; in a group set to "admins only",
+  // non-admins are read-only too. Everyone else can post.
+  const groupSendBlocked = isGroup && groupMeta?.perms.send === 'admins' && !groupMeta.amAdmin;
+  const canPost = (!isChannel || chat?.created_by === myId) && !groupSendBlocked;
+
+  // Load the group's roles/permissions (for send gating), refreshing when the
+  // member list reloads or the group-info sheet opens/closes (perms changed).
+  useEffect(() => {
+    if (chat?.kind !== 'group') { setGroupMeta(null); return; }
+    let alive = true;
+    getGroupMeta(chatId).then((m) => { if (alive) setGroupMeta(m); }).catch(() => {});
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chatId, chat?.kind, membersReloadKey, groupInfoOpen]);
 
   useEffect(() => {
     if (!otherUserId) return;
@@ -3762,7 +3775,7 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
           </div>
           ) : (
             <p className="rounded-lg border border-slate-900 bg-slate-950/60 px-3 py-3 text-center text-xs text-slate-400">
-              {t('channels.readOnlyNotice')}
+              {groupSendBlocked ? t('groupInfo.onlyAdminsCanSend') : t('channels.readOnlyNotice')}
             </p>
           )}
         </div>
