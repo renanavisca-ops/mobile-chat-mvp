@@ -16,9 +16,10 @@ export function AttachSheet(props: {
   onPoll: () => void;
   onGif: () => void;
   onSticker?: () => void;
+  onContact?: () => void;
   onSchedule?: () => void;
 }) {
-  const { open, onClose, onPickPhotos, onPickVideo, onCameraPhoto, onCameraVideo, onPickFile, onPoll, onGif, onSticker, onSchedule } = props;
+  const { open, onClose, onPickPhotos, onPickVideo, onCameraPhoto, onCameraVideo, onPickFile, onPoll, onGif, onSticker, onContact, onSchedule } = props;
   useBackClose(open, onClose);
   const t = useT();
 
@@ -120,6 +121,18 @@ export function AttachSheet(props: {
             />
           )}
           <Btn icon={<BarChartIcon size={18} />} label={t('attach.poll')} onClick={onPoll} />
+          {onContact && (
+            <Btn
+              icon={
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                  <circle cx="12" cy="7" r="4" />
+                </svg>
+              }
+              label={t('attach.contact')}
+              onClick={onContact}
+            />
+          )}
           <Btn icon={<PaperclipIcon size={18} />} label={t('attach.file')} onClick={onPickFile} />
           {onSchedule && (
             <Btn

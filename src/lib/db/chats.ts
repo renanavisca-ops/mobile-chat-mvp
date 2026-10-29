@@ -138,12 +138,12 @@ export async function listChats(): Promise<ChatSummary[]> {
   // (this module isn't a component and can't call the i18n hook).
   const latestByChat = new Map<
     string,
-    { created_at: string; content: string | null; kind: 'text' | 'photo' | 'video' | 'audio' | 'gif' | 'sticker' | 'poll' | 'file' | 'call' | 'deleted' | null }
+    { created_at: string; content: string | null; kind: 'text' | 'photo' | 'video' | 'audio' | 'gif' | 'sticker' | 'poll' | 'file' | 'call' | 'contact' | 'deleted' | null }
   >();
   for (const m of latestRows) {
     if (latestByChat.has(m.chat_id)) continue;
     let content = m.content || '';
-    let kind: 'text' | 'photo' | 'video' | 'audio' | 'gif' | 'sticker' | 'poll' | 'file' | 'call' | 'deleted' | null = content ? 'text' : null;
+    let kind: 'text' | 'photo' | 'video' | 'audio' | 'gif' | 'sticker' | 'poll' | 'file' | 'call' | 'contact' | 'deleted' | null = content ? 'text' : null;
     if (!content && m.ciphertext) {
       try {
         const parsed = JSON.parse(m.ciphertext);
@@ -169,6 +169,8 @@ export async function listChats(): Promise<ChatSummary[]> {
           kind = 'poll';
         } else if (parsed.call) {
           kind = 'call';
+        } else if (parsed.contact) {
+          kind = 'contact';
         } else if (parsed.is_deleted) {
           kind = 'deleted';
         }
@@ -533,6 +535,8 @@ export type MessagePayload = {
   is_deleted?: boolean;
   /** User ids mentioned in `text` (groups). */
   mentions?: string[];
+  /** A shared contact card. */
+  contact?: { userId: string; name: string; username: string | null; avatarUrl: string | null };
 };
 
 export async function sendMessage(chatId: string, payload: MessagePayload) {

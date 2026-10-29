@@ -173,6 +173,7 @@ const en = {
     audio: '🎵 Audio',
     gif: '🎬 GIF',
     sticker: '🙂 Sticker',
+    contact: '👤 Contact',
     poll: '📊 Poll',
     file: '📎 File',
     call: '📞 Call',
@@ -245,6 +246,7 @@ const en = {
     openNeedsDownload: 'To open this file, download it first.',
     savedToGallery: 'Saved to your gallery.',
     viewPhoto: 'View photo',
+    viewContact: 'View contact',
     mediaRetry: 'Tap to retry',
     forwardMediaUnavailable: "Couldn't load the original media to forward.",
     edited: '(edited)',
@@ -502,6 +504,7 @@ const en = {
     poll: 'Poll',
     gif: 'GIF',
     sticker: 'Sticker',
+    contact: 'Contact',
     cancel: 'Cancel',
   },
   stickers: {
@@ -582,6 +585,11 @@ const en = {
     error: 'Could not load GIFs.',
     notConfigured: 'GIFs are not set up yet.',
     poweredBy: 'Powered by GIPHY',
+  },
+  contactPicker: {
+    title: 'Share contact',
+    search: 'Search by name or username',
+    empty: 'No contacts found.',
   },
   join: {
     title: 'Join group',

@@ -61,7 +61,7 @@ Alto valor, bajo riesgo, sin dependencias externas.
 - [x] **Invitación a grupo por enlace/QR** con revocación (aprobación de ingreso: pendiente, v2)
 - [x] **Historial de grupo**: mensajes de sistema para creación, altas, bajas, salidas, uniones por enlace y cambios de admin
 - [x] **Pantalla de guardados/destacados**: lista central de mensajes destacados (Ajustes → Mensajes destacados)
-- [ ] **Compartir ficha de contacto** dentro del chat (enviar un contacto como mensaje)
+- [x] **Compartir ficha de contacto** dentro del chat (enviar un contacto como mensaje, tocar para ver/añadir)
 - [ ] **Compartir ubicación** puntual y en tiempo real por duración limitada 🔒 (mapa/geocoder)
 - [ ] **Listas/filtros de chats** personalizados (no leídos, grupos, favoritos)
 - [ ] **Contactos favoritos** y acceso directo a frecuentes

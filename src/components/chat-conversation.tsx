@@ -42,6 +42,7 @@ import { wasCelebrated, markCelebrated } from '@/lib/effects-seen';
 import { useTheme } from '@/lib/theme';
 import { GifPicker } from '@/components/gif-picker';
 import { StickerPicker } from '@/components/sticker-picker';
+import { ContactPicker } from '@/components/contact-picker';
 import type { Gif } from '@/lib/giphy';
 import { useCall } from '@/lib/call/call-provider';
 import { VideoTrimmer, TrimmedVideo } from '@/components/video-trimmer';
@@ -76,6 +77,8 @@ type Payload = {
   /** User ids mentioned in `text` (groups). */
   mentions?: string[];
   poll?: { question: string; options: string[] };
+  /** A shared contact card. */
+  contact?: { userId: string; name: string; username: string | null; avatarUrl: string | null };
   /** In-chat call log entry (WhatsApp-style). */
   call?: { video: boolean; outcome: 'answered' | 'no_answer' | 'declined' | 'cancelled'; duration?: number; isGroup?: boolean };
   /** Per-path media encryption metadata (toky-media-v1) for encrypted chats. */
@@ -567,6 +570,7 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
   const [gifPickerOpen, setGifPickerOpen] = useState(false);
   // Sticker picker (collection + create)
   const [stickerPickerOpen, setStickerPickerOpen] = useState(false);
+  const [contactPickerOpen, setContactPickerOpen] = useState(false);
 
   // AI: smart replies + translation
   const [suggestions, setSuggestions] = useState<string[]>([]);
@@ -901,6 +905,36 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
   async function onPickSticker(url: string) {
     setStickerPickerOpen(false);
     const payload: Payload = { stickerUrl: url };
+    if (replyingTo) payload.reply_to = replyingTo.id;
+    const temp: MessageRow = {
+      id: `local-${crypto.randomUUID()}`,
+      chat_id: chatId,
+      sender_device_id: 'local',
+      ciphertext: JSON.stringify({ v: 1, ...payload }),
+      nonce: `local-${crypto.randomUUID()}`,
+      message_type: 'whisper',
+      created_at: new Date().toISOString(),
+    };
+    appendLocal(temp);
+    setReplyingTo(null);
+    try {
+      await sendMessage(chatId, payload as any);
+      setErr('');
+    } catch (e: any) {
+      setErr(sendErrorMessage(e));
+    }
+  }
+
+  async function onPickContact(c: { id: string; username: string | null; display_name?: string | null; avatar_url?: string | null }) {
+    setContactPickerOpen(false);
+    const payload: Payload = {
+      contact: {
+        userId: c.id,
+        name: c.display_name || c.username || c.id.slice(0, 8),
+        username: c.username ?? null,
+        avatarUrl: c.avatar_url ?? null,
+      },
+    };
     if (replyingTo) payload.reply_to = replyingTo.id;
     const temp: MessageRow = {
       id: `local-${crypto.randomUUID()}`,
@@ -2781,6 +2815,11 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
           setEmojiOpen(false);
           setStickerPickerOpen(true);
         }}
+        onContact={() => {
+          setEmojiOpen(false);
+          setAttachOpen(false);
+          setContactPickerOpen(true);
+        }}
         onSchedule={() => {
           setEmojiOpen(false);
           setAttachOpen(false);
@@ -2798,6 +2837,8 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
       <GifPicker open={gifPickerOpen} onClose={() => setGifPickerOpen(false)} onPick={onPickGif} />
 
       <StickerPicker open={stickerPickerOpen} onClose={() => setStickerPickerOpen(false)} onPick={onPickSticker} />
+
+      <ContactPicker open={contactPickerOpen} onClose={() => setContactPickerOpen(false)} onPick={onPickContact} />
 
       <VideoTrimmer
         open={trimmerOpen}
@@ -3185,6 +3226,30 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={m.body.stickerUrl} alt="sticker" className="max-h-40 w-auto select-none" draggable={false} />
                       ) : null}
+
+                      {m.body.contact ? (() => {
+                        const ct = m.body.contact;
+                        return (
+                          <button
+                            type="button"
+                            onClick={() => setUserInfoId(ct.userId)}
+                            className="mt-1 flex w-56 max-w-full items-center gap-3 rounded-xl border border-white/10 bg-black/10 p-2 text-left hover:bg-black/20"
+                          >
+                            {ct.avatarUrl ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={ct.avatarUrl} alt="" className="h-10 w-10 rounded-full object-cover" />
+                            ) : (
+                              <span className="grid h-10 w-10 place-items-center rounded-full text-sm font-semibold text-white" style={{ backgroundImage: avatarBg(ct.name) }}>
+                                {initials(ct.name)}
+                              </span>
+                            )}
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate text-sm font-medium">{ct.name}</span>
+                              <span className="block truncate text-xs opacity-70">{t('chat.viewContact')}</span>
+                            </span>
+                          </button>
+                        );
+                      })() : null}
 
                       {m.message_type === 'poll' && m.body.poll ? (
                         <div className="mt-1 space-y-1.5">
