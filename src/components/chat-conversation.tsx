@@ -18,7 +18,7 @@ import { getWallpaperId, wallpaperCss, getCustomWallpaperUrl, CUSTOM_WALLPAPER_I
 import { blockUser, unblockUser, isBlockedByMe } from '@/lib/db/safety';
 import { EmojiPicker } from '@/components/emoji-picker';
 import { useRequireAuth } from '@/lib/auth/use-require-auth';
-import { listChats, sendMessage, deleteMessage, hideMessageForMe, editMessage, pinMessage, unpinMessage, searchMessages, getChatMuted, setChatMuteUntil, toggleReaction, createPoll, votePoll, setDisappearingMessages, enableChatEncryption, chatMustEncrypt, clearChatForMe, getGroupMeta, EncryptionRequiredError, type GroupMeta } from '@/lib/db/chats';
+import { listChats, sendMessage, deleteMessage, hideMessageForMe, editMessage, pinMessage, unpinMessage, searchMessages, getChatMuted, setChatMuteUntil, toggleReaction, createPoll, votePoll, setDisappearingMessages, enableChatEncryption, chatMustEncrypt, clearChatForMe, getGroupMeta, markMessageViewed, getChatMessageViews, EncryptionRequiredError, type GroupMeta } from '@/lib/db/chats';
 import { initKeystore, isUnlocked } from '@/lib/crypto/keystore';
 import { uploadChatImage, uploadChatMedia, uploadChatAudio, uploadChatFile, createSignedChatMediaUrl, fetchCachedMediaUrl, uploadEncryptedChatMedia, fetchDecryptedMediaUrl } from '@/lib/storage/upload';
 import { decryptMedia, type MediaEnc } from '@/lib/crypto/media';
@@ -29,6 +29,7 @@ import { useLanguage } from '@/lib/i18n/context';
 import { PollComposer } from '@/components/poll-composer';
 import { MessagesSkeleton } from '@/components/skeleton';
 import { ImageLightbox } from '@/components/image-lightbox';
+import { ViewOnceViewer } from '@/components/view-once-viewer';
 import { DocumentPreview } from '@/components/document-preview';
 import { MessageText } from '@/components/message-text';
 import { extractMentionIds } from '@/lib/mentions';
@@ -75,6 +76,8 @@ type Payload = {
   fileMime?: string;
   reply_to?: string;
   is_deleted?: boolean;
+  /** "Ver una vez": photo/video the recipient can open exactly once. */
+  viewOnce?: boolean;
   /** User ids mentioned in `text` (groups). */
   mentions?: string[];
   poll?: { question: string; options: string[] };
@@ -523,6 +526,12 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
     return { path };
   }
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  // "Ver una vez": compose toggle + who has opened which one-time message.
+  const [composeViewOnce, setComposeViewOnce] = useState(false);
+  const [myViewedIds, setMyViewedIds] = useState<Set<string>>(new Set());
+  const [openedByOthers, setOpenedByOthers] = useState<Set<string>>(new Set());
+  const [viewOnceOpen, setViewOnceOpen] = useState<{ url: string; kind: 'photo' | 'video'; blob: boolean } | null>(null);
+  const [viewOnceLoadingId, setViewOnceLoadingId] = useState<string | null>(null);
   const [showScrollDown, setShowScrollDown] = useState(false);
   // Swipe-to-reply: track the gesture start and the live horizontal pull.
   const optionsMenuRef = useRef<HTMLDivElement>(null);
@@ -1478,6 +1487,9 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
   }
 
   function extractAllPaths(body: Payload): string[] {
+    // View-once media is never prefetched or rendered inline — it's resolved on
+    // demand only when the recipient taps to open it exactly once.
+    if (body.viewOnce) return [];
     const arr: string[] = [];
     if (body.imagePath) arr.push(body.imagePath);
     if (Array.isArray(body.imagePaths)) for (const p of body.imagePaths) if (p) arr.push(p);
@@ -1575,6 +1587,74 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
       cancelled = true;
     };
   }, [items, signedUrls, failedMedia]);
+
+  // "Ver una vez": load who has opened which one-time message, and keep it live.
+  // My own opens lock the bubble for me; others' opens tell me (the sender) it
+  // was seen. RLS scopes rows to chat members.
+  useEffect(() => {
+    if (!chatId || !myId) return;
+    let alive = true;
+    const load = () =>
+      getChatMessageViews(chatId).then((rows) => {
+        if (!alive) return;
+        const mine = new Set<string>();
+        const others = new Set<string>();
+        for (const r of rows) (r.userId === myId ? mine : others).add(r.messageId);
+        setMyViewedIds(mine);
+        setOpenedByOthers(others);
+      });
+    load();
+    const supabase = browserSupabase();
+    const ch = supabase
+      .channel(`views:${chatId}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'message_views', filter: `chat_id=eq.${chatId}` },
+        (payload: any) => {
+          const row = payload.new;
+          if (!row) return;
+          if (row.user_id === myId) setMyViewedIds((p) => new Set(p).add(row.message_id));
+          else setOpenedByOthers((p) => new Set(p).add(row.message_id));
+        },
+      )
+      .subscribe();
+    return () => {
+      alive = false;
+      supabase.removeChannel(ch);
+    };
+  }, [chatId, myId]);
+
+  // Open a view-once photo/video: resolve its URL on demand (so it isn't
+  // prefetched), record the open, then show the one-time viewer. Re-opening is
+  // blocked by myViewedIds once recorded.
+  async function openViewOnce(m: MessageRow & { body: Payload }) {
+    const body = m.body;
+    const path = body.videoPath || body.imagePaths?.[0] || body.imagePath;
+    if (!path || viewOnceLoadingId) return;
+    const kind: 'photo' | 'video' = body.videoPath ? 'video' : 'photo';
+    setViewOnceLoadingId(m.id);
+    try {
+      const enc = body.enc?.[path];
+      const url = enc
+        ? await fetchDecryptedMediaUrl(path, enc, kind === 'video' ? 'video/mp4' : undefined)
+        : await fetchCachedMediaUrl(path, 300);
+      // Record the open first so a reload can't re-reveal it; ignore failures so
+      // a flaky write never blocks the one view the recipient is owed.
+      try { await markMessageViewed(m.id); } catch {}
+      setMyViewedIds((p) => new Set(p).add(m.id));
+      setViewOnceOpen({ url, kind, blob: url.startsWith('blob:') });
+    } catch {
+      setErr(t('viewOnce.openError'));
+    } finally {
+      setViewOnceLoadingId(null);
+    }
+  }
+  function closeViewOnce() {
+    setViewOnceOpen((cur) => {
+      if (cur?.blob) { try { URL.revokeObjectURL(cur.url); } catch {} }
+      return null;
+    });
+  }
 
   // Tap-to-retry: drop the failed mark so the resolver effect re-admits it.
   function retryMedia(path: string) {
@@ -1910,6 +1990,7 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
     for (const u of previewImages) URL.revokeObjectURL(u);
     setPreviewImages([]);
     setPendingImages([]);
+    setComposeViewOnce(false);
     if (imageInputRef.current) imageInputRef.current.value = '';
   }
 
@@ -1932,6 +2013,7 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
     setPreviewVideo('');
     setPendingVideo(null);
     setPendingVideoTrim(null);
+    setComposeViewOnce(false);
     if (videoInputRef.current) videoInputRef.current.value = '';
     if (cameraVideoRef.current) cameraVideoRef.current.value = '';
   }
@@ -2224,6 +2306,7 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
 
         const payload: Payload = t2 ? { text: t2, videoPath: path } : { videoPath: path };
         if (enc) payload.enc = { [path]: enc };
+        if (composeViewOnce) payload.viewOnce = true;
         if (pendingVideoTrim) {
           payload.videoTrimStart = Math.round(pendingVideoTrim.start * 10) / 10;
           payload.videoTrimEnd = Math.round(pendingVideoTrim.end * 10) / 10;
@@ -2262,6 +2345,7 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
         const encMap: Record<string, MediaEnc> = {};
         for (const r of results) if (r.enc) encMap[r.path] = r.enc;
         if (Object.keys(encMap).length) payload.enc = encMap;
+        if (composeViewOnce) payload.viewOnce = true;
         if (replyingTo) payload.reply_to = replyingTo.id;
 
         const temp: MessageRow = {
@@ -2677,17 +2761,19 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
             if (found) setReplyingTo(found as any);
             setActionsOpen(false);
           }},
-          {
-            key: 'forward',
-            label: t('chat.actionForward'),
-            icon: <ForwardIcon size={18} />,
-            onClick: () => {
-              if (!actionsMsg) return;
-              setForwardBody(actionsMsg.body);
-              setForwardOpen(true);
-            },
-          },
-          ...(actionsMsg && primaryMediaPath(actionsMsg.body)
+          ...(actionsMsg && !actionsMsg.body.viewOnce
+            ? [{
+                key: 'forward',
+                label: t('chat.actionForward'),
+                icon: <ForwardIcon size={18} />,
+                onClick: () => {
+                  if (!actionsMsg) return;
+                  setForwardBody(actionsMsg.body);
+                  setForwardOpen(true);
+                },
+              }]
+            : []),
+          ...(actionsMsg && primaryMediaPath(actionsMsg.body) && !actionsMsg.body.viewOnce
             ? [{
                 key: 'share',
                 label: t('chat.actionShare'),
@@ -3336,7 +3422,41 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
                         </div>
                       ) : null}
 
-                      {imgPaths.length ? (() => {
+                      {m.body.viewOnce && (imgPaths.length > 0 || videoPath) ? (() => {
+                        const voKind: 'photo' | 'video' = videoPath ? 'video' : 'photo';
+                        const label = voKind === 'video' ? t('viewOnce.video') : t('viewOnce.photo');
+                        const loadingThis = viewOnceLoadingId === m.id;
+                        if (isMine(m)) {
+                          return (
+                            <div className="mt-1 flex items-center gap-2 text-sm">
+                              <EyeIcon size={16} />
+                              <span>{label}</span>
+                              <span className="text-xs opacity-70">· {openedByOthers.has(m.id) ? t('viewOnce.opened') : t('viewOnce.sent')}</span>
+                            </div>
+                          );
+                        }
+                        if (myViewedIds.has(m.id)) {
+                          return (
+                            <div className="mt-1 flex items-center gap-2 text-sm text-slate-400">
+                              <EyeOffIcon size={16} />
+                              <span>{t('viewOnce.opened')}</span>
+                            </div>
+                          );
+                        }
+                        return (
+                          <button
+                            type="button"
+                            disabled={loadingThis}
+                            onClick={(e) => { e.stopPropagation(); if (!selectMode) openViewOnce(m); }}
+                            className="mt-1 flex items-center gap-2 rounded-xl border border-white/25 bg-black/20 px-3 py-2 text-sm hover:bg-black/30 disabled:opacity-60"
+                          >
+                            <EyeIcon size={16} />
+                            <span>{loadingThis ? t('viewOnce.opening') : (voKind === 'video' ? t('viewOnce.tapToViewVideo') : t('viewOnce.tapToViewPhoto'))}</span>
+                          </button>
+                        );
+                      })() : null}
+
+                      {imgPaths.length && !m.body.viewOnce ? (() => {
                         const uniqueImgs = Array.from(new Set(imgPaths));
                         const single = uniqueImgs.length === 1;
                         // A single image fills the bubble width (object-cover);
@@ -3392,7 +3512,7 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
                         );
                       })() : null}
 
-                      {videoPath ? (
+                      {videoPath && !m.body.viewOnce ? (
                         <div className="mt-2">
                           {signedUrls[videoPath] ? (
                             <>
@@ -3539,7 +3659,16 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
                   </div>
                 ))}
               </div>
-              <div className="mt-2 flex justify-end">
+              <div className="mt-2 flex items-center justify-between gap-2">
+                <button
+                  type="button"
+                  onClick={() => setComposeViewOnce((v) => !v)}
+                  aria-pressed={composeViewOnce}
+                  title={t('viewOnce.toggleHint')}
+                  className={`flex items-center gap-1.5 rounded px-3 py-1.5 text-xs ${composeViewOnce ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+                >
+                  <EyeIcon size={14} /> {t('viewOnce.toggle')}
+                </button>
                 <button className="rounded bg-slate-800 px-3 py-1.5 text-xs hover:bg-slate-700" onClick={clearPendingImages} disabled={busy}>
                   {t('common.removeAll')}
                 </button>
@@ -3559,13 +3688,24 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
                 )}
               </div>
               <video src={previewVideo} controls className="max-h-72 w-full rounded border border-slate-900" />
-              <div className="mt-2 flex justify-end gap-2">
-                <button className="rounded bg-slate-800 px-3 py-1.5 text-xs hover:bg-slate-700" onClick={() => setTrimmerOpen(true)} disabled={busy}>
-                  ✂️ {t('videoTrim.trim')}
+              <div className="mt-2 flex items-center justify-between gap-2">
+                <button
+                  type="button"
+                  onClick={() => setComposeViewOnce((v) => !v)}
+                  aria-pressed={composeViewOnce}
+                  title={t('viewOnce.toggleHint')}
+                  className={`flex items-center gap-1.5 rounded px-3 py-1.5 text-xs ${composeViewOnce ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+                >
+                  <EyeIcon size={14} /> {t('viewOnce.toggle')}
                 </button>
-                <button className="rounded bg-slate-800 px-3 py-1.5 text-xs hover:bg-slate-700" onClick={clearPendingVideo} disabled={busy}>
-                  {t('common.remove')}
-                </button>
+                <div className="flex gap-2">
+                  <button className="rounded bg-slate-800 px-3 py-1.5 text-xs hover:bg-slate-700" onClick={() => setTrimmerOpen(true)} disabled={busy}>
+                    ✂️ {t('videoTrim.trim')}
+                  </button>
+                  <button className="rounded bg-slate-800 px-3 py-1.5 text-xs hover:bg-slate-700" onClick={clearPendingVideo} disabled={busy}>
+                    {t('common.remove')}
+                  </button>
+                </div>
               </div>
             </div>
           ) : null}
@@ -3904,6 +4044,10 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
 
       {lightboxUrl && (
         <ImageLightbox url={lightboxUrl} alt={t('chatsList.photo')} onClose={() => setLightboxUrl(null)} />
+      )}
+
+      {viewOnceOpen && (
+        <ViewOnceViewer url={viewOnceOpen.url} kind={viewOnceOpen.kind} onClose={closeViewOnce} />
       )}
 
       <SafetyNumberModal

@@ -69,7 +69,7 @@ Alto valor, bajo riesgo, sin dependencias externas.
 ## Etapa 2 — Multimedia y contenido
 
 - [x] **Editor de imágenes** antes de enviar: recortar, dibujar, texto/anotaciones, rotar, voltear y filtros
-- [ ] **Mensajes de visualización única** ("ver una vez") para foto/video
+- [x] **Mensajes de visualización única** ("ver una vez") para foto/video: el destinatario abre una sola vez, se bloquea tras verlo, el emisor ve si fue abierto; no se puede reenviar/compartir/descargar
 - [ ] **Calidad de envío**: alta vs. original vs. comprimido (toggle por envío)
 - [ ] **Pausar/reanudar** grabación de voz y escucha previa antes de enviar
 - [ ] **Descarga automática** configurable por red (Wi-Fi/datos) y tipo de contenido
