@@ -78,7 +78,7 @@ export async function listChats(): Promise<ChatSummary[]> {
   // The latest-per-chat RPC returns exactly one row per chat, so a conversation
   // is never hidden just because its last message fell outside a global row cap.
   const [membersRes, msgsRes] = await Promise.all([
-    supabase.from('chat_members').select('chat_id, user_id, archived').in('chat_id', chatIds),
+    (supabase as any).from('chat_members').select('chat_id, user_id, archived, favorite').in('chat_id', chatIds),
     (supabase as any).rpc('chat_latest_messages', { p_chat_ids: chatIds }),
   ]);
   // Defensive fallback if the RPC isn't available (e.g. an env without the
@@ -96,7 +96,7 @@ export async function listChats(): Promise<ChatSummary[]> {
   }
   // Graceful fallback if the archive migration hasn't been applied yet: refetch
   // without the `archived` column so the chat list still loads (all unarchived).
-  let members: { chat_id: string; user_id: string; archived?: boolean }[] = membersRes.data ?? [];
+  let members: { chat_id: string; user_id: string; archived?: boolean; favorite?: boolean }[] = membersRes.data ?? [];
   if (membersRes.error) {
     const fb = await supabase.from('chat_members').select('chat_id, user_id').in('chat_id', chatIds);
     members = fb.data ?? [];
@@ -107,10 +107,12 @@ export async function listChats(): Promise<ChatSummary[]> {
   const allOtherIds = new Set<string>();
   const myMemberChatIds = new Set<string>();
   const archivedByChat = new Map<string, boolean>();
+  const favoriteByChat = new Map<string, boolean>();
   for (const row of members) {
     if (row.user_id === user.id) {
       myMemberChatIds.add(row.chat_id);
       archivedByChat.set(row.chat_id, !!row.archived);
+      favoriteByChat.set(row.chat_id, !!row.favorite);
       continue;
     }
     const arr = otherIdsByChat.get(row.chat_id) ?? [];
@@ -231,6 +233,7 @@ export async function listChats(): Promise<ChatSummary[]> {
       other_user_avatar: c.kind === 'direct' ? avatarById.get(otherIds[0]) ?? null : null,
       member_ids: otherIds,
       archived: archivedByChat.get(c.id) ?? false,
+      favorite: favoriteByChat.get(c.id) ?? false,
       unread_count: unreadByChat.get(c.id) ?? 0,
       is_announcement: !!c.is_announcement,
       // A "Notas personales" chat is a group I created with no other members.
@@ -775,6 +778,13 @@ export async function getChatMuted(chatId: string): Promise<boolean> {
 export async function setChatArchived(chatId: string, archived: boolean) {
   const supabase = browserSupabase();
   const { error } = await supabase.rpc('set_chat_archived', { p_chat_id: chatId, p_archived: archived });
+  if (error) throw error;
+}
+
+/** Mark/unmark a chat as a favorite (for the Favorites filter). */
+export async function setChatFavorite(chatId: string, favorite: boolean) {
+  const supabase = browserSupabase();
+  const { error } = await (supabase as any).rpc('set_chat_favorite', { p_chat_id: chatId, p_favorite: favorite });
   if (error) throw error;
 }
 
