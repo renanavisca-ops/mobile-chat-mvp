@@ -59,7 +59,7 @@ Alto valor, bajo riesgo, sin dependencias externas.
 - [x] **Roles de grupo**: creador / administrador / miembro; asignar y revocar admins
 - [x] **Permisos de grupo**: quién puede editar datos, enviar mensajes, agregar miembros
 - [x] **Invitación a grupo por enlace/QR** con revocación (aprobación de ingreso: pendiente, v2)
-- [ ] **Historial de grupo**: altas, bajas y cambios (mensajes de sistema ya existen; faltan eventos de rol/enlace)
+- [x] **Historial de grupo**: mensajes de sistema para creación, altas, bajas, salidas, uniones por enlace y cambios de admin
 - [x] **Pantalla de guardados/destacados**: lista central de mensajes destacados (Ajustes → Mensajes destacados)
 - [ ] **Compartir ficha de contacto** dentro del chat (enviar un contacto como mensaje)
 - [ ] **Compartir ubicación** puntual y en tiempo real por duración limitada 🔒 (mapa/geocoder)
