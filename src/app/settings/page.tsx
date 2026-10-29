@@ -622,6 +622,19 @@ export default function SettingsPage() {
           </section>
 
           <section className="space-y-3">
+            <Link
+              href="/saved"
+              className="flex items-center justify-between rounded-xl border border-slate-900 bg-slate-950/50 p-4 shadow-sm hover:bg-slate-900/60"
+            >
+              <span className="flex items-center gap-3 text-sm font-medium text-slate-200">
+                <span className="text-amber-300">★</span>
+                {t('chat.starredTitle')}
+              </span>
+              <span className="text-slate-500">›</span>
+            </Link>
+          </section>
+
+          <section className="space-y-3">
             <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500 ml-1">{t('settings.sectionDevice')}</h2>
             <div className="rounded-xl border border-slate-900 bg-slate-950/50 p-4 shadow-sm">
               <div className="text-sm font-medium text-slate-200">{t('settings.activeDeviceId')}</div>
