@@ -891,6 +891,51 @@ export async function setGroupPerms(chatId: string, perms: { edit: GroupPerm; ad
   if (error) throw error;
 }
 
+/* ---------------------------- Group invite links ---------------------------- */
+
+/** The group's current invite code (null = no active link). Members can read it. */
+export async function getGroupInvite(chatId: string): Promise<string | null> {
+  const sb = browserSupabase() as any;
+  const { data } = await sb.from('chats').select('invite_code').eq('id', chatId).maybeSingle();
+  return data?.invite_code ?? null;
+}
+
+/** Create or rotate the group's invite code (admin only). Returns the new code. */
+export async function rotateGroupInvite(chatId: string): Promise<string> {
+  const { data, error } = await (browserSupabase() as any).rpc('rotate_group_invite', { p_chat_id: chatId });
+  if (error) throw error;
+  return data as string;
+}
+
+/** Revoke the group's invite link (admin only). */
+export async function revokeGroupInvite(chatId: string): Promise<void> {
+  const { error } = await (browserSupabase() as any).rpc('revoke_group_invite', { p_chat_id: chatId });
+  if (error) throw error;
+}
+
+export type InvitePreview = { chatId: string; title: string | null; avatarUrl: string | null; members: number };
+
+/** Preview a group from an invite code (works for non-members). */
+export async function groupInvitePreview(code: string): Promise<InvitePreview | null> {
+  const { data, error } = await (browserSupabase() as any).rpc('group_invite_preview', { p_code: code });
+  const row = Array.isArray(data) ? data[0] : null;
+  if (error || !row) return null;
+  return { chatId: row.chat_id, title: row.title, avatarUrl: row.avatar_url, members: row.members };
+}
+
+/** Join a group via its invite code. Returns the chat id. */
+export async function joinGroupByCode(code: string): Promise<string> {
+  const { data, error } = await (browserSupabase() as any).rpc('join_group_by_code', { p_code: code });
+  if (error) throw error;
+  return data as string;
+}
+
+/** Build the shareable invite URL for a code (origin resolved at runtime). */
+export function inviteLinkFor(code: string): string {
+  const origin = typeof window !== 'undefined' ? window.location.origin : 'https://mobile-chat-mvp.vercel.app';
+  return `${origin}/join?code=${encodeURIComponent(code)}`;
+}
+
 /** Leave a chat (removes yourself from chat_members). */
 export async function leaveChat(chatId: string) {
   const supabase = browserSupabase();
