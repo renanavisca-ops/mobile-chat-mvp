@@ -1179,6 +1179,37 @@ export async function getMessageReaders(
   });
 }
 
+/* ------------------------ View-once ("ver una vez") ------------------------ */
+
+/**
+ * Record that the current user opened a view-once message. The server ignores
+ * the sender's own opens, so a sender never "uses up" their media. Idempotent.
+ */
+export async function markMessageViewed(messageId: string): Promise<void> {
+  const supabase = browserSupabase();
+  // Cast: mark_message_viewed isn't in the generated types yet.
+  const { error } = await (supabase as any).rpc('mark_message_viewed', { p_message_id: messageId });
+  if (error) throw error;
+}
+
+/**
+ * All view-once opens recorded in a chat (members-only via RLS). Returns raw
+ * rows so the caller can split them into "mine" (lock my own re-open) and
+ * "others" (tell the sender it was opened).
+ */
+export async function getChatMessageViews(
+  chatId: string,
+): Promise<{ messageId: string; userId: string }[]> {
+  const supabase = browserSupabase();
+  // Cast: message_views isn't in the generated types yet.
+  const { data, error } = await (supabase as any)
+    .from('message_views')
+    .select('message_id, user_id')
+    .eq('chat_id', chatId);
+  if (error || !data) return [];
+  return (data as any[]).map((r) => ({ messageId: r.message_id as string, userId: r.user_id as string }));
+}
+
 /* ---------------------------- Reactions ---------------------------- */
 
 /**
