@@ -711,6 +711,12 @@ const en = {
     aspectPortrait: 'Portrait',
     aspectWide: 'Wide',
     flip: 'Flip',
+    text: 'Text',
+    addText: 'Add text',
+    textColor: 'Text color',
+    textSize: 'Text size',
+    deleteText: 'Delete',
+    textPlaceholder: 'Type here…',
   },
   poll: {
     createTitle: 'Create poll',

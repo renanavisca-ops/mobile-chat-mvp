@@ -68,7 +68,7 @@ Alto valor, bajo riesgo, sin dependencias externas.
 
 ## Etapa 2 — Multimedia y contenido
 
-- [ ] **Editor de imágenes** antes de enviar: recortar, dibujar, texto, emojis (reusar base del creador de stickers)
+- [x] **Editor de imágenes** antes de enviar: recortar, dibujar, texto/anotaciones, rotar, voltear y filtros
 - [ ] **Mensajes de visualización única** ("ver una vez") para foto/video
 - [ ] **Calidad de envío**: alta vs. original vs. comprimido (toggle por envío)
 - [ ] **Pausar/reanudar** grabación de voz y escucha previa antes de enviar

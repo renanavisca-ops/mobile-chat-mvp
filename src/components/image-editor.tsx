@@ -5,9 +5,41 @@ import { useT } from '@/lib/i18n/context';
 
 type Rotation = 0 | 90 | 180 | 270;
 type FilterKey = 'none' | 'grayscale' | 'sepia' | 'vivid' | 'cool' | 'warm' | 'noir' | 'fade' | 'bright';
-type Mode = 'view' | 'crop' | 'draw';
+type Mode = 'view' | 'crop' | 'draw' | 'text';
 type Rect = { x: number; y: number; w: number; h: number };
 type Stroke = { color: string; size: number; points: { x: number; y: number }[] };
+type TextItem = { id: number; text: string; xr: number; yr: number; color: string; sizeR: number };
+
+/** True when a hex color is light enough to need a dark outline. */
+function isLight(hex: string): boolean {
+  const n = hex.replace('#', '');
+  if (n.length < 6) return false;
+  const r = parseInt(n.slice(0, 2), 16);
+  const g = parseInt(n.slice(2, 4), 16);
+  const b = parseInt(n.slice(4, 6), 16);
+  return 0.299 * r + 0.587 * g + 0.114 * b > 150;
+}
+
+/** Draw a text item onto a canvas context, with a contrasting outline. */
+function drawTextItem(ctx: CanvasRenderingContext2D, item: TextItem, w: number, h: number) {
+  const px = Math.round(item.sizeR * h);
+  ctx.save();
+  ctx.font = `bold ${px}px system-ui, -apple-system, "Segoe UI", sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.lineJoin = 'round';
+  const lines = item.text.split('\n');
+  const lh = px * 1.15;
+  const cx = item.xr * w;
+  let cy = item.yr * h - ((lines.length - 1) * lh) / 2;
+  ctx.strokeStyle = isLight(item.color) ? '#000000' : '#ffffff';
+  ctx.lineWidth = Math.max(2, px * 0.16);
+  for (const line of lines) { ctx.strokeText(line, cx, cy); cy += lh; }
+  ctx.fillStyle = item.color;
+  cy = item.yr * h - ((lines.length - 1) * lh) / 2;
+  for (const line of lines) { ctx.fillText(line, cx, cy); cy += lh; }
+  ctx.restore();
+}
 type Corner = 'nw' | 'ne' | 'sw' | 'se';
 type Edge = 'n' | 'e' | 's' | 'w';
 type Handle = Corner | Edge;
@@ -76,7 +108,12 @@ export function ImageEditor({
   const [aspect, setAspect] = useState<number | null>(null);
   const [ready, setReady] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [texts, setTexts] = useState<TextItem[]>([]);
+  const [selId, setSelId] = useState<number | null>(null);
+  const [stageH, setStageH] = useState(1);
 
+  const nextId = useRef(1);
+  const textDrag = useRef<{ id: number; sx: number; sy: number; xr: number; yr: number } | null>(null);
   const drawingStroke = useRef<Stroke | null>(null);
   // Active crop drag: which handle (or move), the fixed anchor corner, and the
   // crop at gesture start.
@@ -93,6 +130,8 @@ export function ImageEditor({
     setStrokes([]);
     setCrop(null);
     setAspect(null);
+    setTexts([]);
+    setSelId(null);
 
     const url = URL.createObjectURL(file);
     const img = new Image();
@@ -160,6 +199,17 @@ export function ImageEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, rotation, flipH, filter, strokes]);
 
+  // Track the canvas's displayed height so text overlays scale with it.
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const update = () => setStageH(canvas.getBoundingClientRect().height || 1);
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(canvas);
+    return () => ro.disconnect();
+  }, [ready, rotation]);
+
   // -------- Drawing (freehand) on the canvas
   function canvasPoint(e: React.PointerEvent<HTMLCanvasElement>) {
     const canvas = canvasRef.current;
@@ -185,6 +235,39 @@ export function ImageEditor({
       setStrokes((prev) => [...prev, drawingStroke.current!]);
       drawingStroke.current = null;
     }
+  }
+
+  // -------- Text overlays (draggable, baked onto the canvas at save)
+  function addText() {
+    const id = nextId.current++;
+    setTexts((prev) => [...prev, { id, text: '', xr: 0.5, yr: 0.5, color: BRUSH_COLORS[5], sizeR: 0.08 }]);
+    setSelId(id);
+  }
+  function updateText(id: number, patch: Partial<TextItem>) {
+    setTexts((prev) => prev.map((it) => (it.id === id ? { ...it, ...patch } : it)));
+  }
+  function removeText(id: number) {
+    setTexts((prev) => prev.filter((it) => it.id !== id));
+    setSelId((cur) => (cur === id ? null : cur));
+  }
+  function startTextDrag(e: React.PointerEvent, item: TextItem) {
+    e.stopPropagation();
+    setSelId(item.id);
+    const host = canvasRef.current?.getBoundingClientRect();
+    if (!host) return;
+    textDrag.current = { id: item.id, sx: e.clientX, sy: e.clientY, xr: item.xr, yr: item.yr };
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+  }
+  function onTextDragMove(e: React.PointerEvent) {
+    const d = textDrag.current;
+    const host = canvasRef.current?.getBoundingClientRect();
+    if (!d || !host) return;
+    const xr = Math.max(0, Math.min(1, d.xr + (e.clientX - d.sx) / host.width));
+    const yr = Math.max(0, Math.min(1, d.yr + (e.clientY - d.sy) / host.height));
+    updateText(d.id, { xr, yr });
+  }
+  function onTextDragUp() {
+    textDrag.current = null;
   }
 
   // -------- Crop overlay (move + corner-handle resize, optional aspect lock)
@@ -291,6 +374,12 @@ export function ImageEditor({
     setSaving(true);
     try {
       redraw();
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        for (const it of texts) {
+          if (it.text.trim()) drawTextItem(ctx, it, canvas.width, canvas.height);
+        }
+      }
       const region = crop ?? { x: 0, y: 0, w: canvas.width, h: canvas.height };
       const out = document.createElement('canvas');
       out.width = Math.max(1, Math.round(region.w));
@@ -397,6 +486,29 @@ export function ImageEditor({
                 })}
               </div>
             )}
+
+            {/* Text overlays — draggable; hidden while cropping. */}
+            {mode !== 'crop' && texts.map((it) => (
+              <div
+                key={it.id}
+                onPointerDown={(e) => startTextDrag(e, it)}
+                onPointerMove={onTextDragMove}
+                onPointerUp={onTextDragUp}
+                onPointerCancel={onTextDragUp}
+                className={`absolute max-w-[90%] -translate-x-1/2 -translate-y-1/2 cursor-move touch-none whitespace-pre-wrap break-words text-center font-bold leading-tight ${
+                  mode === 'text' && selId === it.id ? 'ring-1 ring-indigo-400/70' : ''
+                }`}
+                style={{
+                  left: `${it.xr * 100}%`,
+                  top: `${it.yr * 100}%`,
+                  color: it.color,
+                  fontSize: `${Math.max(10, it.sizeR * stageH)}px`,
+                  WebkitTextStroke: `${Math.max(1, it.sizeR * stageH * 0.08)}px ${isLight(it.color) ? '#000' : '#fff'}`,
+                }}
+              >
+                {it.text || (mode === 'text' ? t('imageEditor.textPlaceholder') : '')}
+              </div>
+            ))}
           </div>
         </div>
 
@@ -433,6 +545,14 @@ export function ImageEditor({
               className={`rounded-lg px-3 py-1.5 text-xs ${mode === 'draw' ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-200 hover:bg-slate-700'}`}
             >
               ✏️ {t('imageEditor.draw')}
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode(mode === 'text' ? 'view' : 'text')}
+              aria-pressed={mode === 'text'}
+              className={`rounded-lg px-3 py-1.5 text-xs ${mode === 'text' ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-200 hover:bg-slate-700'}`}
+            >
+              🅰 {t('imageEditor.text')}
             </button>
             {strokes.length > 0 && (
               <button
@@ -483,6 +603,67 @@ export function ImageEditor({
                 onChange={(e) => setBrushSize(Number(e.target.value))}
                 className="ml-2 flex-1"
               />
+            </div>
+          )}
+
+          {/* Text controls (text mode) */}
+          {mode === 'text' && (
+            <div className="space-y-2 rounded-lg border border-slate-900 bg-slate-950/60 p-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={addText}
+                  className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-500"
+                >
+                  ＋ {t('imageEditor.addText')}
+                </button>
+                {selId !== null && (
+                  <button
+                    type="button"
+                    onClick={() => removeText(selId)}
+                    className="rounded-lg bg-slate-800 px-3 py-1.5 text-xs text-slate-200 hover:bg-slate-700"
+                  >
+                    {t('imageEditor.deleteText')}
+                  </button>
+                )}
+              </div>
+              {selId !== null && texts.some((it) => it.id === selId) && (() => {
+                const sel = texts.find((it) => it.id === selId)!;
+                return (
+                  <div className="space-y-2">
+                    <textarea
+                      value={sel.text}
+                      autoFocus
+                      rows={2}
+                      placeholder={t('imageEditor.textPlaceholder')}
+                      onChange={(e) => updateText(sel.id, { text: e.target.value })}
+                      className="w-full resize-none rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:border-indigo-500 focus:outline-none"
+                    />
+                    <div className="flex flex-wrap items-center gap-2">
+                      {BRUSH_COLORS.map((c) => (
+                        <button
+                          key={c}
+                          type="button"
+                          onClick={() => updateText(sel.id, { color: c })}
+                          aria-pressed={sel.color === c}
+                          className={`h-6 w-6 rounded-full border-2 ${sel.color === c ? 'border-white' : 'border-transparent'}`}
+                          style={{ background: c }}
+                        />
+                      ))}
+                      <input
+                        type="range"
+                        min={0.03}
+                        max={0.25}
+                        step={0.005}
+                        value={sel.sizeR}
+                        aria-label={t('imageEditor.textSize')}
+                        onChange={(e) => updateText(sel.id, { sizeR: Number(e.target.value) })}
+                        className="ml-2 flex-1"
+                      />
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           )}
 

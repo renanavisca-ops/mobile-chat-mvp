@@ -713,6 +713,12 @@ const es: Dictionary = {
     aspectPortrait: 'Vertical',
     aspectWide: 'Panorámica',
     flip: 'Voltear',
+    text: 'Texto',
+    addText: 'Añadir texto',
+    textColor: 'Color del texto',
+    textSize: 'Tamaño del texto',
+    deleteText: 'Eliminar',
+    textPlaceholder: 'Escribe aquí…',
   },
   poll: {
     createTitle: 'Crear encuesta',
