@@ -134,6 +134,7 @@ export default function ChatsPage() {
   const [openedWhileUnread, setOpenedWhileUnread] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [search, setSearch] = useState('');
+  const [filter, setFilter] = useState<'all' | 'unread' | 'groups'>('all');
   // Global message search (across ALL chats, not just the open one). Results are
   // messages whose text matches; tapping one opens that chat at that message.
   const [msgResults, setMsgResults] = useState<MessageRow[]>([]);
@@ -601,6 +602,27 @@ export default function ChatsPage() {
           <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4 pt-3">
             {!search && <StoriesBar />}
 
+            {!search && !showArchived && chats.length > 0 && (
+              <div className="mb-1 flex gap-2 overflow-x-auto pb-1">
+                {([
+                  ['all', 'chatsList.filterAll'],
+                  ['unread', 'chatsList.filterUnread'],
+                  ['groups', 'chatsList.filterGroups'],
+                ] as const).map(([key, labelKey]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => setFilter(key)}
+                    className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium transition ${
+                      filter === key ? 'toky-grad text-white' : 'bg-slate-800/70 text-slate-300 hover:bg-slate-800'
+                    }`}
+                  >
+                    {t(labelKey)}
+                  </button>
+                ))}
+              </div>
+            )}
+
             {err ? <p className="text-sm text-red-300">{err}</p> : null}
 
             {(loading || !chatsLoaded) && chats.length === 0 ? (
@@ -646,7 +668,14 @@ export default function ChatsPage() {
                 if (au !== bu) return bu - au;
                 return ts(b) - ts(a);
               };
-              const visible = (showArchived ? archivedList : searched.filter((c) => !c.archived))
+              // Filter chips apply only to the normal (non-search, non-archived) list.
+              const matchesFilter = (c: ChatSummary) => {
+                if (filter === 'unread') return (c.unread_count ?? 0) > 0 || (c.id === selectedId && openedWhileUnread);
+                if (filter === 'groups') return c.kind === 'group' && !c.is_self;
+                return true;
+              };
+              const base = showArchived ? archivedList : searched.filter((c) => !c.archived);
+              const visible = (isSearching || showArchived ? base : base.filter(matchesFilter))
                 .slice()
                 .sort(byUnreadThenRecent);
               return (
@@ -658,6 +687,8 @@ export default function ChatsPage() {
                 )}
                 {visible.length === 0 && isSearching ? (
                   <p className="px-3 py-1 text-[13px] text-slate-500">{t('chatsList.noChatNameMatches')}</p>
+                ) : visible.length === 0 && !isSearching && !showArchived && filter !== 'all' ? (
+                  <p className="px-3 py-6 text-center text-[13px] text-slate-500">{t('chatsList.noFilterMatches')}</p>
                 ) : (
                 <ul className="space-y-0.5">
                 {showArchived ? (
