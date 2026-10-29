@@ -175,6 +175,7 @@ const es: Dictionary = {
     audio: '🎵 Audio',
     gif: '🎬 GIF',
     sticker: '🙂 Sticker',
+    contact: '👤 Contacto',
     poll: '📊 Encuesta',
     file: '📎 Archivo',
     call: '📞 Llamada',
@@ -247,6 +248,7 @@ const es: Dictionary = {
     openNeedsDownload: 'Para abrir este archivo, descárgalo primero.',
     savedToGallery: 'Guardado en tu galería.',
     viewPhoto: 'Ver foto',
+    viewContact: 'Ver contacto',
     mediaRetry: 'Toca para reintentar',
     forwardMediaUnavailable: 'No se pudo cargar el contenido original para reenviar.',
     edited: '(editado)',
@@ -504,6 +506,7 @@ const es: Dictionary = {
     poll: 'Encuesta',
     gif: 'GIF',
     sticker: 'Sticker',
+    contact: 'Contacto',
     cancel: 'Cancelar',
   },
   stickers: {
@@ -584,6 +587,11 @@ const es: Dictionary = {
     error: 'No se pudieron cargar los GIFs.',
     notConfigured: 'Los GIFs aún no están configurados.',
     poweredBy: 'Con tecnología de GIPHY',
+  },
+  contactPicker: {
+    title: 'Compartir contacto',
+    search: 'Buscar por nombre o usuario',
+    empty: 'No se encontraron contactos.',
   },
   join: {
     title: 'Unirse al grupo',

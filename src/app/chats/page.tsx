@@ -507,6 +507,8 @@ export default function ChatsPage() {
         return t('chatsList.gif');
       case 'sticker':
         return t('chatsList.sticker');
+      case 'contact':
+        return t('chatsList.contact');
       case 'poll':
         return t('chatsList.poll');
       case 'file':
