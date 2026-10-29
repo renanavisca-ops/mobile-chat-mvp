@@ -63,7 +63,7 @@ Alto valor, bajo riesgo, sin dependencias externas.
 - [x] **Pantalla de guardados/destacados**: lista central de mensajes destacados (Ajustes → Mensajes destacados)
 - [x] **Compartir ficha de contacto** dentro del chat (enviar un contacto como mensaje, tocar para ver/añadir)
 - [x] **Compartir ubicación puntual** (GPS → tarjeta que abre Google Maps) · en tiempo real: pendiente 🔒 (API de mapas)
-- [ ] **Listas/filtros de chats** personalizados (no leídos, grupos, favoritos)
+- [x] **Filtros de chats** (Todos / No leídos / Grupos) · listas personalizadas y favoritos: v2
 - [ ] **Contactos favoritos** y acceso directo a frecuentes
 
 ## Etapa 2 — Multimedia y contenido
