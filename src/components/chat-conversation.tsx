@@ -30,7 +30,8 @@ import { PollComposer } from '@/components/poll-composer';
 import { MessagesSkeleton } from '@/components/skeleton';
 import { ImageLightbox } from '@/components/image-lightbox';
 import { DocumentPreview } from '@/components/document-preview';
-import { Linkify } from '@/components/linkify';
+import { MessageText } from '@/components/message-text';
+import { extractMentionIds } from '@/lib/mentions';
 import { tap, impact } from '@/lib/haptics';
 import { LinkPreview, firstUrl } from '@/components/link-preview';
 import { SafetyNumberModal } from '@/components/safety-number-modal';
@@ -72,6 +73,8 @@ type Payload = {
   fileMime?: string;
   reply_to?: string;
   is_deleted?: boolean;
+  /** User ids mentioned in `text` (groups). */
+  mentions?: string[];
   poll?: { question: string; options: string[] };
   /** In-chat call log entry (WhatsApp-style). */
   call?: { video: boolean; outcome: 'answered' | 'no_answer' | 'declined' | 'cancelled'; duration?: number; isGroup?: boolean };
@@ -229,6 +232,8 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
 
   // compose
   const [text, setText] = useState('');
+  // Active @mention typing context: the '@' index and the query after it.
+  const [mentionQuery, setMentionQuery] = useState<{ start: number; query: string } | null>(null);
   const [pendingImages, setPendingImages] = useState<File[]>([]);
   const [pendingVideo, setPendingVideo] = useState<File | null>(null);
   const [pendingVideoTrim, setPendingVideoTrim] = useState<{ start: number; end: number } | null>(null);
@@ -943,6 +948,54 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
     for (const p of memberProfiles) if (p.username) m.set(p.id, p.username);
     return m;
   }, [memberProfiles]);
+
+  // @mention maps: lowercased username → id (to resolve on send) and → display
+  // info (to render). Built from the group's members.
+  const usernameToId = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const p of memberProfiles) if (p.username) m.set(p.username.toLowerCase(), p.id);
+    return m;
+  }, [memberProfiles]);
+  const mentionNames = useMemo(() => {
+    const m = new Map<string, { name: string; me: boolean }>();
+    for (const p of memberProfiles) {
+      if (p.username) m.set(p.username.toLowerCase(), { name: p.display_name || p.username, me: p.id === myId });
+    }
+    return m;
+  }, [memberProfiles, myId]);
+
+  // Update the @mention autocomplete context from the caret position.
+  const computeMentionQuery = (value: string, caret: number) => {
+    if (chat?.kind !== 'group') { setMentionQuery(null); return; }
+    const before = value.slice(0, caret);
+    const m = before.match(/(?:^|[\s(])@([a-zA-Z0-9._]{0,32})$/);
+    setMentionQuery(m ? { start: caret - m[1].length - 1, query: m[1] } : null);
+  };
+  const mentionCandidates = useMemo(() => {
+    if (chat?.kind !== 'group' || !mentionQuery) return [];
+    const q = mentionQuery.query.toLowerCase();
+    return memberProfiles
+      .filter((p) => p.id !== myId && p.username)
+      .filter((p) => q === '' || (p.username || '').toLowerCase().includes(q) || (p.display_name || '').toLowerCase().includes(q))
+      .slice(0, 6);
+  }, [chat?.kind, mentionQuery, memberProfiles, myId]);
+  const insertMention = (p: { username: string | null }) => {
+    if (!mentionQuery || !p.username) return;
+    const caret = textInputRef.current?.selectionStart ?? text.length;
+    const before = text.slice(0, mentionQuery.start);
+    const after = text.slice(caret);
+    const insert = `@${p.username} `;
+    setText(before + insert + after);
+    setMentionQuery(null);
+    requestAnimationFrame(() => {
+      const el = textInputRef.current;
+      if (el) {
+        const pos = (before + insert).length;
+        el.focus();
+        el.setSelectionRange(pos, pos);
+      }
+    });
+  };
 
   const otherMemberIds = useMemo(
     () => memberProfiles.map((p) => p.id).filter((id) => id !== myId),
@@ -2153,6 +2206,10 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
       // TEXT
       const payload: Payload = { text: t2 };
       if (replyingTo) payload.reply_to = replyingTo.id;
+      if (isGroup) {
+        const mentions = extractMentionIds(t2, usernameToId, myId ?? undefined);
+        if (mentions.length) payload.mentions = mentions;
+      }
 
       const temp: MessageRow = {
         id: `local-${crypto.randomUUID()}`,
@@ -2167,6 +2224,7 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
       setReplyingTo(null);
 
       setText('');
+      setMentionQuery(null);
       await sendMessage(chatId, payload as any);
       setErr('');
     } catch (e: any) {
@@ -2966,7 +3024,7 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
                         m.body.stickerUrl ? `${isMine(m) ? 'ml-auto' : 'mr-auto'} !p-0 bg-transparent shadow-none text-slate-300` :
                         isMine(m) ? `ml-auto toky-grad text-white shadow-[0_4px_14px_-6px_rgba(79,70,229,0.7)] ${grouped ? 'rounded-tr-md rounded-br-md' : 'rounded-br-md'}` :
                         `mr-auto bg-slate-800 text-slate-100 shadow-sm ${grouped ? 'rounded-tl-md rounded-bl-md' : 'rounded-bl-md'}`
-                      }`}
+                      } ${!isMine(m) && myId && m.body.mentions?.includes(myId) ? 'ring-1 ring-amber-400/50' : ''}`}
                       style={swipe?.id === m.id
                         ? { transform: `translateX(${swipe.dx}px)`, transition: 'none' }
                         : { transition: 'transform .18s ease-out' }}
@@ -3087,7 +3145,7 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
                               </button>
                             );
                           })()}
-                          {m.body.text ? <div className="text-sm mt-1 whitespace-pre-wrap break-words"><Linkify text={m.body.text} /></div> : null}
+                          {m.body.text ? <div className="text-sm mt-1 whitespace-pre-wrap break-words"><MessageText text={m.body.text} mentions={mentionNames} /></div> : null}
                           {(() => {
                             const link = m.body.text ? firstUrl(m.body.text) : null;
                             return link ? <LinkPreview url={link} mine={isMine(m)} /> : null;
@@ -3491,6 +3549,34 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
 
           {canPost ? (
           <div ref={composerRef} className="toky-glass relative -mx-3 flex items-end gap-2 border-t border-slate-800/70 px-2 py-2">
+            {/* @mention autocomplete (groups) — floats above the input. */}
+            {mentionQuery && mentionCandidates.length > 0 && (
+              <div className="absolute inset-x-2 bottom-full z-30 mb-2 overflow-hidden rounded-2xl border border-slate-700 bg-slate-900/95 shadow-2xl backdrop-blur">
+                <div className="max-h-56 overflow-y-auto py-1">
+                  {mentionCandidates.map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onMouseDown={(e) => { e.preventDefault(); insertMention(p); }}
+                      className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-slate-800"
+                    >
+                      {p.avatar_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={p.avatar_url} alt="" className="h-8 w-8 rounded-full object-cover" />
+                      ) : (
+                        <span className="grid h-8 w-8 place-items-center rounded-full bg-slate-700 text-xs font-semibold text-slate-200">
+                          {(p.display_name || p.username || '?').trim().charAt(0).toUpperCase()}
+                        </span>
+                      )}
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm text-slate-100">{p.display_name || p.username}</span>
+                        {p.username && <span className="block truncate text-xs text-slate-500">@{p.username}</span>}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             {/* Rounded input pill — replaced by a live recording strip while
                 recording, or an audio preview (play / discard) once stopped. */}
             {isRecording ? (
@@ -3561,16 +3647,33 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
                 value={text}
                 onChange={(e) => {
                   setText(e.target.value);
+                  computeMentionQuery(e.target.value, e.target.selectionStart ?? e.target.value.length);
                   // Grow the box with the text, up to the max-height (then scroll).
                   const el = e.currentTarget;
                   el.style.height = 'auto';
                   el.style.height = `${Math.min(el.scrollHeight, 128)}px`;
                 }}
+                onKeyUp={(e) => computeMentionQuery(e.currentTarget.value, e.currentTarget.selectionStart ?? 0)}
+                onClick={(e) => computeMentionQuery(e.currentTarget.value, e.currentTarget.selectionStart ?? 0)}
                 placeholder={t('chat.composerPlaceholder')}
                 onFocus={() => { composerFocusedRef.current = true; setEmojiOpen(false); }}
                 onBlur={() => { composerFocusedRef.current = false; setMeActivity(null); }}
                 onPaste={onComposerPaste}
                 onKeyDown={(e) => {
+                  // While the @mention list is open, Enter/Tab picks the first
+                  // match instead of sending; Escape closes it.
+                  if (mentionQuery && mentionCandidates.length > 0) {
+                    if (e.key === 'Enter' || e.key === 'Tab') {
+                      e.preventDefault();
+                      insertMention(mentionCandidates[0]);
+                      return;
+                    }
+                    if (e.key === 'Escape') {
+                      e.preventDefault();
+                      setMentionQuery(null);
+                      return;
+                    }
+                  }
                   // Enter sends; Shift+Enter inserts a newline.
                   // Ignore keyboard auto-repeat (e.repeat) and in-flight sends so
                   // that holding Enter can't fire onSend dozens of times and send

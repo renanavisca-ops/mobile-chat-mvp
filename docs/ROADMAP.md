@@ -55,7 +55,7 @@ a web/Android/iOS, que comparten el WebView remoto). Lo nativo requiere nuevo
 
 Alto valor, bajo riesgo, sin dependencias externas.
 
-- [ ] **Menciones** `@usuario` en grupos (autocompletar, resaltar, notificar al mencionado)
+- [x] **Menciones** `@usuario` en grupos (autocompletar, resaltar, notificar al mencionado incluso en silencio)
 - [ ] **Roles de grupo**: creador / administrador / miembro; asignar y revocar admins
 - [ ] **Permisos de grupo**: quién puede editar datos, enviar mensajes, agregar miembros
 - [ ] **Invitación a grupo por enlace/QR** con revocación (y opción de aprobación de ingreso)
