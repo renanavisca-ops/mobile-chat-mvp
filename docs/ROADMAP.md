@@ -56,8 +56,8 @@ a web/Android/iOS, que comparten el WebView remoto). Lo nativo requiere nuevo
 Alto valor, bajo riesgo, sin dependencias externas.
 
 - [x] **Menciones** `@usuario` en grupos (autocompletar, resaltar, notificar al mencionado incluso en silencio)
-- [ ] **Roles de grupo**: creador / administrador / miembro; asignar y revocar admins
-- [ ] **Permisos de grupo**: quién puede editar datos, enviar mensajes, agregar miembros
+- [x] **Roles de grupo**: creador / administrador / miembro; asignar y revocar admins
+- [x] **Permisos de grupo**: quién puede editar datos, enviar mensajes, agregar miembros
 - [ ] **Invitación a grupo por enlace/QR** con revocación (y opción de aprobación de ingreso)
 - [ ] **Historial de grupo**: altas, bajas y cambios (mensajes de sistema ya existen; faltan eventos de rol/enlace)
 - [ ] **Pantalla de guardados/destacados**: lista central de mensajes destacados (hoy se marcan, falta la vista)
