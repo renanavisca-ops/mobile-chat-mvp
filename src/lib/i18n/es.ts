@@ -385,6 +385,7 @@ const es: Dictionary = {
   },
   groupInfo: {
     title: 'Información del grupo',
+    channelTitle: 'Información del canal',
     changePhoto: 'Cambiar foto',
     uploading: 'Subiendo…',
     groupName: 'Nombre del grupo',

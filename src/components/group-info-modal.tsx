@@ -36,6 +36,7 @@ export function GroupInfoModal({
   onClearChat,
   autoSave,
   onToggleAutoSave,
+  isChannel = false,
 }: {
   open: boolean;
   onClose: () => void;
@@ -60,6 +61,8 @@ export function GroupInfoModal({
   /** "Guardar en Fotos": auto-save incoming media (native only). */
   autoSave?: boolean;
   onToggleAutoSave?: () => void;
+  /** Render as a channel: hides group-only sections (permissions, invite, disappearing). */
+  isChannel?: boolean;
 }) {
   const t = useT();
   useBackClose(open, onClose);
@@ -311,7 +314,7 @@ export function GroupInfoModal({
     >
       <div className="max-h-[90vh] w-full max-w-sm overflow-auto rounded-3xl border border-slate-800 toky-glass toky-elev p-4">
         <div className="flex items-center justify-between">
-          <div className="text-base font-semibold text-slate-100">{t('groupInfo.title')}</div>
+          <div className="text-base font-semibold text-slate-100">{isChannel ? t('groupInfo.channelTitle') : t('groupInfo.title')}</div>
           <button type="button" onClick={onClose} className="rounded bg-slate-800 px-3 py-1.5 text-xs hover:bg-slate-700">
             {t('common.close')}
           </button>
@@ -455,7 +458,7 @@ export function GroupInfoModal({
           </div>
         )}
 
-        {amAdmin && (
+        {amAdmin && !isChannel && (
           <div className="mt-3 rounded-lg border border-slate-900 bg-slate-950/60 p-3">
             <div className="text-sm font-medium text-slate-200">{t('groupInfo.disappearingTitle')}</div>
             <div className="text-xs text-slate-500">{t('groupInfo.disappearingDesc')}</div>
@@ -533,7 +536,7 @@ export function GroupInfoModal({
           </ul>
         </div>
 
-        {amAdmin && (
+        {amAdmin && !isChannel && (
           <div className="mt-4 space-y-2 rounded-xl border border-slate-800 bg-slate-900/40 p-3">
             <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">{t('groupInfo.inviteLink')}</div>
             {inviteCode ? (
@@ -574,7 +577,7 @@ export function GroupInfoModal({
           </div>
         )}
 
-        {amAdmin && meta && (
+        {amAdmin && meta && !isChannel && (
           <div className="mt-4 space-y-2 rounded-xl border border-slate-800 bg-slate-900/40 p-3">
             <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">{t('groupInfo.permissions')}</div>
             {([

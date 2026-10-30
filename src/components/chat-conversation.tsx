@@ -1151,15 +1151,17 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
     ? members.join(', ')
     : '';
   const isGroupCreator = isGroup && chat?.created_by === myId;
-  // In a channel only the owner may post; in a group set to "admins only",
-  // non-admins are read-only too. Everyone else can post.
+  // In a channel the owner and channel admins may post; in a group set to
+  // "admins only", non-admins are read-only too. Everyone else can post.
   const groupSendBlocked = isGroup && groupMeta?.perms.send === 'admins' && !groupMeta.amAdmin;
-  const canPost = (!isChannel || chat?.created_by === myId) && !groupSendBlocked;
+  const channelCanPost = !isChannel || chat?.created_by === myId || !!groupMeta?.amAdmin;
+  const canPost = channelCanPost && !groupSendBlocked;
 
-  // Load the group's roles/permissions (for send gating), refreshing when the
-  // member list reloads or the group-info sheet opens/closes (perms changed).
+  // Load the chat's roles/permissions (for send gating + role management),
+  // refreshing when the member list reloads or the info sheet opens/closes.
+  // Loaded for groups AND channels (channel admins can post).
   useEffect(() => {
-    if (chat?.kind !== 'group') { setGroupMeta(null); return; }
+    if (chat?.kind !== 'group' && chat?.kind !== 'channel') { setGroupMeta(null); return; }
     let alive = true;
     getGroupMeta(chatId).then((m) => { if (alive) setGroupMeta(m); }).catch(() => {});
     return () => { alive = false; };
@@ -2717,7 +2719,7 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
         {/* Rounded-square avatar of the person/group you're chatting with */}
         <button
           type="button"
-          onClick={() => { if (isGroup) setGroupInfoOpen(true); else if (otherUserId) setUserInfoId(otherUserId); }}
+          onClick={() => { if (isGroup || isChannel) setGroupInfoOpen(true); else if (otherUserId) setUserInfoId(otherUserId); }}
           className="shrink-0"
           aria-label={headerName}
         >
@@ -2737,7 +2739,7 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
         {/* Name + connection status */}
         <button
           type="button"
-          onClick={() => { if (isGroup) setGroupInfoOpen(true); else if (otherUserId) setUserInfoId(otherUserId); }}
+          onClick={() => { if (isGroup || isChannel) setGroupInfoOpen(true); else if (otherUserId) setUserInfoId(otherUserId); }}
           className="min-w-0 flex-1 px-1 text-left"
         >
           <div className="truncate text-base font-semibold leading-tight">{headerName}</div>
@@ -3328,7 +3330,7 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
         onOpenDoc={(body) => setDocPreview(body)}
       />
 
-      {isGroup && (
+      {(isGroup || isChannel) && (
         <GroupInfoModal
           open={groupInfoOpen}
           onClose={() => setGroupInfoOpen(false)}
@@ -3336,7 +3338,8 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
           title={chat?.title ?? null}
           description={chat?.description ?? null}
           avatarUrl={chat?.avatar_url ?? null}
-          isCreator={isGroupCreator}
+          isCreator={isChannel ? chat?.created_by === myId : isGroupCreator}
+          isChannel={isChannel}
           members={memberProfiles}
           disappearingSeconds={chat?.disappearing_seconds}
           onUpdated={(patch) => setChat((prev) => (prev ? { ...prev, ...patch } : prev))}
