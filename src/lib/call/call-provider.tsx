@@ -259,6 +259,9 @@ export function CallProvider({ children }: { children: ReactNode }) {
   const pcsRef = useRef<Map<string, RTCPeerConnection>>(new Map());
   const remoteSetRef = useRef<Map<string, boolean>>(new Map());
   const pendingIceRef = useRef<Map<string, RTCIceCandidateInit[]>>(new Map());
+  // Unstable-connection recovery: debounce timers + per-peer ICE-restart guard.
+  const iceRestartTimers = useRef<Map<string, number>>(new Map());
+  const iceRestartedRef = useRef<Set<string>>(new Set());
   const localStreamRef = useRef<MediaStream | null>(null);
   const channelRef = useRef<RealtimeChannel | null>(null);
   const callIdRef = useRef<string | null>(null);
@@ -412,6 +415,9 @@ export function CallProvider({ children }: { children: ReactNode }) {
     pcsRef.current.delete(pid);
     remoteSetRef.current.delete(pid);
     pendingIceRef.current.delete(pid);
+    iceRestartedRef.current.delete(pid);
+    const tm = iceRestartTimers.current.get(pid);
+    if (tm) { window.clearTimeout(tm); iceRestartTimers.current.delete(pid); }
     setParticipants((prev) => {
       const next = new Map(prev);
       next.delete(pid);
@@ -563,7 +569,19 @@ export function CallProvider({ children }: { children: ReactNode }) {
     const existing = pcsRef.current.get(pid);
     if (existing) return existing;
     const pc = new RTCPeerConnection({ iceServers: iceServersRef.current });
-    localStreamRef.current?.getTracks().forEach((tr) => pc.addTrack(tr, localStreamRef.current!));
+    localStreamRef.current?.getTracks().forEach((tr) => {
+      const sender = pc.addTrack(tr, localStreamRef.current!);
+      // Cap video bitrate and prefer graceful degradation so a shaky link
+      // drops quality instead of freezing/stalling the whole call.
+      if (tr.kind === 'video') {
+        try {
+          const p = sender.getParameters();
+          p.degradationPreference = 'balanced';
+          p.encodings = (p.encodings && p.encodings.length ? p.encodings : [{}]).map((e) => ({ ...e, maxBitrate: 700_000 }));
+          void sender.setParameters(p);
+        } catch { /* not all browsers support setParameters before negotiation */ }
+      }
+    });
     pc.onicecandidate = (e) => {
       if (e.candidate) sendSignal('ice', { from: myIdRef.current, to: pid, candidate: e.candidate.toJSON() });
     };
@@ -588,10 +606,50 @@ export function CallProvider({ children }: { children: ReactNode }) {
       });
     };
     pc.oniceconnectionstatechange = () => {
-      if (pc.iceConnectionState === 'failed') teardownPeer(pid);
+      const st = pc.iceConnectionState;
+      if (st === 'connected' || st === 'completed') {
+        // Recovered: reset guards.
+        iceRestartedRef.current.delete(pid);
+        const tm = iceRestartTimers.current.get(pid);
+        if (tm) { window.clearTimeout(tm); iceRestartTimers.current.delete(pid); }
+      } else if (st === 'disconnected') {
+        // Often transient on a shaky link — wait briefly, then try an ICE
+        // restart to recover instead of dropping the peer.
+        if (!iceRestartTimers.current.has(pid)) {
+          const tm = window.setTimeout(() => {
+            iceRestartTimers.current.delete(pid);
+            const cur = pcsRef.current.get(pid);
+            if (cur && (cur.iceConnectionState === 'disconnected' || cur.iceConnectionState === 'failed')) {
+              void doIceRestart(pid);
+            }
+          }, 2500);
+          iceRestartTimers.current.set(pid, tm);
+        }
+      } else if (st === 'failed') {
+        // One restart attempt; if that doesn't take, give up on this peer.
+        if (!iceRestartedRef.current.has(pid)) {
+          iceRestartedRef.current.add(pid);
+          void doIceRestart(pid);
+        } else {
+          teardownPeer(pid);
+        }
+      }
     };
     pcsRef.current.set(pid, pc);
     return pc;
+  }
+
+  // Renegotiate with a fresh ICE gathering to recover a stalled connection.
+  // Only the offer initiator (lower id) drives it, mirroring the mesh rule, so
+  // both sides don't restart at once (glare).
+  async function doIceRestart(pid: string) {
+    const pc = pcsRef.current.get(pid);
+    if (!pc || myIdRef.current >= pid) return;
+    try {
+      const offer = await pc.createOffer({ iceRestart: true });
+      await pc.setLocalDescription(offer);
+      sendSignal('offer', { from: myIdRef.current, to: pid, sdp: offer });
+    } catch { /* will retry on the next state change */ }
   }
 
   async function initiateOffer(pid: string) {
