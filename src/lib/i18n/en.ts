@@ -71,6 +71,8 @@ const en = {
     join: 'Follow',
     joining: 'Following…',
     open: 'Open',
+    unfollow: 'Unfollow',
+    unfollowing: 'Leaving…',
     readOnlyNotice: 'Only the channel owner can post here.',
   },
   consent: {
