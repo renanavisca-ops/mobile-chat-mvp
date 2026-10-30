@@ -829,6 +829,15 @@ const es: Dictionary = {
     wrongPin: 'PIN incorrecto',
     forgot: '¿Olvidaste tu PIN? Cerrar sesión',
   },
+  linkSafety: {
+    title: 'Enlace sospechoso',
+    warnBadge: 'Este enlace podría ser engañoso',
+    openAnyway: 'Abrir de todos modos',
+    reason_userinfo: 'Este enlace esconde su destino real detrás de un "@": el sitio al que lleva no es el que parece.',
+    reason_punycode: 'El dominio usa caracteres especiales que pueden imitar a una marca conocida (ataque de homógrafos).',
+    reason_ip: 'El enlace apunta a una dirección IP en vez de a un dominio, algo poco común en sitios legítimos.',
+    reason_generic: 'Este enlace podría ser engañoso. Revisa bien la dirección antes de continuar.',
+  },
   chatLock: {
     lockChat: 'Bloquear chat',
     unlockChat: 'Quitar bloqueo del chat',
