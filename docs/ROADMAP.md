@@ -93,7 +93,7 @@ Alto valor, bajo riesgo, sin dependencias externas.
 
 - [ ] **Vincular dispositivos** adicionales por QR (sesión web/escritorio como dispositivo enlazado) 🔒 _(diferido — depende de la arquitectura multidispositivo/E2EE, aún no decidida)_
 - [x] **Revocar dispositivos** perdidos y administrar sesiones: lista de dispositivos de la cuenta (con etiqueta por plataforma y fecha), "este dispositivo" y revocar los demás · Ajustes → Dispositivo (además de "Cerrar sesión en todos")
-- [ ] **Cola de envío offline** y reintentos idempotentes
+- [x] **Cola de envío offline** y reintentos idempotentes: los envíos (texto y payloads con medios ya subidos) se encolan sin conexión y se reintentan al reconectar; `client_id` único por remitente evita duplicados aunque un reintento ya hubiera llegado
 - [ ] **Resolución de conflictos** y reconciliación al reconectar
 - [ ] **Cliente de escritorio** (empaquetar la web como app de escritorio) 🔒
 
