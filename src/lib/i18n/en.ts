@@ -859,6 +859,11 @@ const en = {
     use_contacts: 'Share a contact card',
     use_files: 'Attach and download files',
   },
+  screenSecurity: {
+    title: 'Screenshot protection',
+    desc: 'Block screenshots and screen recording while using Toky.',
+    androidOnly: 'Available on Android. iOS does not allow blocking screenshots.',
+  },
   chatLock: {
     lockChat: 'Lock chat',
     unlockChat: 'Remove chat lock',

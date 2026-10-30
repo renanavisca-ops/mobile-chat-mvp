@@ -11,6 +11,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(AudioRoutePlugin.class);
         registerPlugin(ScreenSharePlugin.class);
         registerPlugin(PrintPlugin.class);
+        registerPlugin(ScreenSecurityPlugin.class);
         super.onCreate(savedInstanceState);
     }
 }

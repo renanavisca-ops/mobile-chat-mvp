@@ -20,6 +20,7 @@ import { AutoDownloadSettings } from '@/components/autodownload-settings';
 import { StorageManager } from '@/components/storage-manager';
 import { AppLockSettings } from '@/components/app-lock-settings';
 import { PermissionsSettings } from '@/components/permissions-settings';
+import { ScreenSecuritySettings } from '@/components/screen-security-settings';
 import {
   initKeystore,
   isUnlocked,
@@ -1064,6 +1065,7 @@ export default function SettingsPage() {
           <section className="space-y-3">
             <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500 ml-1">{t('settings.sectionSecurity')}</h2>
             <AppLockSettings />
+            <ScreenSecuritySettings />
             <div className="rounded-xl border border-slate-900 bg-slate-950/50 p-4 shadow-sm">
               <form onSubmit={handleUpdatePassword} className="space-y-4">
                 <div className="space-y-1.5">

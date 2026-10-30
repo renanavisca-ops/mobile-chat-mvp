@@ -32,6 +32,7 @@ import { PushBanner } from '@/components/push-banner';
 import { ServiceWorkerRegister } from '@/components/sw-register';
 import { BackButtonHandler } from '@/components/back-button-handler';
 import { AppLockGate } from '@/components/app-lock-gate';
+import { ScreenSecurityApplier } from '@/components/screen-security-applier';
 
 export const metadata: Metadata = {
   title: 'Toky Chat',
@@ -73,6 +74,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <ServiceWorkerRegister />
             <BackButtonHandler />
             <AppLockGate />
+            <ScreenSecurityApplier />
             <ConsentGate />
             <NotificationRouter />
             <PushBanner />
