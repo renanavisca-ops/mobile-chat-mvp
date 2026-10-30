@@ -17,6 +17,7 @@ import { subscribeToPush, unsubscribeFromPush, isPushSubscribed, pushSupported }
 import { isNativeApp } from '@/lib/native-push';
 import { StatusPrivacyModal } from '@/components/status-privacy-modal';
 import { AutoDownloadSettings } from '@/components/autodownload-settings';
+import { StorageManager } from '@/components/storage-manager';
 import {
   initKeystore,
   isUnlocked,
@@ -59,6 +60,7 @@ export default function SettingsPage() {
   const [readReceipts, setReadReceipts] = useState<boolean>(true);
   const [savingPrivacy, setSavingPrivacy] = useState(false);
   const [statusPrivacyOpen, setStatusPrivacyOpen] = useState(false);
+  const [storageOpen, setStorageOpen] = useState(false);
 
   // Password change state
   const [newPassword, setNewPassword] = useState('');
@@ -965,6 +967,17 @@ export default function SettingsPage() {
           <section className="space-y-3">
             <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500 ml-1">{t('settings.sectionData')}</h2>
             <AutoDownloadSettings />
+            <button
+              type="button"
+              onClick={() => setStorageOpen(true)}
+              className="flex w-full items-center justify-between gap-3 rounded-xl border border-slate-900 bg-slate-950/50 p-4 text-left shadow-sm hover:bg-slate-900/60"
+            >
+              <div>
+                <div className="text-sm font-medium text-slate-200">{t('storage.title')}</div>
+                <div className="mt-1 text-xs text-slate-400">{t('storage.manageDesc')}</div>
+              </div>
+              <span className="shrink-0 text-slate-500">›</span>
+            </button>
           </section>
 
           <section className="space-y-3">
@@ -1412,6 +1425,7 @@ export default function SettingsPage() {
       )}
 
       <StatusPrivacyModal open={statusPrivacyOpen} onClose={() => setStatusPrivacyOpen(false)} />
+      {storageOpen && <StorageManager onClose={() => setStorageOpen(false)} />}
     </PageShell>
   );
 }
