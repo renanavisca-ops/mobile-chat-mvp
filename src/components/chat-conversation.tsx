@@ -18,7 +18,7 @@ import { getWallpaperId, wallpaperCss, getCustomWallpaperUrl, CUSTOM_WALLPAPER_I
 import { blockUser, unblockUser, isBlockedByMe } from '@/lib/db/safety';
 import { EmojiPicker } from '@/components/emoji-picker';
 import { useRequireAuth } from '@/lib/auth/use-require-auth';
-import { listChats, sendMessage, deleteMessage, hideMessageForMe, editMessage, pinMessage, unpinMessage, searchMessages, getChatMuted, setChatMuteUntil, toggleReaction, createPoll, votePoll, setDisappearingMessages, enableChatEncryption, chatMustEncrypt, clearChatForMe, getGroupMeta, markMessageViewed, getChatMessageViews, EncryptionRequiredError, type GroupMeta } from '@/lib/db/chats';
+import { listChats, sendMessage, deleteMessage, hideMessageForMe, editMessage, pinMessage, unpinMessage, searchMessages, getChatMuted, setChatMuteUntil, toggleReaction, createPoll, votePoll, setDisappearingMessages, enableChatEncryption, chatMustEncrypt, clearChatForMe, getGroupMeta, markMessageViewed, getChatMessageViews, setEventRsvp, getChatEventRsvps, type EventRsvpStatus, EncryptionRequiredError, type GroupMeta } from '@/lib/db/chats';
 import { initKeystore, isUnlocked } from '@/lib/crypto/keystore';
 import { uploadChatImage, uploadChatMedia, uploadChatAudio, uploadChatFile, createSignedChatMediaUrl, fetchCachedMediaUrl, uploadEncryptedChatMedia, fetchDecryptedMediaUrl } from '@/lib/storage/upload';
 import { decryptMedia, type MediaEnc } from '@/lib/crypto/media';
@@ -27,6 +27,8 @@ import { browserSupabase } from '@/lib/supabase/client';
 import { useOnlineUsers } from '@/components/presence-provider';
 import { useLanguage } from '@/lib/i18n/context';
 import { PollComposer } from '@/components/poll-composer';
+import { EventComposer, type NewEvent } from '@/components/event-composer';
+import { addToCalendar, googleCalendarUrl } from '@/lib/calendar';
 import { MessagesSkeleton } from '@/components/skeleton';
 import { ImageLightbox } from '@/components/image-lightbox';
 import { ViewOnceViewer } from '@/components/view-once-viewer';
@@ -82,6 +84,8 @@ type Payload = {
   /** User ids mentioned in `text` (groups). */
   mentions?: string[];
   poll?: { question: string; options: string[] };
+  /** An in-chat event (date/time + optional place/note). */
+  event?: { title: string; startsAt: string; endsAt?: string; location?: string; note?: string };
   /** A shared contact card. */
   contact?: { userId: string; name: string; username: string | null; avatarUrl: string | null };
   /** A shared one-time location. */
@@ -606,6 +610,9 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
 
   // Poll composer
   const [pollComposerOpen, setPollComposerOpen] = useState(false);
+  // Event composer + RSVPs (messageId -> { userId -> status }).
+  const [eventComposerOpen, setEventComposerOpen] = useState(false);
+  const [rsvps, setRsvps] = useState<{ messageId: string; userId: string; status: EventRsvpStatus }[]>([]);
 
   // GIF picker
   const [gifPickerOpen, setGifPickerOpen] = useState(false);
@@ -886,6 +893,7 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
       if (b.gifUrl) return `[${t('export.gif')}]`;
       if (b.filePath) return `[${t('export.file')}: ${b.fileName || ''}]`;
       if (b.poll) return `[${t('export.poll')}: ${b.poll.question}]`;
+      if (b.event) return `[${t('chatsList.event')}: ${b.event.title}]`;
       return '';
     }
     const lines = items
@@ -1721,6 +1729,60 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
       supabase.removeChannel(ch);
     };
   }, [chatId, myId]);
+
+  // Event RSVPs: load the chat's RSVPs and keep them live (own isolated channel,
+  // like message_views, to avoid threading through the shared realtime hook).
+  useEffect(() => {
+    if (!chatId) return;
+    let alive = true;
+    const load = () => getChatEventRsvps(chatId).then((rows) => { if (alive) setRsvps(rows); });
+    load();
+    const supabase = browserSupabase();
+    const ch = supabase
+      .channel(`rsvps:${chatId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'event_rsvps', filter: `chat_id=eq.${chatId}` }, load)
+      .subscribe();
+    return () => { alive = false; supabase.removeChannel(ch); };
+  }, [chatId]);
+
+  const rsvpByMessage = useMemo(() => {
+    const map = new Map<string, { going: number; maybe: number; no: number; mine: EventRsvpStatus | null }>();
+    for (const r of rsvps) {
+      const e = map.get(r.messageId) ?? { going: 0, maybe: 0, no: 0, mine: null };
+      e[r.status] += 1;
+      if (r.userId === myId) e.mine = r.status;
+      map.set(r.messageId, e);
+    }
+    return map;
+  }, [rsvps, myId]);
+
+  async function onCreateEvent(ev: NewEvent) {
+    const payload: Payload = { event: ev };
+    const temp: MessageRow = {
+      id: `local-${crypto.randomUUID()}`,
+      chat_id: chatId,
+      sender_device_id: 'local',
+      ciphertext: JSON.stringify({ v: 1, ...payload }),
+      nonce: `local-${crypto.randomUUID()}`,
+      message_type: 'whisper',
+      created_at: new Date().toISOString(),
+    };
+    appendLocal(temp);
+    await sendMessage(chatId, payload as any);
+  }
+
+  async function onSetRsvp(messageId: string, status: EventRsvpStatus) {
+    // Optimistic: reflect my choice immediately, then persist.
+    setRsvps((prev) => {
+      const without = prev.filter((r) => !(r.messageId === messageId && r.userId === myId));
+      return myId ? [...without, { messageId, userId: myId, status }] : without;
+    });
+    try {
+      await setEventRsvp(messageId, chatId, status);
+    } catch (e: any) {
+      setErr(sendErrorMessage(e));
+    }
+  }
 
   // Open a view-once photo/video: resolve its URL on demand (so it isn't
   // prefetched), record the open, then show the one-time viewer. Re-opening is
@@ -3044,6 +3106,11 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
           setEmojiOpen(false);
           onShareLocation();
         }}
+        onEvent={() => {
+          setEmojiOpen(false);
+          setAttachOpen(false);
+          setEventComposerOpen(true);
+        }}
         onSchedule={() => {
           setEmojiOpen(false);
           setAttachOpen(false);
@@ -3078,6 +3145,12 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
         open={pollComposerOpen}
         onClose={() => setPollComposerOpen(false)}
         onCreate={onCreatePoll}
+      />
+
+      <EventComposer
+        open={eventComposerOpen}
+        onClose={() => setEventComposerOpen(false)}
+        onCreate={onCreateEvent}
       />
 
       <ImageEditor
@@ -3489,6 +3562,59 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
                               <span className="block truncate text-xs opacity-70">{t('chat.openInMaps')}</span>
                             </span>
                           </button>
+                        );
+                      })() : null}
+
+                      {m.body.event ? (() => {
+                        const ev = m.body.event;
+                        const d = new Date(ev.startsAt);
+                        const dateStr = isNaN(d.getTime())
+                          ? ''
+                          : d.toLocaleString(lang, { weekday: 'short', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+                        const tally = rsvpByMessage.get(m.id) ?? { going: 0, maybe: 0, no: 0, mine: null as EventRsvpStatus | null };
+                        return (
+                          <div className="mt-1 w-64 max-w-full space-y-2 rounded-xl border border-white/15 bg-black/15 p-3">
+                            <div className="flex items-start gap-2">
+                              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-indigo-500/25 text-lg">📅</span>
+                              <div className="min-w-0">
+                                <div className="truncate text-sm font-semibold">{ev.title}</div>
+                                {dateStr && <div className="text-xs opacity-80">{dateStr}</div>}
+                              </div>
+                            </div>
+                            {ev.location && <div className="truncate text-xs opacity-80">📍 {ev.location}</div>}
+                            {ev.note && <div className="whitespace-pre-wrap break-words text-xs opacity-70">{ev.note}</div>}
+                            <div className="flex gap-1">
+                              {(['going', 'maybe', 'no'] as EventRsvpStatus[]).map((s) => (
+                                <button
+                                  key={s}
+                                  type="button"
+                                  onClick={(e) => { e.stopPropagation(); onSetRsvp(m.id, s); }}
+                                  aria-pressed={tally.mine === s}
+                                  className={`flex-1 rounded-lg px-1.5 py-1 text-[11px] ${tally.mine === s ? 'bg-indigo-600 text-white' : 'bg-black/20 hover:bg-black/30'}`}
+                                >
+                                  {t(`event.rsvp_${s}`)}{tally[s] > 0 ? ` ${tally[s]}` : ''}
+                                </button>
+                              ))}
+                            </div>
+                            <div className="flex gap-2">
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); void addToCalendar(ev); }}
+                                className="flex-1 rounded-lg border border-white/20 px-2 py-1 text-[11px] hover:bg-black/20"
+                              >
+                                {t('event.addToCalendar')}
+                              </button>
+                              <a
+                                href={googleCalendarUrl(ev)}
+                                target="_blank"
+                                rel="noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                className="rounded-lg border border-white/20 px-2 py-1 text-[11px] hover:bg-black/20"
+                              >
+                                {t('event.google')}
+                              </a>
+                            </div>
+                          </div>
                         );
                       })() : null}
 

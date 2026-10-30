@@ -140,12 +140,12 @@ export async function listChats(): Promise<ChatSummary[]> {
   // (this module isn't a component and can't call the i18n hook).
   const latestByChat = new Map<
     string,
-    { created_at: string; content: string | null; kind: 'text' | 'photo' | 'video' | 'audio' | 'gif' | 'sticker' | 'poll' | 'file' | 'call' | 'contact' | 'location' | 'deleted' | null }
+    { created_at: string; content: string | null; kind: 'text' | 'photo' | 'video' | 'audio' | 'gif' | 'sticker' | 'poll' | 'file' | 'call' | 'contact' | 'location' | 'event' | 'deleted' | null }
   >();
   for (const m of latestRows) {
     if (latestByChat.has(m.chat_id)) continue;
     let content = m.content || '';
-    let kind: 'text' | 'photo' | 'video' | 'audio' | 'gif' | 'sticker' | 'poll' | 'file' | 'call' | 'contact' | 'location' | 'deleted' | null = content ? 'text' : null;
+    let kind: 'text' | 'photo' | 'video' | 'audio' | 'gif' | 'sticker' | 'poll' | 'file' | 'call' | 'contact' | 'location' | 'event' | 'deleted' | null = content ? 'text' : null;
     if (!content && m.ciphertext) {
       try {
         const parsed = JSON.parse(m.ciphertext);
@@ -175,6 +175,8 @@ export async function listChats(): Promise<ChatSummary[]> {
           kind = 'contact';
         } else if (parsed.location) {
           kind = 'location';
+        } else if (parsed.event) {
+          kind = 'event';
         } else if (parsed.is_deleted) {
           kind = 'deleted';
         }
@@ -1208,6 +1210,43 @@ export async function getChatMessageViews(
     .eq('chat_id', chatId);
   if (error || !data) return [];
   return (data as any[]).map((r) => ({ messageId: r.message_id as string, userId: r.user_id as string }));
+}
+
+/* ------------------------- Events / RSVPs ------------------------- */
+
+export type EventRsvpStatus = 'going' | 'maybe' | 'no';
+
+/** Set (or change) the current user's RSVP to an in-chat event. */
+export async function setEventRsvp(
+  messageId: string,
+  chatId: string,
+  status: EventRsvpStatus,
+): Promise<void> {
+  const supabase = browserSupabase();
+  const { data: me } = await supabase.auth.getUser();
+  if (!me.user) throw new Error('Not authenticated');
+  const { error } = await (supabase as any).from('event_rsvps').upsert(
+    { message_id: messageId, chat_id: chatId, user_id: me.user.id, status, updated_at: new Date().toISOString() },
+    { onConflict: 'message_id,user_id' },
+  );
+  if (error) throw error;
+}
+
+/** All RSVPs recorded in a chat (members-only via RLS). */
+export async function getChatEventRsvps(
+  chatId: string,
+): Promise<{ messageId: string; userId: string; status: EventRsvpStatus }[]> {
+  const supabase = browserSupabase();
+  const { data, error } = await (supabase as any)
+    .from('event_rsvps')
+    .select('message_id, user_id, status')
+    .eq('chat_id', chatId);
+  if (error || !data) return [];
+  return (data as any[]).map((r) => ({
+    messageId: r.message_id as string,
+    userId: r.user_id as string,
+    status: r.status as EventRsvpStatus,
+  }));
 }
 
 /* ---------------------------- Reactions ---------------------------- */
