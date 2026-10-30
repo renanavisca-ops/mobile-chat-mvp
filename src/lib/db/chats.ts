@@ -1212,6 +1212,13 @@ export async function markMessageViewed(messageId: string): Promise<void> {
   if (error) throw error;
 }
 
+/** Record that the current follower has seen a channel's posts (per-post reach). */
+export async function markChannelSeen(chatId: string): Promise<void> {
+  const supabase = browserSupabase();
+  const { error } = await (supabase as any).rpc('mark_channel_seen', { p_chat_id: chatId });
+  if (error) throw error;
+}
+
 /**
  * All view-once opens recorded in a chat (members-only via RLS). Returns raw
  * rows so the caller can split them into "mine" (lock my own re-open) and
