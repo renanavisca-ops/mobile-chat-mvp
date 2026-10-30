@@ -15,6 +15,7 @@ import { browserSupabase } from '@/lib/supabase/client';
 import { logCallStart, logCallAnswered, logCallEnded } from '@/lib/db/calls';
 import { logCallEvent } from '@/lib/db/chats';
 import { isBlockedWith } from '@/lib/db/safety';
+import { isContact } from '@/lib/db/contacts';
 import { startRingtone, stopRingtone, startRingback, primeRingAudio } from '@/lib/call/ringtone';
 import {
   hasNativeAudioRoute,
@@ -192,6 +193,8 @@ export function CallProvider({ children }: { children: ReactNode }) {
   const [myId, setMyId] = useState<string | null>(null);
   const myIdRef = useRef<string>('');
   const myNameRef = useRef<string>('');
+  // "Calls from" privacy: 'contacts' auto-declines 1:1 calls from non-contacts.
+  const callsPolicyRef = useRef<'everyone' | 'contacts'>('everyone');
 
   const [phase, setPhase] = useState<Phase>('idle');
   const phaseRef = useRef<Phase>('idle');
@@ -345,12 +348,14 @@ export function CallProvider({ children }: { children: ReactNode }) {
       setMyId(u?.id ?? null);
       myIdRef.current = u?.id ?? '';
       if (u) {
-        const { data: prof } = await supabase
+        // Cast: calls_policy isn't in the generated types yet.
+        const { data: prof } = await (supabase as any)
           .from('profiles')
-          .select('username, display_name')
+          .select('username, display_name, calls_policy')
           .eq('id', u.id)
           .maybeSingle();
         myNameRef.current = prof?.display_name || prof?.username || 'Someone';
+        callsPolicyRef.current = (prof as any)?.calls_policy === 'contacts' ? 'contacts' : 'everyone';
       }
     });
     const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
@@ -1111,6 +1116,15 @@ export function CallProvider({ children }: { children: ReactNode }) {
       }
       // Silently ignore calls from a blocked party (either direction).
       if (inv.from && (await isBlockedWith(inv.from).catch(() => false))) return;
+      // "Calls from contacts only": auto-decline 1:1 calls from non-contacts.
+      // Fail open on error so a transient glitch never drops a legit call.
+      if (!inv.isGroup && callsPolicyRef.current === 'contacts' && inv.from) {
+        const known = await isContact(inv.from).catch(() => true);
+        if (!known) {
+          sendToUser(inv.from, 'declined', { callId: inv.callId, from: myIdRef.current });
+          return;
+        }
+      }
       setIncoming(inv);
       setPhaseBoth('ringing');
     });
