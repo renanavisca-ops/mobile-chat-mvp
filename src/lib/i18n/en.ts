@@ -383,6 +383,7 @@ const en = {
   },
   groupInfo: {
     title: 'Group info',
+    channelTitle: 'Channel info',
     changePhoto: 'Change photo',
     uploading: 'Uploading…',
     groupName: 'Group name',
