@@ -829,6 +829,14 @@ const es: Dictionary = {
     wrongPin: 'PIN incorrecto',
     forgot: '¿Olvidaste tu PIN? Cerrar sesión',
   },
+  chatLock: {
+    lockChat: 'Bloquear chat',
+    unlockChat: 'Quitar bloqueo del chat',
+    needAppLock: 'Primero activa el Bloqueo de la app (PIN) en Ajustes → Seguridad.',
+    lockedTitle: 'Chat bloqueado',
+    lockedSubtitle: 'Ingresa tu PIN para abrir este chat',
+    listLocked: 'Chat bloqueado',
+  },
   poll: {
     createTitle: 'Crear encuesta',
     questionPlaceholder: 'Escribe una pregunta…',

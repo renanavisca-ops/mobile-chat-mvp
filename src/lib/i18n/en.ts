@@ -827,6 +827,14 @@ const en = {
     wrongPin: 'Wrong PIN',
     forgot: 'Forgot your PIN? Sign out',
   },
+  chatLock: {
+    lockChat: 'Lock chat',
+    unlockChat: 'Remove chat lock',
+    needAppLock: 'First turn on the App lock (PIN) in Settings → Security.',
+    lockedTitle: 'Chat locked',
+    lockedSubtitle: 'Enter your PIN to open this chat',
+    listLocked: 'Locked chat',
+  },
   poll: {
     createTitle: 'Create poll',
     questionPlaceholder: 'Ask a question…',
