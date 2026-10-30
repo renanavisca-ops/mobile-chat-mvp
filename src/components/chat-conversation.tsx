@@ -425,6 +425,7 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
   }, [focusMessageId, messages, msgLoading, hasMore, loadingMore, loadMore]);
 
   const [isRecording, setIsRecording] = useState(false);
+  const [isRecPaused, setIsRecPaused] = useState(false);
   const [recSeconds, setRecSeconds] = useState(0);
   // A finished recording waiting for the user to send or discard it (we no
   // longer auto-send the moment recording stops).
@@ -1392,6 +1393,7 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
           recTimerRef.current = null;
         }
         setIsRecording(false);
+        setIsRecPaused(false);
         if (recCanceledRef.current) {
           audioChunksRef.current = [];
           return; // discarded — nothing to preview
@@ -1403,11 +1405,41 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
 
       recorder.start();
       setIsRecording(true);
+      setIsRecPaused(false);
       setRecSeconds(0);
-      if (recTimerRef.current) window.clearInterval(recTimerRef.current);
-      recTimerRef.current = window.setInterval(() => setRecSeconds((s) => s + 1), 1000);
+      startRecTimer();
     } catch (e: any) {
       setErr(t('chat.micError', { error: e.message }));
+    }
+  }
+
+  function startRecTimer() {
+    if (recTimerRef.current) window.clearInterval(recTimerRef.current);
+    recTimerRef.current = window.setInterval(() => setRecSeconds((s) => s + 1), 1000);
+  }
+  function stopRecTimer() {
+    if (recTimerRef.current) {
+      window.clearInterval(recTimerRef.current);
+      recTimerRef.current = null;
+    }
+  }
+
+  // Pause/resume while recording: MediaRecorder keeps the take, and the timer
+  // freezes so the clock reflects only recorded audio.
+  function pauseRecording() {
+    const r = mediaRecorderRef.current;
+    if (r && isRecording && r.state === 'recording') {
+      try { r.pause(); } catch { return; }
+      stopRecTimer();
+      setIsRecPaused(true);
+    }
+  }
+  function resumeRecording() {
+    const r = mediaRecorderRef.current;
+    if (r && isRecording && r.state === 'paused') {
+      try { r.resume(); } catch { return; }
+      startRecTimer();
+      setIsRecPaused(false);
     }
   }
 
@@ -3885,7 +3917,7 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
             {/* Rounded input pill — replaced by a live recording strip while
                 recording, or an audio preview (play / discard) once stopped. */}
             {isRecording ? (
-              <div className="flex min-w-0 flex-1 items-center gap-3 rounded-3xl border border-red-500/40 bg-red-500/10 px-3 py-2.5">
+              <div className="flex min-w-0 flex-1 items-center gap-2.5 rounded-3xl border border-red-500/40 bg-red-500/10 px-3 py-2.5">
                 <button
                   type="button"
                   onClick={cancelRecording}
@@ -3895,9 +3927,18 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
                 >
                   <TrashIcon size={18} />
                 </button>
-                <span className="h-2.5 w-2.5 shrink-0 animate-pulse rounded-full bg-red-500" />
-                <span className="text-sm font-medium text-red-200">{t('chat.recording')}</span>
+                <span className={`h-2.5 w-2.5 shrink-0 rounded-full bg-red-500 ${isRecPaused ? '' : 'animate-pulse'}`} />
+                <span className="text-sm font-medium text-red-200">{isRecPaused ? t('chat.recordingPaused') : t('chat.recording')}</span>
                 <span className="ml-auto text-sm tabular-nums text-red-200/90">{fmtRecTime(recSeconds)}</span>
+                <button
+                  type="button"
+                  onClick={isRecPaused ? resumeRecording : pauseRecording}
+                  className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-red-200 hover:bg-red-500/20"
+                  title={isRecPaused ? t('chat.resumeRecording') : t('chat.pauseRecording')}
+                  aria-label={isRecPaused ? t('chat.resumeRecording') : t('chat.pauseRecording')}
+                >
+                  {isRecPaused ? <PlayGlyph /> : <PauseGlyph />}
+                </button>
               </div>
             ) : pendingAudio ? (
               <div className="flex min-w-0 flex-1 items-center gap-2 rounded-3xl border border-slate-800 bg-slate-900 px-2 py-1.5">
@@ -4146,6 +4187,23 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
         </div>
       )}
     </div>
+  );
+}
+
+function PauseGlyph({ size = 18 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} aria-hidden fill="currentColor">
+      <rect x="6" y="5" width="4" height="14" rx="1" />
+      <rect x="14" y="5" width="4" height="14" rx="1" />
+    </svg>
+  );
+}
+
+function PlayGlyph({ size = 18 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} aria-hidden fill="currentColor">
+      <path d="M8 5.5v13l11-6.5z" />
+    </svg>
   );
 }
 
