@@ -72,7 +72,7 @@ Alto valor, bajo riesgo, sin dependencias externas.
 - [x] **Mensajes de visualización única** ("ver una vez") para foto/video: el destinatario abre una sola vez, se bloquea tras verlo, el emisor ve si fue abierto; no se puede reenviar/compartir/descargar
 - [x] **Calidad de envío**: Estándar (comprimido) / Alta / Original (toggle por envío, recordado; se aplica al enviar)
 - [x] **Pausar/reanudar** grabación de voz (botón en la barra de grabación) + escucha previa antes de enviar (ya existía el preview)
-- [ ] **Descarga automática** configurable por red (Wi-Fi/datos) y tipo de contenido
+- [x] **Descarga automática** configurable por red (Wi-Fi/datos) y tipo (fotos/voz/video): lo desactivado se descarga al tocar · Ajustes → Datos y almacenamiento
 - [ ] **Gestión de almacenamiento**: ver uso por chat, archivos grandes, liberar espacio
 - [ ] **Eventos/recordatorios**: crear, invitar y recordar dentro del chat 🔒
 - [ ] **Paquetes de stickers** y favoritos; importar/organizar
