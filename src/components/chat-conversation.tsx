@@ -11,6 +11,7 @@ import { AttachSheet } from '@/components/attach-sheet';
 import { ScheduleMessageModal } from '@/components/schedule-message-modal';
 import { CameraCapture } from '@/components/camera-capture';
 import { ReportModal } from '@/components/report-modal';
+import { sendQueued, flushQueue } from '@/lib/send-queue';
 import { GroupInfoModal } from '@/components/group-info-modal';
 import { UserInfoModal } from '@/components/user-info-modal';
 import { ChatMediaGallery } from '@/components/chat-media-gallery';
@@ -979,7 +980,7 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
     appendLocal(temp);
     setReplyingTo(null);
     try {
-      await sendMessage(chatId, payload as any);
+      await sendQueued(chatId, payload as any);
       setErr('');
     } catch (e: any) {
       setErr(sendErrorMessage(e));
@@ -1009,7 +1010,7 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
     appendLocal(temp);
     setReplyingTo(null);
     try {
-      await sendMessage(chatId, payload as any);
+      await sendQueued(chatId, payload as any);
       setErr('');
     } catch (e: any) {
       setErr(sendErrorMessage(e));
@@ -1039,7 +1040,7 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
     appendLocal(temp);
     setReplyingTo(null);
     try {
-      await sendMessage(chatId, payload as any);
+      await sendQueued(chatId, payload as any);
       setErr('');
     } catch (e: any) {
       setErr(sendErrorMessage(e));
@@ -1062,7 +1063,7 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
     appendLocal(temp);
     setReplyingTo(null);
     try {
-      await sendMessage(chatId, payload as any);
+      await sendQueued(chatId, payload as any);
       setErr('');
     } catch (e: any) {
       setErr(sendErrorMessage(e));
@@ -1629,7 +1630,7 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
       };
       appendLocal(temp);
       setReplyingTo(null);
-      await sendMessage(chatId, payload as any);
+      await sendQueued(chatId, payload as any);
       setErr('');
     } catch (e: any) {
       setErr(e.message);
@@ -1830,6 +1831,9 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
     return () => { alive = false; supabase.removeChannel(ch); };
   }, [chatId]);
 
+  // Opening a chat is a good moment to flush any offline-queued sends.
+  useEffect(() => { void flushQueue(); }, [chatId]);
+
   const rsvpByMessage = useMemo(() => {
     const map = new Map<string, { going: number; maybe: number; no: number; mine: EventRsvpStatus | null }>();
     for (const r of rsvps) {
@@ -1853,7 +1857,7 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
       created_at: new Date().toISOString(),
     };
     appendLocal(temp);
-    await sendMessage(chatId, payload as any);
+    await sendQueued(chatId, payload as any);
   }
 
   async function onSetRsvp(messageId: string, status: EventRsvpStatus) {
@@ -2342,7 +2346,7 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
       };
       appendLocal(temp);
       setReplyingTo(null);
-      await sendMessage(chatId, payload as any);
+      await sendQueued(chatId, payload as any);
       setErr('');
     } catch (e: any) {
       setErr(sendErrorMessage(e));
@@ -2571,7 +2575,7 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
         setText('');
         clearPendingVideo();
 
-        await sendMessage(chatId, payload as any);
+        await sendQueued(chatId, payload as any);
         setErr('');
         return;
       }
@@ -2610,7 +2614,7 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
         setText('');
         clearPendingImages();
 
-        await sendMessage(chatId, payload as any);
+        await sendQueued(chatId, payload as any);
         setErr('');
         return;
       }
@@ -2637,7 +2641,7 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
 
       setText('');
       setMentionQuery(null);
-      await sendMessage(chatId, payload as any);
+      await sendQueued(chatId, payload as any);
       setErr('');
     } catch (e: any) {
       setErr(sendErrorMessage(e));

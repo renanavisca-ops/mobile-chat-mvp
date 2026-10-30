@@ -548,7 +548,7 @@ export type MessagePayload = {
   location?: { lat: number; lng: number };
 };
 
-export async function sendMessage(chatId: string, payload: MessagePayload) {
+export async function sendMessage(chatId: string, payload: MessagePayload, clientId?: string) {
   const supabase = browserSupabase();
 
   const { data: me } = await supabase.auth.getUser();
@@ -590,7 +590,7 @@ export async function sendMessage(chatId: string, payload: MessagePayload) {
     ? new Date(Date.now() + disappearingSeconds * 1000).toISOString()
     : null;
 
-  const { error } = await supabase.from('messages').insert({
+  const row = {
     chat_id: chatId,
     sender_device_id: deviceId,
     sender_id: me.user.id,
@@ -600,7 +600,15 @@ export async function sendMessage(chatId: string, payload: MessagePayload) {
     sender_type: 'agent',
     nonce,
     expires_at: expiresAt,
-  });
+    client_id: clientId ?? null,
+  };
+
+  // With a client_id, upsert ignoring duplicates so a retry of a message that
+  // already landed is a no-op (idempotent offline-queue retries).
+  // Cast: client_id isn't in the generated types yet.
+  const { error } = clientId
+    ? await (supabase as any).from('messages').upsert(row, { onConflict: 'sender_id,client_id', ignoreDuplicates: true })
+    : await (supabase as any).from('messages').insert(row);
 
   if (error) throw error;
 }

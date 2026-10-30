@@ -33,6 +33,7 @@ import { ServiceWorkerRegister } from '@/components/sw-register';
 import { BackButtonHandler } from '@/components/back-button-handler';
 import { AppLockGate } from '@/components/app-lock-gate';
 import { ScreenSecurityApplier } from '@/components/screen-security-applier';
+import { SendQueueFlusher } from '@/components/send-queue-flusher';
 
 export const metadata: Metadata = {
   title: 'Toky Chat',
@@ -75,6 +76,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <BackButtonHandler />
             <AppLockGate />
             <ScreenSecurityApplier />
+            <SendQueueFlusher />
             <ConsentGate />
             <NotificationRouter />
             <PushBanner />
