@@ -39,7 +39,10 @@ import {
   ScreenShareIcon,
   ScreenShareOffIcon,
   HandPointerIcon,
+  PlusIcon,
 } from '@/components/icons';
+import { listMyContacts } from '@/lib/db/contacts';
+import type { ProfileLite } from '@/lib/db/types';
 
 type Phase = 'idle' | 'ringing' | 'incall';
 
@@ -199,6 +202,8 @@ export function CallProvider({ children }: { children: ReactNode }) {
   const [phase, setPhase] = useState<Phase>('idle');
   const phaseRef = useRef<Phase>('idle');
   const [label, setLabel] = useState('');
+  const labelRef = useRef('');
+  useEffect(() => { labelRef.current = label; }, [label]);
   const [isVideo, setIsVideo] = useState(false);
   // Whether OUR local stream currently has a video track. Distinct from isVideo
   // (which means "this call shows the video UI"): after a voice→video upgrade a
@@ -210,6 +215,9 @@ export function CallProvider({ children }: { children: ReactNode }) {
   const [incoming, setIncoming] = useState<Invite | null>(null);
   const [participants, setParticipants] = useState<Map<string, Participant>>(new Map());
   const [errText, setErrText] = useState('');
+  // Add-participant picker (invite more people to the ongoing call).
+  const [addOpen, setAddOpen] = useState(false);
+  const [addRows, setAddRows] = useState<ProfileLite[]>([]);
   // Brief banner shown after a call ends for a notable reason (e.g. rejected).
   const [endedNote, setEndedNote] = useState('');
 
@@ -806,6 +814,35 @@ export function CallProvider({ children }: { children: ReactNode }) {
     []
   );
 
+  // Invite more people to the ongoing call. The mesh is presence-based, so when
+  // an invitee accepts and joins call:<id>, presence sync connects everyone —
+  // no renegotiation plumbing needed here. Turns a 1:1 into a group call.
+  const addParticipants = useCallback(async (ids: string[]) => {
+    if (phaseRef.current !== 'incall' || ids.length === 0) return;
+    callIsGroupRef.current = true;
+    for (const pid of ids) {
+      if (!invitedRef.current.includes(pid)) invitedRef.current.push(pid);
+      sendToUser(pid, 'invite', {
+        callId: callIdRef.current,
+        chatId: callChatIdRef.current ?? '',
+        from: myIdRef.current,
+        fromName: myNameRef.current,
+        video: callVideoRef.current,
+        isGroup: true,
+        label: labelRef.current,
+      });
+    }
+    try {
+      const { data: sess } = await supabase.auth.getSession();
+      void apiFetch('/api/push/call', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${sess.session?.access_token}` },
+        body: JSON.stringify({ calleeIds: ids, callerName: myNameRef.current, video: callVideoRef.current, chatId: callChatIdRef.current ?? '' }),
+      });
+    } catch { /* best-effort */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   async function acceptCall() {
     const inv = incoming;
     if (!inv) return;
@@ -1313,6 +1350,44 @@ export function CallProvider({ children }: { children: ReactNode }) {
         </div>
       )}
 
+      {/* Add participants to the ongoing call */}
+      {phase === 'incall' && addOpen && (() => {
+        const inCall = new Set<string>([...participants.keys(), myIdRef.current, ...invitedRef.current]);
+        const rows = addRows.filter((r) => !inCall.has(r.id));
+        return (
+          <div className="fixed inset-0 z-[99] flex items-end justify-center bg-black/70 p-0 backdrop-blur-sm sm:items-center sm:p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) setAddOpen(false); }}>
+            <div className="toky-glass toky-elev flex max-h-[70vh] w-full max-w-sm flex-col rounded-t-3xl border border-slate-800 sm:rounded-3xl">
+              <div className="flex items-center justify-between border-b border-slate-800 px-4 py-3">
+                <h2 className="text-base font-semibold text-slate-100">{t('call.addParticipant')}</h2>
+                <button onClick={() => setAddOpen(false)} className="text-slate-400 hover:text-slate-200" aria-label={t('common.close')}>✕</button>
+              </div>
+              <div className="min-h-0 flex-1 overflow-y-auto p-2">
+                {rows.length === 0 ? (
+                  <p className="p-4 text-center text-sm text-slate-500">{t('call.noContactsToAdd')}</p>
+                ) : (
+                  <ul className="space-y-1">
+                    {rows.map((r) => (
+                      <li key={r.id}>
+                        <button
+                          type="button"
+                          onClick={() => { void addParticipants([r.id]); setAddOpen(false); }}
+                          className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm text-slate-100 hover:bg-slate-900"
+                        >
+                          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-slate-800 text-xs font-semibold text-slate-300">
+                            {(r.username ?? '?').trim().charAt(0).toUpperCase()}
+                          </span>
+                          <span className="truncate">{r.username ?? r.id.slice(0, 8)}</span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Incoming */}
       {phase === 'ringing' && incoming && (
         <div className="fixed inset-0 z-[95] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
@@ -1517,6 +1592,15 @@ export function CallProvider({ children }: { children: ReactNode }) {
                 <HandPointerIcon size={22} />
               </button>
             )}
+            <button
+              type="button"
+              onClick={() => { setAddOpen(true); listMyContacts().then(setAddRows).catch(() => setAddRows([])); }}
+              aria-label={t('call.addParticipant')}
+              title={t('call.addParticipant')}
+              className="grid h-12 w-12 place-items-center rounded-full bg-slate-800 text-white hover:bg-slate-700"
+            >
+              <PlusIcon size={22} />
+            </button>
             <button
               type="button"
               onClick={endCall}

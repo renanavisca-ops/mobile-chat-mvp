@@ -625,6 +625,8 @@ const es: Dictionary = {
     logNoAnswer: 'Llamada sin respuesta',
     logDeclined: 'Llamada rechazada',
     hangUp: 'Colgar',
+    addParticipant: 'Agregar participante',
+    noContactsToAdd: 'No hay contactos para agregar.',
     mute: 'Silenciar',
     unmute: 'Activar micrófono',
     toggleCamera: 'Cámara',
