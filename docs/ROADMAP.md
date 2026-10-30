@@ -73,7 +73,7 @@ Alto valor, bajo riesgo, sin dependencias externas.
 - [x] **Calidad de envío**: Estándar (comprimido) / Alta / Original (toggle por envío, recordado; se aplica al enviar)
 - [x] **Pausar/reanudar** grabación de voz (botón en la barra de grabación) + escucha previa antes de enviar (ya existía el preview)
 - [x] **Descarga automática** configurable por red (Wi-Fi/datos) y tipo (fotos/voz/video): lo desactivado se descarga al tocar · Ajustes → Datos y almacenamiento
-- [ ] **Gestión de almacenamiento**: ver uso por chat, archivos grandes, liberar espacio
+- [x] **Gestión de almacenamiento**: uso de caché por chat, archivos más grandes y liberar espacio (Ajustes → Datos y almacenamiento → Almacenamiento). Solo caché local; el objeto compartido en el servidor no se toca.
 - [ ] **Eventos/recordatorios**: crear, invitar y recordar dentro del chat 🔒
 - [ ] **Paquetes de stickers** y favoritos; importar/organizar
 
