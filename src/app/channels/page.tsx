@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { PageShell } from '@/components/page-shell';
 import { useRequireAuth } from '@/lib/auth/use-require-auth';
-import { listPublicChannels, createChannel, joinChannel, leaveChat, type ChannelSummary } from '@/lib/db/chats';
+import { listPublicChannels, createChannel, joinChannel, leaveChat, CHANNEL_CATEGORIES, type ChannelSummary } from '@/lib/db/chats';
 import { EmptyState } from '@/components/empty-state';
 import { ChatListSkeleton } from '@/components/skeleton';
 import { HashIcon, PlusIcon } from '@/components/icons';
@@ -22,14 +22,17 @@ export default function ChannelsPage() {
   const [err, setErr] = useState('');
   const [busyId, setBusyId] = useState<string | null>(null);
 
+  const [cat, setCat] = useState<string>('');
+
   const [createOpen, setCreateOpen] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newDesc, setNewDesc] = useState('');
+  const [newCat, setNewCat] = useState<string>('other');
   const [creating, setCreating] = useState(false);
 
-  function load(search?: string) {
+  function load(search?: string, category?: string) {
     setLoading(true);
-    listPublicChannels(search)
+    listPublicChannels(search, category || undefined)
       .then(setChannels)
       .catch((e) => setErr(e?.message ?? String(e)))
       .finally(() => setLoading(false));
@@ -43,10 +46,10 @@ export default function ChannelsPage() {
 
   useEffect(() => {
     if (authLoading) return;
-    const timer = setTimeout(() => load(q), 300);
+    const timer = setTimeout(() => load(q, cat), 300);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q]);
+  }, [q, cat]);
 
   async function onJoin(c: ChannelSummary) {
     setBusyId(c.id);
@@ -79,7 +82,7 @@ export default function ChannelsPage() {
     setCreating(true);
     setErr('');
     try {
-      const id = await createChannel(title, newDesc.trim() || undefined);
+      const id = await createChannel(title, newDesc.trim() || undefined, newCat);
       router.push(`/chats/view?c=${id}`);
     } catch (e: any) {
       setErr(e?.message ?? String(e));
@@ -109,6 +112,29 @@ export default function ChannelsPage() {
           </button>
         </div>
 
+        {/* Category directory */}
+        <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+          <button
+            type="button"
+            onClick={() => setCat('')}
+            aria-pressed={cat === ''}
+            className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium ${cat === '' ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+          >
+            {t('channels.catAll')}
+          </button>
+          {CHANNEL_CATEGORIES.map((c) => (
+            <button
+              key={c}
+              type="button"
+              onClick={() => setCat(c)}
+              aria-pressed={cat === c}
+              className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium ${cat === c ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+            >
+              {t(`channels.cat_${c}`)}
+            </button>
+          ))}
+        </div>
+
         {loading ? (
           <ChatListSkeleton rows={6} />
         ) : channels.length === 0 ? (
@@ -133,7 +159,14 @@ export default function ChannelsPage() {
                   )}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-medium text-slate-100">{c.title || t('channels.untitled')}</div>
+                  <div className="flex items-center gap-2">
+                    <span className="truncate text-sm font-medium text-slate-100">{c.title || t('channels.untitled')}</span>
+                    {c.category ? (
+                      <span className="shrink-0 rounded-full bg-slate-800 px-2 py-0.5 text-[10px] font-medium text-slate-400">
+                        {t(`channels.cat_${c.category}`)}
+                      </span>
+                    ) : null}
+                  </div>
                   {c.description ? (
                     <div className="truncate text-xs text-slate-400">{c.description}</div>
                   ) : null}
@@ -194,6 +227,22 @@ export default function ChannelsPage() {
               placeholder={t('channels.descPlaceholder')}
               className="mt-2 w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
             />
+            <div className="mt-3">
+              <div className="mb-1.5 text-xs text-slate-400">{t('channels.category')}</div>
+              <div className="flex flex-wrap gap-1.5">
+                {CHANNEL_CATEGORIES.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => setNewCat(c)}
+                    aria-pressed={newCat === c}
+                    className={`rounded-full px-2.5 py-1 text-xs ${newCat === c ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+                  >
+                    {t(`channels.cat_${c}`)}
+                  </button>
+                ))}
+              </div>
+            </div>
             <p className="mt-2 text-xs text-slate-500">{t('channels.createNote')}</p>
             <div className="mt-4 flex gap-2">
               <button
