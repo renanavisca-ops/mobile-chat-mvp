@@ -19,6 +19,7 @@ import { StatusPrivacyModal } from '@/components/status-privacy-modal';
 import { AutoDownloadSettings } from '@/components/autodownload-settings';
 import { StorageManager } from '@/components/storage-manager';
 import { AppLockSettings } from '@/components/app-lock-settings';
+import { PermissionsSettings } from '@/components/permissions-settings';
 import {
   initKeystore,
   isUnlocked,
@@ -1053,6 +1054,11 @@ export default function SettingsPage() {
               </div>
               <span className="shrink-0 text-slate-500">›</span>
             </button>
+          </section>
+
+          <section className="space-y-3">
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500 ml-1">{t('settings.sectionPermissions')}</h2>
+            <PermissionsSettings />
           </section>
 
           <section className="space-y-3">
