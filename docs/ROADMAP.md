@@ -114,7 +114,7 @@ Alto valor, bajo riesgo, sin dependencias externas.
 - [x] **Agregar participantes** a una llamada en curso: botón "Agregar participante" en la llamada que invita a un contacto al `callId` actual; el mesh por presencia conecta al que se une (1:1 pasa a grupal)
 - [x] **Silenciar llamadas de desconocidos**: ya cubierto por la política de llamadas "Mis contactos" (Etapa 3) — auto-rechaza llamadas 1:1 de no-contactos
 - [x] **Adaptación a conexión inestable**: tope de bitrate de video + degradación balanceada, y reconexión por ICE restart (recupera al desconectarse en vez de cortar; un reintento antes de rendirse)
-- [ ] **Continuidad en segundo plano** afinada por SO/permisos 📱
+- [x] **Continuidad en segundo plano** afinada por SO/permisos 📱: el servicio en primer plano de la llamada declara el tipo `camera` además de `microphone` cuando la llamada es de video (requisito de Android 14+ para seguir usando la cámara con la pantalla apagada); `startCallAudio` recibe el flag `video` desde el provider (iniciar/aceptar/unirse por enlace)
 
 ## Etapa 7 — Herramientas empresariales
 

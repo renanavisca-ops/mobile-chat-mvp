@@ -9,7 +9,7 @@ import { registerPlugin, Capacitor } from '@capacitor/core';
 export type CallOutput = 'earpiece' | 'speaker' | 'wired' | 'bluetooth';
 
 interface AudioRoutePlugin {
-  startCallAudio(): Promise<void>;
+  startCallAudio(options?: { video?: boolean }): Promise<void>;
   setSpeakerphoneOn(options: { on: boolean }): Promise<{ on: boolean }>;
   listOutputs(): Promise<{ outputs: { type: CallOutput; active?: boolean }[] }>;
   setOutput(options: { type: CallOutput }): Promise<{ ok: boolean }>;
@@ -28,10 +28,10 @@ export function hasNativeAudioRoute(): boolean {
 }
 
 /** Enter WebRTC voice mode (routing + echo cancellation) at call start. */
-export async function nativeStartCallAudio(): Promise<void> {
+export async function nativeStartCallAudio(video = false): Promise<void> {
   if (!hasNativeAudioRoute()) return;
   try {
-    await AudioRoute.startCallAudio();
+    await AudioRoute.startCallAudio({ video });
   } catch {
     // best effort — never let audio routing break the call
   }

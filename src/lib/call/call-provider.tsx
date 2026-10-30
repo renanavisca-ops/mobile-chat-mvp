@@ -825,7 +825,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
         // Enter native voice mode. Default the output to the EARPIECE for a voice
         // call (like a normal phone call) and only to the loudspeaker for a video
         // call; the user can still toggle the speaker during the call.
-        await nativeStartCallAudio();
+        await nativeStartCallAudio(opts.video);
         setSpeakerOn(opts.video);
         await applySpeaker(opts.video);
         iceServersRef.current = await getIceServers();
@@ -925,7 +925,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
       if (localVideoRef.current) localVideoRef.current.srcObject = stream;
       // Enter native voice mode. Earpiece by default for a voice call, speaker
       // for a video call; the user can toggle the speaker during the call.
-      await nativeStartCallAudio();
+      await nativeStartCallAudio(inv.video);
       setSpeakerOn(inv.video);
       await applySpeaker(inv.video);
       iceServersRef.current = await getIceServers();
@@ -956,7 +956,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
       localStreamRef.current = stream;
       setLocalHasVideo(opts.video);
       if (localVideoRef.current) localVideoRef.current.srcObject = stream;
-      await nativeStartCallAudio();
+      await nativeStartCallAudio(opts.video);
       setSpeakerOn(opts.video);
       await applySpeaker(opts.video);
       iceServersRef.current = await getIceServers();
