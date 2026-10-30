@@ -46,8 +46,10 @@ public class AudioRoutePlugin extends Plugin {
             return;
         }
         am.setMode(AudioManager.MODE_IN_COMMUNICATION);
+        boolean video = Boolean.TRUE.equals(call.getBoolean("video", false));
         try {
             Intent i = new Intent(getContext(), CallForegroundService.class);
+            i.putExtra("video", video);
             ContextCompat.startForegroundService(getContext(), i);
         } catch (Exception ignored) {
             // If the service can't start, the call still works while foregrounded.

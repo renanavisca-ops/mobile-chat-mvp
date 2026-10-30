@@ -42,9 +42,13 @@ public class CallForegroundService extends Service {
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .build();
 
+        boolean video = intent != null && intent.getBooleanExtra("video", false);
         int type = 0;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             type = ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE;
+            // A video call keeps using the camera with the screen off, which
+            // Android 14+ requires the service to declare as a camera type.
+            if (video) type |= ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA;
         }
         ServiceCompat.startForeground(this, NOTIF_ID, notification, type);
 
