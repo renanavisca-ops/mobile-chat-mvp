@@ -524,6 +524,8 @@ export default function ChatsPage() {
         return t('chatsList.contact');
       case 'location':
         return t('chatsList.location');
+      case 'event':
+        return t('chatsList.event');
       case 'poll':
         return t('chatsList.poll');
       case 'file':
