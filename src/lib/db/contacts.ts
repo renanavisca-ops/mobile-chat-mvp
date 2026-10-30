@@ -83,6 +83,21 @@ export async function listMyContacts(): Promise<ProfileLite[]> {
   return result;
 }
 
+/** Whether the given user is in the current user's contacts. */
+export async function isContact(userId: string): Promise<boolean> {
+  const supabase = browserSupabase();
+  const { data: me } = await supabase.auth.getUser();
+  if (!me.user) return false;
+  const { data, error } = await supabase
+    .from('contacts')
+    .select('contact_id')
+    .eq('owner_id', me.user.id)
+    .eq('contact_id', userId)
+    .maybeSingle();
+  if (error) return false;
+  return !!data;
+}
+
 /**
  * Add a contact
  */

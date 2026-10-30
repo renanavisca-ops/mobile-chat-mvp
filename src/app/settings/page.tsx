@@ -59,6 +59,8 @@ export default function SettingsPage() {
   const [activeDeviceId, setActiveDeviceId] = useState<string | null>(null);
   const [showOnline, setShowOnline] = useState<boolean>(true);
   const [readReceipts, setReadReceipts] = useState<boolean>(true);
+  const [groupAddPolicy, setGroupAddPolicy] = useState<'everyone' | 'contacts' | 'nobody'>('everyone');
+  const [callsPolicy, setCallsPolicy] = useState<'everyone' | 'contacts'>('everyone');
   const [savingPrivacy, setSavingPrivacy] = useState(false);
   const [statusPrivacyOpen, setStatusPrivacyOpen] = useState(false);
   const [storageOpen, setStorageOpen] = useState(false);
@@ -447,6 +449,8 @@ export default function SettingsPage() {
           setProfile(prof);
           setShowOnline((prof as any)?.show_online ?? true);
           setReadReceipts((prof as any)?.read_receipts ?? true);
+          setGroupAddPolicy((prof as any)?.group_add_policy ?? 'everyone');
+          setCallsPolicy((prof as any)?.calls_policy ?? 'everyone');
           setDisplayName((prof as any)?.display_name ?? '');
           setAvatarUrl((prof as any)?.avatar_url ?? null);
         }
@@ -524,6 +528,38 @@ export default function SettingsPage() {
       if (error) throw error;
     } catch (e: any) {
       setReadReceipts(!next); // revert on failure
+      setStatus(`❌ ${e?.message ?? String(e)}`);
+    } finally {
+      setSavingPrivacy(false);
+    }
+  }
+
+  async function saveGroupAddPolicy(next: 'everyone' | 'contacts' | 'nobody') {
+    if (!user) return;
+    const prev = groupAddPolicy;
+    setGroupAddPolicy(next);
+    setSavingPrivacy(true);
+    try {
+      const { error } = await supabase.from('profiles').update({ group_add_policy: next } as any).eq('id', user.id);
+      if (error) throw error;
+    } catch (e: any) {
+      setGroupAddPolicy(prev);
+      setStatus(`❌ ${e?.message ?? String(e)}`);
+    } finally {
+      setSavingPrivacy(false);
+    }
+  }
+
+  async function saveCallsPolicy(next: 'everyone' | 'contacts') {
+    if (!user) return;
+    const prev = callsPolicy;
+    setCallsPolicy(next);
+    setSavingPrivacy(true);
+    try {
+      const { error } = await supabase.from('profiles').update({ calls_policy: next } as any).eq('id', user.id);
+      if (error) throw error;
+    } catch (e: any) {
+      setCallsPolicy(prev);
       setStatus(`❌ ${e?.message ?? String(e)}`);
     } finally {
       setSavingPrivacy(false);
@@ -952,6 +988,44 @@ export default function SettingsPage() {
                 />
               </button>
             </div>
+            <div className="rounded-xl border border-slate-900 bg-slate-950/50 p-4 shadow-sm">
+              <div className="text-sm font-medium text-slate-200">{t('settings.whoAddsGroups')}</div>
+              <div className="mt-1 text-xs text-slate-400">{t('settings.whoAddsGroupsDesc')}</div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {(['everyone', 'contacts', 'nobody'] as const).map((opt) => (
+                  <button
+                    key={opt}
+                    type="button"
+                    disabled={savingPrivacy}
+                    onClick={() => saveGroupAddPolicy(opt)}
+                    aria-pressed={groupAddPolicy === opt}
+                    className={`rounded-full px-3 py-1.5 text-xs ${groupAddPolicy === opt ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'} disabled:opacity-50`}
+                  >
+                    {t(`settings.policy_${opt}`)}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-slate-900 bg-slate-950/50 p-4 shadow-sm">
+              <div className="text-sm font-medium text-slate-200">{t('settings.whoCalls')}</div>
+              <div className="mt-1 text-xs text-slate-400">{t('settings.whoCallsDesc')}</div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {(['everyone', 'contacts'] as const).map((opt) => (
+                  <button
+                    key={opt}
+                    type="button"
+                    disabled={savingPrivacy}
+                    onClick={() => saveCallsPolicy(opt)}
+                    aria-pressed={callsPolicy === opt}
+                    className={`rounded-full px-3 py-1.5 text-xs ${callsPolicy === opt ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'} disabled:opacity-50`}
+                  >
+                    {t(`settings.policy_${opt}`)}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <button
               type="button"
               onClick={() => setStatusPrivacyOpen(true)}
