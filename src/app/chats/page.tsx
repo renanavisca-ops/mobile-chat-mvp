@@ -598,6 +598,9 @@ export default function ChatsPage() {
                       <Link href="/channels" onClick={() => setMenuOpen(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-200 hover:bg-slate-900">
                         <HashIcon size={18} /> {t('nav.channels')}
                       </Link>
+                      <Link href="/communities" onClick={() => setMenuOpen(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-200 hover:bg-slate-900">
+                        <UsersIcon size={18} /> {t('nav.communities')}
+                      </Link>
                     </div>
                   </>
                 )}
