@@ -63,6 +63,7 @@ export default function SettingsPage() {
   const [readReceipts, setReadReceipts] = useState<boolean>(true);
   const [groupAddPolicy, setGroupAddPolicy] = useState<'everyone' | 'contacts' | 'nobody'>('everyone');
   const [callsPolicy, setCallsPolicy] = useState<'everyone' | 'contacts'>('everyone');
+  const [allowBroadcasts, setAllowBroadcasts] = useState(true);
   const [savingPrivacy, setSavingPrivacy] = useState(false);
   const [statusPrivacyOpen, setStatusPrivacyOpen] = useState(false);
   const [storageOpen, setStorageOpen] = useState(false);
@@ -452,6 +453,7 @@ export default function SettingsPage() {
           setReadReceipts((prof as any)?.read_receipts ?? true);
           setGroupAddPolicy((prof as any)?.group_add_policy ?? 'everyone');
           setCallsPolicy((prof as any)?.calls_policy ?? 'everyone');
+          setAllowBroadcasts((prof as any)?.allow_broadcasts !== false);
           setDisplayName((prof as any)?.display_name ?? '');
           setAvatarUrl((prof as any)?.avatar_url ?? null);
         }
@@ -545,6 +547,22 @@ export default function SettingsPage() {
       if (error) throw error;
     } catch (e: any) {
       setGroupAddPolicy(prev);
+      setStatus(`❌ ${e?.message ?? String(e)}`);
+    } finally {
+      setSavingPrivacy(false);
+    }
+  }
+
+  async function toggleAllowBroadcasts() {
+    if (!user) return;
+    const next = !allowBroadcasts;
+    setAllowBroadcasts(next);
+    setSavingPrivacy(true);
+    try {
+      const { error } = await supabase.from('profiles').update({ allow_broadcasts: next } as any).eq('id', user.id);
+      if (error) throw error;
+    } catch (e: any) {
+      setAllowBroadcasts(!next);
       setStatus(`❌ ${e?.message ?? String(e)}`);
     } finally {
       setSavingPrivacy(false);
@@ -1022,6 +1040,22 @@ export default function SettingsPage() {
                   </button>
                 ))}
               </div>
+            </div>
+
+            <div className="rounded-xl border border-slate-900 bg-slate-950/50 p-4 shadow-sm flex items-center justify-between gap-3">
+              <div>
+                <div className="text-sm font-medium text-slate-200">{t('settings.allowBroadcasts')}</div>
+                <div className="text-xs text-slate-400 mt-1">{t('settings.allowBroadcastsDesc')}</div>
+              </div>
+              <button
+                onClick={toggleAllowBroadcasts}
+                disabled={savingPrivacy}
+                role="switch"
+                aria-checked={allowBroadcasts}
+                className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors disabled:opacity-50 ${allowBroadcasts ? 'bg-emerald-600' : 'bg-slate-700'}`}
+              >
+                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${allowBroadcasts ? 'translate-x-6' : 'translate-x-1'}`} />
+              </button>
             </div>
 
             <button

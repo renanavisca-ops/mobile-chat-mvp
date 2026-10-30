@@ -380,6 +380,7 @@ const en = {
     sending: 'Sending…',
     sentSummary: 'Sent to {ok} of {total}.',
     failedCount: '{n} failed',
+    skippedCount: "{n} skipped (don't accept broadcasts)",
   },
   groupInfo: {
     title: 'Group info',
@@ -1039,6 +1040,8 @@ const en = {
     whoAddsGroupsDesc: 'With "My contacts", only people you have as a contact can add you.',
     whoCalls: 'Who can call me',
     whoCallsDesc: '1:1 calls from non-contacts are auto-declined when you choose "My contacts".',
+    allowBroadcasts: 'Receive broadcast lists',
+    allowBroadcastsDesc: "If off, you won't receive messages sent via broadcast lists.",
     policy_everyone: 'Everyone',
     policy_contacts: 'My contacts',
     policy_nobody: 'Nobody',

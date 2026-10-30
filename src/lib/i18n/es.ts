@@ -382,6 +382,7 @@ const es: Dictionary = {
     sending: 'Enviando…',
     sentSummary: 'Enviado a {ok} de {total}.',
     failedCount: '{n} fallaron',
+    skippedCount: '{n} omitidos (no aceptan difusiones)',
   },
   groupInfo: {
     title: 'Información del grupo',
@@ -1041,6 +1042,8 @@ const es: Dictionary = {
     whoAddsGroupsDesc: 'Si eliges "Mis contactos", solo quienes tengas como contacto podrán agregarte.',
     whoCalls: 'Quién puede llamarme',
     whoCallsDesc: 'Las llamadas 1:1 de desconocidos se rechazan automáticamente cuando eliges "Mis contactos".',
+    allowBroadcasts: 'Recibir listas de difusión',
+    allowBroadcastsDesc: 'Si lo desactivas, no recibirás mensajes enviados por listas de difusión.',
     policy_everyone: 'Todos',
     policy_contacts: 'Mis contactos',
     policy_nobody: 'Nadie',
