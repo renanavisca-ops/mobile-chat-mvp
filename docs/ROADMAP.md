@@ -75,7 +75,7 @@ Alto valor, bajo riesgo, sin dependencias externas.
 - [x] **Descarga automática** configurable por red (Wi-Fi/datos) y tipo (fotos/voz/video): lo desactivado se descarga al tocar · Ajustes → Datos y almacenamiento
 - [x] **Gestión de almacenamiento**: uso de caché por chat, archivos más grandes y liberar espacio (Ajustes → Datos y almacenamiento → Almacenamiento). Solo caché local; el objeto compartido en el servidor no se toca.
 - [x] **Eventos/recordatorios**: tarjeta de evento en el chat + RSVP (Voy/Tal vez/No) + "Agregar al calendario" (.ics/Google) para el recordatorio. Push programado en servidor: pendiente 🔒 (requiere scheduler)
-- [ ] **Paquetes de stickers** y favoritos; importar/organizar
+- [x] **Paquetes de stickers** y favoritos; importar/organizar: pestañas Favoritos/Todos/paquetes, ★ favoritos, importar imagen como sticker, mover a paquete (organización local por dispositivo)
 
 ## Etapa 3 — Privacidad y seguridad
 
