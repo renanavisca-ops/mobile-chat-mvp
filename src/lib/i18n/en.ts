@@ -623,6 +623,8 @@ const en = {
     logNoAnswer: 'No answer',
     logDeclined: 'Call declined',
     hangUp: 'Hang up',
+    addParticipant: 'Add participant',
+    noContactsToAdd: 'No contacts to add.',
     mute: 'Mute',
     unmute: 'Unmute',
     toggleCamera: 'Toggle camera',

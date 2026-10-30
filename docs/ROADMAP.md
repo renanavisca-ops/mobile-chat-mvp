@@ -111,8 +111,8 @@ Alto valor, bajo riesgo, sin dependencias externas.
 
 - [ ] **Selección de salida Bluetooth/auriculares** (hoy altavoz/auricular) 📱
 - [ ] **Enlaces de invitación a llamada** y acceso controlado
-- [ ] **Agregar participantes** a una llamada en curso
-- [ ] **Silenciar llamadas de desconocidos**
+- [x] **Agregar participantes** a una llamada en curso: botón "Agregar participante" en la llamada que invita a un contacto al `callId` actual; el mesh por presencia conecta al que se une (1:1 pasa a grupal)
+- [x] **Silenciar llamadas de desconocidos**: ya cubierto por la política de llamadas "Mis contactos" (Etapa 3) — auto-rechaza llamadas 1:1 de no-contactos
 - [ ] **Adaptación a conexión inestable** (reducción de datos, reconexión robusta)
 - [ ] **Continuidad en segundo plano** afinada por SO/permisos 📱
 
