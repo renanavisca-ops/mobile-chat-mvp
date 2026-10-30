@@ -82,7 +82,7 @@ Alto valor, bajo riesgo, sin dependencias externas.
 - [ ] **Decisión E2EE**: hoy el cifrado de mensajes no está activo (solo medios). Definir alcance real y activarlo de forma verificable, o declarar claramente qué está cifrado 🔒 _(diferido por decisión del usuario — 2026-10)_
 - [x] **Avisos de cambio de clave/dispositivo** de contactos: aviso en el chat 1:1 cuando cambia el número de seguridad del contacto (con "Ver número" y "Entendido"); limpia el estado "verificado"
 - [~] **Bloqueo de la app** con código (PIN) + autobloqueo configurable (Ajustes → Seguridad). Biometría nativa: pendiente 📱 (requiere plugin)
-- [ ] **Bloqueo de chats sensibles** individual (biometría/código)
+- [x] **Bloqueo de chats sensibles** individual con el PIN: bloquear/desbloquear desde el menú del chat, pide PIN al abrir y enmascara la vista previa en la lista (reusa el PIN del bloqueo de app)
 - [ ] **Copias de seguridad cifradas** opcionales y restauración con clave 🔒
 - [ ] **Restricciones**: quién puede agregarme a grupos / llamadas de desconocidos
 - [ ] **Protección frente a enlaces peligrosos** (avisos) y reporte de spam

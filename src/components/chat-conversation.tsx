@@ -39,6 +39,7 @@ import { tap, impact } from '@/lib/haptics';
 import { LinkPreview, firstUrl } from '@/components/link-preview';
 import { SafetyNumberModal } from '@/components/safety-number-modal';
 import { peerFingerprint } from '@/lib/crypto/keystore';
+import { isChatLocked, isChatLockAvailable, lockChat, unlockChat, verifyChatPin } from '@/lib/chat-lock';
 import { starMessage, unstarMessage, getStarredIdsForChat } from '@/lib/db/stars';
 import { ImageEditor } from '@/components/image-editor';
 import { MessageEffects, detectEffect } from '@/components/message-effects';
@@ -588,6 +589,12 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
   // safety-number fingerprint differs from the last one we saw.
   const [keyChanged, setKeyChanged] = useState(false);
   const [peerFp, setPeerFp] = useState<string | null>(null);
+  // Sensitive-chat lock: whether this chat is locked and still needs a PIN to
+  // reveal in this view. Re-locks every time the conversation is opened.
+  const [chatLocked, setChatLocked] = useState(() => isChatLocked(chatId));
+  const [needUnlock, setNeedUnlock] = useState(() => isChatLocked(chatId));
+  const [unlockPin, setUnlockPin] = useState('');
+  const [unlockError, setUnlockError] = useState(false);
   const [starredIds, setStarredIds] = useState<Set<string>>(new Set());
   const [starredOpen, setStarredOpen] = useState(false);
   const [selectMode, setSelectMode] = useState(false);
@@ -1195,6 +1202,43 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
       try { localStorage.setItem(`toky:peerfp:${otherUserId}`, peerFp); } catch {}
     }
     setKeyChanged(false);
+  }
+
+  // Lock gate: re-evaluate whenever the open chat changes. A locked chat needs
+  // the PIN re-entered each time it's opened.
+  useEffect(() => {
+    const locked = isChatLocked(chatId);
+    setChatLocked(locked);
+    setNeedUnlock(locked);
+    setUnlockPin('');
+    setUnlockError(false);
+  }, [chatId]);
+
+  function toggleChatLock() {
+    setSafetyMenuOpen(false);
+    if (chatLocked) {
+      unlockChat(chatId);
+      setChatLocked(false);
+      return;
+    }
+    if (!isChatLockAvailable()) {
+      toast(t('chatLock.needAppLock'));
+      return;
+    }
+    lockChat(chatId);
+    setChatLocked(true);
+  }
+
+  async function submitChatUnlock() {
+    if (unlockPin.length < 4) return;
+    if (await verifyChatPin(unlockPin)) {
+      setNeedUnlock(false);
+      setUnlockPin('');
+      setUnlockError(false);
+    } else {
+      setUnlockError(true);
+      setUnlockPin('');
+    }
   }
 
   async function toggleBlock() {
@@ -2789,7 +2833,18 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
                     {t('safety.title')}
                   </button>
                 )}
-                {otherUserId && <div className="my-1 border-t border-slate-800/70" />}
+                <button
+                  type="button"
+                  onClick={toggleChatLock}
+                  className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-slate-200 hover:bg-slate-900"
+                >
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="4" y="11" width="16" height="9" rx="2" />
+                    <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+                  </svg>
+                  {chatLocked ? t('chatLock.unlockChat') : t('chatLock.lockChat')}
+                </button>
+                <div className="my-1 border-t border-slate-800/70" />
                 {otherUserId && (<>
                 <button
                   type="button"
@@ -4405,6 +4460,53 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
         peerName={headerName}
         peerUserId={otherUserId}
       />
+
+      {needUnlock && (
+        <div className="fixed inset-0 z-[110] flex flex-col items-center justify-center gap-5 bg-slate-950 px-6 text-center">
+          <div className="toky-grad grid h-14 w-14 place-items-center rounded-3xl text-white">
+            <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="4" y="11" width="16" height="9" rx="2" />
+              <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+            </svg>
+          </div>
+          <div>
+            <h2 className="font-display text-lg font-bold text-slate-100">{t('chatLock.lockedTitle')}</h2>
+            <p className="mt-1 text-sm text-slate-400">{t('chatLock.lockedSubtitle')}</p>
+          </div>
+          <input
+            type="password"
+            inputMode="numeric"
+            autoComplete="off"
+            maxLength={12}
+            autoFocus
+            value={unlockPin}
+            onChange={(e) => { setUnlockPin(e.target.value.replace(/\D/g, '')); setUnlockError(false); }}
+            onKeyDown={(e) => { if (e.key === 'Enter') void submitChatUnlock(); }}
+            placeholder="••••"
+            className={`w-44 rounded-2xl border bg-slate-900 px-4 py-3 text-center text-2xl tracking-[0.4em] text-slate-100 focus:outline-none ${
+              unlockError ? 'border-rose-500 focus:ring-2 focus:ring-rose-500/40' : 'border-slate-700 focus:ring-2 focus:ring-indigo-500/40'
+            }`}
+          />
+          {unlockError && <p className="-mt-3 text-xs text-rose-400">{t('appLock.wrongPin')}</p>}
+          <div className="flex w-44 flex-col gap-2">
+            <button
+              type="button"
+              onClick={submitChatUnlock}
+              disabled={unlockPin.length < 4}
+              className="toky-grad toky-ring-brand rounded-2xl px-4 py-3 text-sm font-semibold text-white disabled:opacity-50"
+            >
+              {t('appLock.unlock')}
+            </button>
+            <button
+              type="button"
+              onClick={() => { try { window.history.back(); } catch { /* ignore */ } }}
+              className="rounded-2xl border border-slate-800 px-4 py-2.5 text-sm text-slate-300 hover:bg-slate-800/40"
+            >
+              {t('common.cancel')}
+            </button>
+          </div>
+        </div>
+      )}
 
       {starredOpen && (
         <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/60 p-0 backdrop-blur-sm sm:items-center sm:p-4" onClick={() => setStarredOpen(false)}>

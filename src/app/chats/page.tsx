@@ -14,6 +14,7 @@ import { useRequireAuth } from '@/lib/auth/use-require-auth';
 import { ensureIdentity } from '@/lib/crypto/keystore';
 import { browserSupabase } from '@/lib/supabase/client';
 import { listChats, markIncomingDelivered, setChatArchived, setChatFavorite, getOrCreateSelfChat, searchAllMessages } from '@/lib/db/chats';
+import { isChatLocked } from '@/lib/chat-lock';
 import { getCached, setCached } from '@/lib/cache';
 import { tap, impact } from '@/lib/haptics';
 import { useIsOnline } from '@/components/presence-provider';
@@ -507,6 +508,7 @@ export default function ChatsPage() {
   }
 
   function preview(c: ChatSummary): string {
+    if (isChatLocked(c.id)) return `🔒 ${t('chatLock.listLocked')}`;
     switch (c.last_message_kind) {
       case 'text':
         return c.last_ciphertext ?? '';
