@@ -7,25 +7,12 @@ import { listMessages, listMessagesSince, markMessagesAsRead, listReactions, lis
 import type { MessageRow, MessageReaction, PollVote, HiddenMessage } from '@/lib/db/types';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import { getCached, setCached } from '@/lib/cache';
+import { mergeMessages } from '@/lib/realtime/merge-messages';
 
 const PAGE_SIZE = 50;
 // Persisted per-chat cache size. Kept modest so localStorage doesn't bloat
 // across many chats; older history still loads on demand via "load more".
 const CACHE_CAP = 60;
-
-// Merge fetched rows onto existing ones: de-dupe by id and drop our optimistic
-// `local-` echoes once the real row (same plaintext) has arrived, then sort.
-function mergeMessages(prev: MessageRow[], rows: MessageRow[]): MessageRow[] {
-  const map = new Map<string, MessageRow>();
-  for (const m of prev) map.set(m.id, m);
-  for (const r of rows) map.set(r.id, r);
-  const realCiphertexts = new Set(rows.map((r) => r.ciphertext ?? ''));
-  const merged = Array.from(map.values()).filter(
-    (m) => !(String(m.id).startsWith('local-') && realCiphertexts.has(m.ciphertext ?? ''))
-  );
-  merged.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-  return merged;
-}
 
 export function useChatRealtime(chatId: string) {
   // Seed synchronously from the persisted cache so the conversation paints
