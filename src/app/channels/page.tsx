@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { PageShell } from '@/components/page-shell';
 import { useRequireAuth } from '@/lib/auth/use-require-auth';
-import { listPublicChannels, createChannel, joinChannel, type ChannelSummary } from '@/lib/db/chats';
+import { listPublicChannels, createChannel, joinChannel, leaveChat, type ChannelSummary } from '@/lib/db/chats';
 import { EmptyState } from '@/components/empty-state';
 import { ChatListSkeleton } from '@/components/skeleton';
 import { HashIcon, PlusIcon } from '@/components/icons';
@@ -56,6 +56,19 @@ export default function ChannelsPage() {
       router.push(`/chats/view?c=${c.id}`);
     } catch (e: any) {
       setErr(e?.message ?? String(e));
+      setBusyId(null);
+    }
+  }
+
+  async function onUnfollow(c: ChannelSummary) {
+    setBusyId(c.id);
+    setErr('');
+    try {
+      await leaveChat(c.id);
+      setChannels((prev) => prev.map((x) => (x.id === c.id ? { ...x, joined: false } : x)));
+    } catch (e: any) {
+      setErr(e?.message ?? String(e));
+    } finally {
       setBusyId(null);
     }
   }
@@ -126,11 +139,21 @@ export default function ChannelsPage() {
                   ) : null}
                 </div>
                 {c.joined ? (
-                  <Link href={`/chats/view?c=${c.id}`}
-                    className="shrink-0 rounded-lg border border-slate-800 bg-slate-900 px-3 py-1.5 text-xs text-slate-200 hover:bg-slate-800"
-                  >
-                    {t('channels.open')}
-                  </Link>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <Link href={`/chats/view?c=${c.id}`}
+                      className="rounded-lg border border-slate-800 bg-slate-900 px-3 py-1.5 text-xs text-slate-200 hover:bg-slate-800"
+                    >
+                      {t('channels.open')}
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={() => onUnfollow(c)}
+                      disabled={busyId === c.id}
+                      className="rounded-lg border border-slate-800 bg-slate-900 px-3 py-1.5 text-xs text-rose-300 hover:bg-slate-800 disabled:opacity-50"
+                    >
+                      {busyId === c.id ? t('channels.unfollowing') : t('channels.unfollow')}
+                    </button>
+                  </div>
                 ) : (
                   <button
                     type="button"

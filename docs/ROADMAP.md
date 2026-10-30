@@ -95,11 +95,11 @@ Alto valor, bajo riesgo, sin dependencias externas.
 - [x] **Revocar dispositivos** perdidos y administrar sesiones: lista de dispositivos de la cuenta (con etiqueta por plataforma y fecha), "este dispositivo" y revocar los demás · Ajustes → Dispositivo (además de "Cerrar sesión en todos")
 - [x] **Cola de envío offline** y reintentos idempotentes: los envíos (texto y payloads con medios ya subidos) se encolan sin conexión y se reintentan al reconectar; `client_id` único por remitente evita duplicados aunque un reintento ya hubiera llegado
 - [x] **Resolución de conflictos** y reconciliación al reconectar: al volver la conexión/foco se reconcilia la página viva — se reflejan ediciones, se eliminan mensajes borrados/expirados detectados ausentes y se conservan los ecos locales pendientes e historial anterior (con pruebas)
-- [ ] **Cliente de escritorio** (empaquetar la web como app de escritorio) 🔒
+- [ ] **Cliente de escritorio** (empaquetar la web como app de escritorio) 🔒 _(diferido por decisión del usuario — 2026-10; requiere Electron/Tauri y build fuera de este entorno)_
 
 ## Etapa 5 — Canales, difusión y comunidades
 
-- [ ] **Canales públicos/privados** más allá de novedades: crear, seguir, dejar de seguir
+- [x] **Canales públicos** más allá de novedades: crear, seguir y **dejar de seguir** (nuevo) · Canales privados (invitación): pendiente v2
 - [ ] **Descubrir/buscar canales**; directorio y categorías
 - [ ] **Publicar** en canal: texto, imagen, video, enlace, audio, encuesta
 - [ ] **Reacciones y métricas** agregadas por publicación

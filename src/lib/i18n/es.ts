@@ -73,6 +73,8 @@ const es: Dictionary = {
     join: 'Seguir',
     joining: 'Siguiendo…',
     open: 'Abrir',
+    unfollow: 'Dejar de seguir',
+    unfollowing: 'Saliendo…',
     readOnlyNotice: 'Solo el propietario del canal puede publicar aquí.',
   },
   consent: {
