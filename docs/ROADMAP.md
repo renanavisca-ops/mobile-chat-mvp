@@ -109,7 +109,7 @@ Alto valor, bajo riesgo, sin dependencias externas.
 
 ## Etapa 6 — Llamadas (mejoras)
 
-- [ ] **Selección de salida Bluetooth/auriculares** (hoy altavoz/auricular) 📱
+- [x] **Selección de salida Bluetooth/auriculares** 📱: selector de salida de audio en la llamada (auricular/altavoz/cable/Bluetooth) vía AudioRoute nativo (Android; toma efecto en el próximo build)
 - [x] **Enlaces de invitación a llamada** y acceso controlado: botón "Copiar enlace" en la llamada genera `/call?c=…`; abrirlo une a la persona al `callId` (acceso controlado: solo miembros del chat de la llamada)
 - [x] **Agregar participantes** a una llamada en curso: botón "Agregar participante" en la llamada que invita a un contacto al `callId` actual; el mesh por presencia conecta al que se une (1:1 pasa a grupal)
 - [x] **Silenciar llamadas de desconocidos**: ya cubierto por la política de llamadas "Mis contactos" (Etapa 3) — auto-rechaza llamadas 1:1 de no-contactos

@@ -21,7 +21,10 @@ import {
   hasNativeAudioRoute,
   nativeStartCallAudio,
   nativeSetSpeakerphone,
+  nativeListOutputs,
+  nativeSetOutput,
   nativeStopCallAudio,
+  type CallOutput,
 } from '@/lib/call/native-audio';
 import { useT } from '@/lib/i18n/context';
 import { screenShareSupported, captureScreenTrack, stopScreenCapture } from '@/lib/call/screen-share';
@@ -219,6 +222,9 @@ export function CallProvider({ children }: { children: ReactNode }) {
   // Add-participant picker (invite more people to the ongoing call).
   const [addOpen, setAddOpen] = useState(false);
   const [addRows, setAddRows] = useState<ProfileLite[]>([]);
+  // Audio output picker (native Android: earpiece/speaker/wired/bluetooth).
+  const [outputsOpen, setOutputsOpen] = useState(false);
+  const [outputs, setOutputs] = useState<{ type: CallOutput; active?: boolean }[]>([]);
   // Brief banner shown after a call ends for a notable reason (e.g. rejected).
   const [endedNote, setEndedNote] = useState('');
 
@@ -977,6 +983,17 @@ export function CallProvider({ children }: { children: ReactNode }) {
     cleanup();
   }
 
+  async function openOutputs() {
+    setOutputs(await nativeListOutputs());
+    setOutputsOpen(true);
+  }
+  async function chooseOutput(type: CallOutput) {
+    await nativeSetOutput(type);
+    setSpeakerOn(type === 'speaker');
+    setOutputs(await nativeListOutputs());
+    setOutputsOpen(false);
+  }
+
   function copyCallLink() {
     const origin = typeof window !== 'undefined' ? window.location.origin : '';
     const url = `${origin}/call?c=${callIdRef.current}&chat=${encodeURIComponent(callChatIdRef.current ?? '')}&v=${callVideoRef.current ? 1 : 0}`;
@@ -1488,6 +1505,29 @@ export function CallProvider({ children }: { children: ReactNode }) {
         );
       })()}
 
+      {/* Audio output picker (native) */}
+      {phase === 'incall' && outputsOpen && (
+        <div className="fixed inset-0 z-[99] flex items-end justify-center bg-black/70 p-0 backdrop-blur-sm sm:items-center sm:p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) setOutputsOpen(false); }}>
+          <div className="toky-glass toky-elev w-full max-w-sm rounded-t-3xl border border-slate-800 p-2 sm:rounded-3xl">
+            <div className="px-3 py-2 text-sm font-semibold text-slate-100">{t('call.audioOutput')}</div>
+            <ul>
+              {(outputs.length ? outputs : [{ type: 'earpiece' as CallOutput }, { type: 'speaker' as CallOutput }]).map((o) => (
+                <li key={o.type}>
+                  <button
+                    type="button"
+                    onClick={() => void chooseOutput(o.type)}
+                    className={`flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left text-sm hover:bg-slate-900 ${o.active ? 'text-emerald-300' : 'text-slate-100'}`}
+                  >
+                    <span>{t(`call.output_${o.type}`)}</span>
+                    {o.active && <span>✓</span>}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
+
       {/* Incoming */}
       {phase === 'ringing' && incoming && (
         <div className="fixed inset-0 z-[95] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
@@ -1665,6 +1705,17 @@ export function CallProvider({ children }: { children: ReactNode }) {
             >
               {speakerOn ? <SpeakerIcon size={22} /> : <SpeakerOffIcon size={22} />}
             </button>
+            {hasNativeAudioRoute() && (
+              <button
+                type="button"
+                onClick={openOutputs}
+                aria-label={t('call.audioOutput')}
+                title={t('call.audioOutput')}
+                className="grid h-12 w-12 place-items-center rounded-full bg-slate-800 text-white hover:bg-slate-700"
+              >
+                <OutputGlyph />
+              </button>
+            )}
             {canScreenShare && (
               <button
                 type="button"
@@ -1722,6 +1773,15 @@ export function CallProvider({ children }: { children: ReactNode }) {
         </div>
       )}
     </Ctx.Provider>
+  );
+}
+
+function OutputGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" width={22} height={22} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+      <path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4" />
+    </svg>
   );
 }
 
