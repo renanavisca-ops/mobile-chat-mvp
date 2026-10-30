@@ -10,6 +10,9 @@ const es: Dictionary = {
     markVerified: 'Marcar como verificado',
     verified: 'Verificado',
     unavailable: 'Este contacto aún no ha publicado una clave de cifrado, así que no hay número de seguridad disponible.',
+    keyChanged: 'El número de seguridad de {{name}} cambió. Pudo cambiar de dispositivo o reinstalar la app; también podría indicar que alguien intercepta. Verifícalo si es importante.',
+    viewNumber: 'Ver número',
+    gotIt: 'Entendido',
   },
   common: {
     save: 'Guardar',

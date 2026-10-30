@@ -38,6 +38,7 @@ import { extractMentionIds } from '@/lib/mentions';
 import { tap, impact } from '@/lib/haptics';
 import { LinkPreview, firstUrl } from '@/components/link-preview';
 import { SafetyNumberModal } from '@/components/safety-number-modal';
+import { peerFingerprint } from '@/lib/crypto/keystore';
 import { starMessage, unstarMessage, getStarredIdsForChat } from '@/lib/db/stars';
 import { ImageEditor } from '@/components/image-editor';
 import { MessageEffects, detectEffect } from '@/components/message-effects';
@@ -583,6 +584,10 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
 
   // Forward state
   const [safetyOpen, setSafetyOpen] = useState(false);
+  // Peer key/device-change warning (direct chats): set when the contact's
+  // safety-number fingerprint differs from the last one we saw.
+  const [keyChanged, setKeyChanged] = useState(false);
+  const [peerFp, setPeerFp] = useState<string | null>(null);
   const [starredIds, setStarredIds] = useState<Set<string>>(new Set());
   const [starredOpen, setStarredOpen] = useState(false);
   const [selectMode, setSelectMode] = useState(false);
@@ -1155,6 +1160,42 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
     if (!otherUserId) return;
     isBlockedByMe(otherUserId).then(setBlocked).catch(() => {});
   }, [otherUserId]);
+
+  // Watch the contact's safety-number fingerprint. The first time we see it we
+  // remember it silently; if it later differs (new device / reinstall / someone
+  // intercepting), we surface a warning and drop any prior "verified" mark.
+  useEffect(() => {
+    setKeyChanged(false);
+    setPeerFp(null);
+    if (!otherUserId) return;
+    let alive = true;
+    peerFingerprint(otherUserId)
+      .then((fp) => {
+        if (!alive || !fp) return;
+        const key = `toky:peerfp:${otherUserId}`;
+        let prev: string | null = null;
+        try { prev = localStorage.getItem(key); } catch {}
+        if (!prev) {
+          try { localStorage.setItem(key, fp); } catch {}
+          return;
+        }
+        if (prev !== fp) {
+          setPeerFp(fp);
+          setKeyChanged(true);
+          try { localStorage.setItem(`toky:verified:${chatId}`, '0'); } catch {}
+        }
+      })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [otherUserId, chatId]);
+
+  // Dismiss the key-change warning: trust the new fingerprint going forward.
+  function acknowledgeKeyChange() {
+    if (otherUserId && peerFp) {
+      try { localStorage.setItem(`toky:peerfp:${otherUserId}`, peerFp); } catch {}
+    }
+    setKeyChanged(false);
+  }
 
   async function toggleBlock() {
     if (!otherUserId) return;
@@ -3318,6 +3359,30 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
                 {items.find((m) => m.id === chat.pinned_message_id)?.body.text || t('chat.pinnedFallback')}
               </span>
             </button>
+          )}
+
+          {keyChanged && (
+            <div className="mb-2 flex flex-col gap-2 rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2.5 text-xs text-amber-100 sm:flex-row sm:items-center">
+              <span className="flex-1">
+                ⚠️ {t('safety.keyChanged', { name: headerName })}
+              </span>
+              <span className="flex shrink-0 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSafetyOpen(true)}
+                  className="rounded-lg bg-amber-500/20 px-2.5 py-1 font-medium text-amber-100 hover:bg-amber-500/30"
+                >
+                  {t('safety.viewNumber')}
+                </button>
+                <button
+                  type="button"
+                  onClick={acknowledgeKeyChange}
+                  className="rounded-lg bg-slate-800 px-2.5 py-1 text-slate-200 hover:bg-slate-700"
+                >
+                  {t('safety.gotIt')}
+                </button>
+              </span>
+            </div>
           )}
 
           <div ref={scrollRef} onScroll={handleScroll} style={wallpaperStyle} className="-mx-3 min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain border-y border-slate-900 bg-slate-950/40 px-3 py-3">

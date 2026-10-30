@@ -8,6 +8,9 @@ const en = {
     markVerified: 'Mark as verified',
     verified: 'Verified',
     unavailable: 'This contact has not published an encryption key yet, so a safety number is not available.',
+    keyChanged: "{{name}}'s safety number changed. They may have switched devices or reinstalled the app; it could also mean someone is intercepting. Verify it if this matters.",
+    viewNumber: 'View number',
+    gotIt: 'Got it',
   },
   common: {
     save: 'Save',
