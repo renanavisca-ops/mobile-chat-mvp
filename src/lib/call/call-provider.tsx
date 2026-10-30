@@ -56,10 +56,11 @@ type StartOpts = {
 
 type CallContext = {
   startCall: (opts: StartOpts) => void;
+  joinCallByLink: (opts: { callId: string; chatId: string; video: boolean; label: string }) => void;
   busy: boolean;
 };
 
-const Ctx = createContext<CallContext>({ startCall: () => {}, busy: false });
+const Ctx = createContext<CallContext>({ startCall: () => {}, joinCallByLink: () => {}, busy: false });
 
 type Invite = {
   callId: string;
@@ -871,6 +872,38 @@ export function CallProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  // Join an ongoing call from an invite link. Like acceptCall but driven by
+  // link params instead of an incoming invite; the presence mesh connects us to
+  // whoever's already there. Access is gated by the caller (chat membership
+  // checked before this runs).
+  const joinCallByLink = useCallback(async (opts: { callId: string; chatId: string; video: boolean; label: string }) => {
+    if (phaseRef.current !== 'idle' || !myIdRef.current) return;
+    setErrText('');
+    setLabel(opts.label);
+    setIsVideo(opts.video);
+    callIdRef.current = opts.callId;
+    callChatIdRef.current = opts.chatId;
+    callVideoRef.current = opts.video;
+    callIsGroupRef.current = true;
+    wasCallerRef.current = false;
+    setPhaseBoth('incall');
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia(MEDIA(opts.video));
+      localStreamRef.current = stream;
+      setLocalHasVideo(opts.video);
+      if (localVideoRef.current) localVideoRef.current.srcObject = stream;
+      await nativeStartCallAudio();
+      setSpeakerOn(opts.video);
+      await applySpeaker(opts.video);
+      iceServersRef.current = await getIceServers();
+      await joinCall(opts.callId);
+    } catch (e: any) {
+      setErrText(e?.message ?? String(e));
+      cleanup();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   function declineCall() {
     const inv = incoming;
     if (inv) sendToUser(inv.from, 'declined', { callId: inv.callId, from: myIdRef.current });
@@ -884,6 +917,15 @@ export function CallProvider({ children }: { children: ReactNode }) {
       for (const pid of invitedRef.current) sendToUser(pid, 'cancel', { callId: callIdRef.current });
     }
     cleanup();
+  }
+
+  function copyCallLink() {
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    const url = `${origin}/call?c=${callIdRef.current}&chat=${encodeURIComponent(callChatIdRef.current ?? '')}&v=${callVideoRef.current ? 1 : 0}`;
+    const done = () => { setEndedNote(t('call.linkCopied')); window.setTimeout(() => setEndedNote(''), 2500); };
+    try {
+      navigator.clipboard.writeText(url).then(done).catch(done);
+    } catch { done(); }
   }
 
   function toggleMute() {
@@ -1236,7 +1278,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
     : t('call.connecting');
 
   return (
-    <Ctx.Provider value={{ startCall, busy: phase !== 'idle' }}>
+    <Ctx.Provider value={{ startCall, joinCallByLink, busy: phase !== 'idle' }}>
       {children}
 
       {endedNote && (
@@ -1603,6 +1645,15 @@ export function CallProvider({ children }: { children: ReactNode }) {
             </button>
             <button
               type="button"
+              onClick={copyCallLink}
+              aria-label={t('call.copyLink')}
+              title={t('call.copyLink')}
+              className="grid h-12 w-12 place-items-center rounded-full bg-slate-800 text-white hover:bg-slate-700"
+            >
+              <LinkGlyph />
+            </button>
+            <button
+              type="button"
               onClick={endCall}
               aria-label={t('call.hangUp')}
               className="grid h-14 w-14 place-items-center rounded-full bg-rose-600 text-white shadow-[0_8px_22px_-8px_rgba(225,29,72,0.8)] hover:bg-rose-500"
@@ -1613,6 +1664,15 @@ export function CallProvider({ children }: { children: ReactNode }) {
         </div>
       )}
     </Ctx.Provider>
+  );
+}
+
+function LinkGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" width={22} height={22} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M10 13a5 5 0 0 0 7.07 0l2-2a5 5 0 0 0-7.07-7.07l-1 1" />
+      <path d="M14 11a5 5 0 0 0-7.07 0l-2 2a5 5 0 0 0 7.07 7.07l1-1" />
+    </svg>
   );
 }
 
