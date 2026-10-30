@@ -47,6 +47,28 @@ export async function listMyStickers(limit = 200): Promise<Sticker[]> {
     });
 }
 
+/**
+ * Turn a picked image into a sticker-sized transparent PNG (fit inside 512×512,
+ * aspect preserved) for quick import without opening the full editor.
+ */
+export async function imageToStickerBlob(file: File | Blob): Promise<Blob> {
+  const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' } as ImageBitmapOptions);
+  const MAX = 512;
+  const scale = Math.min(1, MAX / Math.max(bitmap.width, bitmap.height));
+  const w = Math.max(1, Math.round(bitmap.width * scale));
+  const h = Math.max(1, Math.round(bitmap.height * scale));
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) { bitmap.close?.(); throw new Error('canvas unavailable'); }
+  ctx.drawImage(bitmap, 0, 0, w, h);
+  bitmap.close?.();
+  const blob: Blob | null = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+  if (!blob) throw new Error('encode failed');
+  return blob;
+}
+
 /** Delete one of the current user's stickers. */
 export async function deleteSticker(path: string): Promise<void> {
   const supabase = browserSupabase();
