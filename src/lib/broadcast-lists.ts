@@ -90,3 +90,33 @@ export function deleteBroadcastList(ownerId: string, id: string): void {
   store[ownerId] = (store[ownerId] ?? []).filter((l) => l.id !== id);
   writeStore(store);
 }
+
+/**
+ * Delivery rule / consent: of the given recipient ids, return which accept
+ * broadcasts (profiles.allow_broadcasts) and which opted out. Blocked
+ * relationships are additionally rejected by the messages insert policy at send
+ * time, so this covers the opt-out consent and the rest is enforced server-side.
+ */
+export async function filterBroadcastConsent(
+  ids: string[],
+): Promise<{ eligible: Set<string>; optedOut: Set<string> }> {
+  const eligible = new Set<string>();
+  const optedOut = new Set<string>();
+  if (ids.length === 0) return { eligible, optedOut };
+  try {
+    const { browserSupabase } = await import('@/lib/supabase/client');
+    const { data } = await (browserSupabase() as any)
+      .from('profiles')
+      .select('id, allow_broadcasts')
+      .in('id', ids);
+    const byId = new Map<string, boolean>((data ?? []).map((r: any) => [r.id, r.allow_broadcasts !== false]));
+    for (const id of ids) {
+      // Default to eligible if a profile row/flag is missing.
+      if (byId.get(id) === false) optedOut.add(id);
+      else eligible.add(id);
+    }
+  } catch {
+    for (const id of ids) eligible.add(id);
+  }
+  return { eligible, optedOut };
+}

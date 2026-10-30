@@ -104,7 +104,7 @@ Alto valor, bajo riesgo, sin dependencias externas.
 - [x] **Publicar** en canal: texto, imagen, video, enlace, audio, encuesta (el dueño usa el compositor completo; los enlaces generan vista previa)
 - [x] **Reacciones y métricas** agregadas por publicación: reacciones (ya existían, por membresía) + métrica de alcance por post para el dueño (👁 vistas distintas vía `mark_channel_seen` + total de reacciones)
 - [x] **Roles y notificaciones** por canal: el dueño puede nombrar co-administradores que también publican (RLS: canal permite dueño o admin) desde el panel de info del canal; notificaciones por canal (silenciar/activar) en ese mismo panel
-- [ ] **Listas de difusión** con consentimiento y reglas de entrega (ampliar broadcast)
+- [x] **Listas de difusión** con consentimiento y reglas de entrega: cada destinatario puede desactivar "Recibir listas de difusión" (Ajustes → Privacidad); el envío solo llega a quienes lo aceptan (+ bloqueados ya excluidos por RLS) y muestra resumen de omitidos
 - [ ] **Comunidades**: agrupar varios grupos con anuncios y administración central
 
 ## Etapa 6 — Llamadas (mejoras)

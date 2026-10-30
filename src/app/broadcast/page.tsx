@@ -9,6 +9,7 @@ import {
   listBroadcastLists,
   createBroadcastList,
   deleteBroadcastList,
+  filterBroadcastConsent,
   type BroadcastList,
 } from '@/lib/broadcast-lists';
 import { useT } from '@/lib/i18n/context';
@@ -231,7 +232,7 @@ function SendToList({ list, onBack }: { list: BroadcastList; onBack: () => void 
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [done, setDone] = useState<{ ok: number; failed: number } | null>(null);
+  const [done, setDone] = useState<{ ok: number; failed: number; skipped: number } | null>(null);
   const [err, setErr] = useState('');
 
   async function send() {
@@ -241,9 +242,15 @@ function SendToList({ list, onBack }: { list: BroadcastList; onBack: () => void 
     setBusy(true);
     setDone(null);
     setProgress(0);
+
+    // Delivery rule / consent: only send to recipients who accept broadcasts.
+    const { eligible } = await filterBroadcastConsent(list.members.map((m) => m.id));
+    const targets = list.members.filter((m) => eligible.has(m.id));
+    const skipped = list.members.length - targets.length;
+
     let ok = 0;
     let failed = 0;
-    for (const m of list.members) {
+    for (const m of targets) {
       try {
         const chatId = await createDirectChatWith(m.id);
         await sendMessage(chatId, { text: body });
@@ -254,7 +261,7 @@ function SendToList({ list, onBack }: { list: BroadcastList; onBack: () => void 
       setProgress((p) => p + 1);
     }
     setBusy(false);
-    setDone({ ok, failed });
+    setDone({ ok, failed, skipped });
     if (ok > 0) setText('');
   }
 
@@ -276,6 +283,7 @@ function SendToList({ list, onBack }: { list: BroadcastList; onBack: () => void 
             .replace('{ok}', String(done.ok))
             .replace('{total}', String(list.members.length))}
           {done.failed > 0 ? ` · ${t('broadcast.failedCount').replace('{n}', String(done.failed))}` : ''}
+          {done.skipped > 0 ? ` · ${t('broadcast.skippedCount').replace('{n}', String(done.skipped))}` : ''}
         </p>
       )}
 
