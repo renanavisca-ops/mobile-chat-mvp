@@ -6,9 +6,13 @@
 // where the WebView supports neither setSinkId nor real loudspeaker routing.
 import { registerPlugin, Capacitor } from '@capacitor/core';
 
+export type CallOutput = 'earpiece' | 'speaker' | 'wired' | 'bluetooth';
+
 interface AudioRoutePlugin {
   startCallAudio(): Promise<void>;
   setSpeakerphoneOn(options: { on: boolean }): Promise<{ on: boolean }>;
+  listOutputs(): Promise<{ outputs: { type: CallOutput; active?: boolean }[] }>;
+  setOutput(options: { type: CallOutput }): Promise<{ ok: boolean }>;
   stopCallAudio(): Promise<void>;
 }
 
@@ -41,6 +45,28 @@ export async function nativeSetSpeakerphone(on: boolean): Promise<boolean | null
     return typeof res?.on === 'boolean' ? res.on : on;
   } catch {
     return null;
+  }
+}
+
+/** List available call audio outputs (empty off-native). */
+export async function nativeListOutputs(): Promise<{ type: CallOutput; active?: boolean }[]> {
+  if (!hasNativeAudioRoute()) return [];
+  try {
+    const res = await AudioRoute.listOutputs();
+    return Array.isArray(res?.outputs) ? res.outputs : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Route call audio to a specific output. Returns true if applied. */
+export async function nativeSetOutput(type: CallOutput): Promise<boolean> {
+  if (!hasNativeAudioRoute()) return false;
+  try {
+    const res = await AudioRoute.setOutput({ type });
+    return !!res?.ok;
+  } catch {
+    return false;
   }
 }
 
