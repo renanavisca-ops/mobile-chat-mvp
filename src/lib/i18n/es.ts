@@ -861,6 +861,17 @@ const es: Dictionary = {
     use_contacts: 'Compartir una ficha de contacto',
     use_files: 'Adjuntar y descargar archivos',
   },
+  devices: {
+    title: 'Tus dispositivos',
+    desc: 'Dispositivos donde has usado tu cuenta. Puedes revocar los que no reconozcas.',
+    none: 'No hay dispositivos registrados.',
+    unnamed: 'Dispositivo',
+    thisDevice: 'Este dispositivo',
+    added: 'Agregado el {{date}}',
+    revoke: 'Revocar',
+    revoking: 'Revocando…',
+    signOutHint: 'Para cerrar la sesión en todos los dispositivos, usa "Cerrar sesión en todos".',
+  },
   screenSecurity: {
     title: 'Protección de capturas',
     desc: 'Bloquea capturas de pantalla y grabación mientras usas Toky.',

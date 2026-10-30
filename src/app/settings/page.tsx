@@ -21,6 +21,7 @@ import { StorageManager } from '@/components/storage-manager';
 import { AppLockSettings } from '@/components/app-lock-settings';
 import { PermissionsSettings } from '@/components/permissions-settings';
 import { ScreenSecuritySettings } from '@/components/screen-security-settings';
+import { DeviceManager } from '@/components/device-manager';
 import {
   initKeystore,
   isUnlocked,
@@ -58,7 +59,6 @@ export default function SettingsPage() {
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState<string>('');
-  const [activeDeviceId, setActiveDeviceId] = useState<string | null>(null);
   const [showOnline, setShowOnline] = useState<boolean>(true);
   const [readReceipts, setReadReceipts] = useState<boolean>(true);
   const [groupAddPolicy, setGroupAddPolicy] = useState<'everyone' | 'contacts' | 'nobody'>('everyone');
@@ -352,7 +352,6 @@ export default function SettingsPage() {
   }
 
   useEffect(() => {
-    setActiveDeviceId(localStorage.getItem('active_device_id'));
     const id = getWallpaperId();
     setWpId(id);
     if (id === CUSTOM_WALLPAPER_ID) {
@@ -678,10 +677,7 @@ export default function SettingsPage() {
 
           <section className="space-y-3">
             <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500 ml-1">{t('settings.sectionDevice')}</h2>
-            <div className="rounded-xl border border-slate-900 bg-slate-950/50 p-4 shadow-sm">
-              <div className="text-sm font-medium text-slate-200">{t('settings.activeDeviceId')}</div>
-              <div className="text-xs text-slate-400 mt-1">{activeDeviceId ?? t('settings.noDevice')}</div>
-            </div>
+            <DeviceManager />
           </section>
 
           <section className="space-y-3">

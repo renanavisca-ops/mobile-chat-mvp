@@ -1370,7 +1370,10 @@ async function ensureLocalDevice(userId: string): Promise<string> {
     return ids[0];
   }
 
-  const label = `Web-${new Date().toISOString().slice(0, 10)}`;
+  // Label the device by platform so the device manager reads clearly.
+  const ua = typeof navigator !== 'undefined' ? navigator.userAgent : '';
+  const platform = /android/i.test(ua) ? 'Android' : /iphone|ipad|ipod/i.test(ua) ? 'iOS' : 'Web';
+  const label = `${platform} · ${new Date().toISOString().slice(0, 10)}`;
 
   const { data: created, error: cErr } = await supabase
     .from('devices')
