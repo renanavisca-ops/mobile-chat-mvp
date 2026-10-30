@@ -87,7 +87,7 @@ Alto valor, bajo riesgo, sin dependencias externas.
 - [x] **Restricciones**: quién puede agregarme a grupos (Todos/Mis contactos/Nadie, con trigger en el servidor) y llamadas 1:1 de desconocidos (Todos/Mis contactos, auto-rechazo en el receptor) · Ajustes → Privacidad
 - [x] **Protección frente a enlaces peligrosos** (aviso + confirmación antes de abrir enlaces con credenciales embebidas, punycode o IP) y reporte de spam (reporte por mensaje/usuario con motivo "spam", ya disponible)
 - [x] **Permisos granulares** (cámara, micrófono, ubicación, notificaciones) revisables y solicitables en Ajustes → Permisos; contactos y archivos se piden al usar (Permissions API; iOS muestra "se pide al usar")
-- [ ] **Protección de capturas** donde sea técnicamente posible 📱 (sin garantizar)
+- [x] **Protección de capturas** (Android, FLAG_SECURE vía plugin nativo `ScreenSecurity`) con toggle en Ajustes → Seguridad 📱 · iOS no permite bloquear capturas (limitación del SO); toma efecto en el próximo build nativo
 
 ## Etapa 4 — Multidispositivo y sincronización
 

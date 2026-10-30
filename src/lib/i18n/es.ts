@@ -861,6 +861,11 @@ const es: Dictionary = {
     use_contacts: 'Compartir una ficha de contacto',
     use_files: 'Adjuntar y descargar archivos',
   },
+  screenSecurity: {
+    title: 'Protección de capturas',
+    desc: 'Bloquea capturas de pantalla y grabación mientras usas Toky.',
+    androidOnly: 'Disponible en Android. iOS no permite bloquear capturas.',
+  },
   chatLock: {
     lockChat: 'Bloquear chat',
     unlockChat: 'Quitar bloqueo del chat',
