@@ -16,6 +16,7 @@ import { useNotifications } from '@/lib/hooks/useNotifications';
 import { subscribeToPush, unsubscribeFromPush, isPushSubscribed, pushSupported } from '@/lib/push';
 import { isNativeApp } from '@/lib/native-push';
 import { StatusPrivacyModal } from '@/components/status-privacy-modal';
+import { AutoDownloadSettings } from '@/components/autodownload-settings';
 import {
   initKeystore,
   isUnlocked,
@@ -959,6 +960,11 @@ export default function SettingsPage() {
               </div>
               <span className="shrink-0 text-slate-500">›</span>
             </button>
+          </section>
+
+          <section className="space-y-3">
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500 ml-1">{t('settings.sectionData')}</h2>
+            <AutoDownloadSettings />
           </section>
 
           <section className="space-y-3">

@@ -55,6 +55,7 @@ import { PhoneIcon, VideoIcon, PlusIcon, SmileIcon, MicIcon, PencilIcon, ReplyIc
 import { SeenBySheet } from '@/components/seen-by-sheet';
 import { canNativeFiles, shareNativeFile, saveNativeFile, saveMediaToGallery } from '@/lib/native-files';
 import { isAutoSaveOn, setAutoSaveOn, isMediaSaved, markMediaSaved } from '@/lib/media-autosave';
+import { getAutoDownloadSettings, getNetworkClass, onNetworkChange, isAutoDownloadAllowed, type MediaKind, type NetworkClass, type AutoDownloadSettings } from '@/lib/media-autodownload';
 import { compressImageForSend, type SendQuality } from '@/lib/image-compress';
 import type { ChatSummary, MessageRow } from '@/lib/db/types';
 
@@ -527,6 +528,21 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
     return { path };
   }
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  // Auto-download gating: media kinds withheld on the current network show a
+  // tap-to-download tile instead of fetching automatically.
+  const [deferredMedia, setDeferredMedia] = useState<Set<string>>(new Set());
+  const [manualPaths, setManualPaths] = useState<Set<string>>(new Set());
+  const [autoDownload, setAutoDownload] = useState<AutoDownloadSettings>(getAutoDownloadSettings);
+  const [netClass, setNetClass] = useState<NetworkClass>('wifi');
+  useEffect(() => {
+    setAutoDownload(getAutoDownloadSettings());
+    setNetClass(getNetworkClass());
+    const offNet = onNetworkChange(() => setNetClass(getNetworkClass()));
+    // Pick up a settings change made on the Settings screen when we return.
+    const onFocus = () => setAutoDownload(getAutoDownloadSettings());
+    window.addEventListener('focus', onFocus);
+    return () => { offNet(); window.removeEventListener('focus', onFocus); };
+  }, []);
   // Per-send image quality (remembered across sends).
   const [sendQuality, setSendQuality] = useState<SendQuality>('standard');
   useEffect(() => {
@@ -1554,18 +1570,45 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
       // — older/camera-recorded videos were stored without a usable video type,
       // which mobile WebViews won't play from a blob URL.
       const videoPaths = new Set<string>();
+      // Classify each path by media kind for auto-download gating. Unclassified
+      // paths (e.g. documents) are never gated — they open on tap already.
+      const kindByPath = new Map<string, MediaKind>();
       for (const m of items) {
-        for (const p of extractAllPaths(m.body)) {
-          if (!encByPath.has(p)) encByPath.set(p, m.body.enc?.[p]);
+        const b = m.body;
+        for (const p of extractAllPaths(b)) {
+          if (!encByPath.has(p)) encByPath.set(p, b.enc?.[p]);
         }
-        if (m.body.videoPath) videoPaths.add(m.body.videoPath);
+        if (b.imagePath) kindByPath.set(b.imagePath, 'photos');
+        if (Array.isArray(b.imagePaths)) for (const p of b.imagePaths) if (p) kindByPath.set(p, 'photos');
+        if (b.videoPath) { videoPaths.add(b.videoPath); kindByPath.set(b.videoPath, 'video'); }
+        if (b.audioPath) kindByPath.set(b.audioPath, 'audio');
       }
 
       // Skip paths already resolved or already marked failed (tap-to-retry
       // clears the failed mark, which re-admits the path here).
-      const missing = Array.from(encByPath.keys()).filter(
+      const candidates = Array.from(encByPath.keys()).filter(
         (p) => !signedUrls[p] && !failedMedia.has(p)
       );
+
+      // Withhold media the current network/settings don't auto-download, unless
+      // the user tapped to fetch it (manualPaths). The rest auto-resolve.
+      const nextDeferred = new Set<string>();
+      const missing: string[] = [];
+      for (const p of candidates) {
+        const kind = kindByPath.get(p);
+        if (kind && !manualPaths.has(p) && !isAutoDownloadAllowed(kind, netClass, autoDownload)) {
+          nextDeferred.add(p);
+        } else {
+          missing.push(p);
+        }
+      }
+      // Replace the deferred set (drops paths now allowed/resolved); only when
+      // it actually changed, to avoid a render loop.
+      setDeferredMedia((prev) => {
+        if (prev.size === nextDeferred.size && Array.from(prev).every((p) => nextDeferred.has(p))) return prev;
+        return nextDeferred;
+      });
+
       if (missing.length === 0) return;
 
       // Resolve a single attachment. On the first failure we refresh the auth
@@ -1630,7 +1673,18 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
     return () => {
       cancelled = true;
     };
-  }, [items, signedUrls, failedMedia]);
+  }, [items, signedUrls, failedMedia, autoDownload, netClass, manualPaths]);
+
+  // User tapped a withheld media tile: fetch it now (overrides auto-download).
+  function downloadDeferred(path: string) {
+    setManualPaths((prev) => new Set(prev).add(path));
+    setDeferredMedia((prev) => {
+      if (!prev.has(path)) return prev;
+      const next = new Set(prev);
+      next.delete(path);
+      return next;
+    });
+  }
 
   // "Ver una vez": load who has opened which one-time message, and keep it live.
   // My own opens lock the bubble for me; others' opens tell me (the sender) it
@@ -3551,6 +3605,19 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
                                 </button>
                               );
                             }
+                            if (deferredMedia.has(path)) {
+                              return (
+                                <button
+                                  key={path}
+                                  type="button"
+                                  onClick={(e) => { e.stopPropagation(); downloadDeferred(path); }}
+                                  className={`flex ${single ? 'h-56' : 'aspect-square'} w-full flex-col items-center justify-center gap-1 bg-slate-900/60 text-xs text-slate-300 hover:bg-slate-800`}
+                                >
+                                  <DownloadIcon size={20} />
+                                  <span>{t('autoDownload.tapToDownload')}</span>
+                                </button>
+                              );
+                            }
                             return (
                               <div key={path} className={`${single ? 'h-56' : 'aspect-square'} w-full animate-pulse bg-slate-800`} />
                             );
@@ -3580,6 +3647,15 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
                                 </div>
                               ) : null}
                             </>
+                          ) : deferredMedia.has(videoPath) ? (
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); downloadDeferred(videoPath); }}
+                              className="flex h-40 w-full flex-col items-center justify-center gap-1 rounded-lg border border-slate-900 bg-slate-900/60 text-xs text-slate-300 hover:bg-slate-800"
+                            >
+                              <DownloadIcon size={22} />
+                              <span>{t('autoDownload.tapToDownloadVideo')}</span>
+                            </button>
                           ) : (
                             <div className="h-40 w-full animate-pulse rounded-lg border border-slate-900 bg-slate-800" />
                           )}
@@ -3590,6 +3666,15 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
                         <div className="mt-1 w-56 max-w-full">
                           {signedUrls[audioPath] ? (
                             <AudioMessage src={signedUrls[audioPath]} mine={isMine(m)} />
+                          ) : deferredMedia.has(audioPath) ? (
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); downloadDeferred(audioPath); }}
+                              className="flex h-10 w-full items-center justify-center gap-2 rounded-full border border-slate-800 bg-slate-900/60 text-xs text-slate-300 hover:bg-slate-800"
+                            >
+                              <DownloadIcon size={16} />
+                              <span>{t('autoDownload.tapToDownloadAudio')}</span>
+                            </button>
                           ) : (
                             <div className="h-10 w-full animate-pulse rounded-full border border-slate-900 bg-slate-800" />
                           )}
