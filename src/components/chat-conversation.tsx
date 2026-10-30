@@ -19,7 +19,7 @@ import { getWallpaperId, wallpaperCss, getCustomWallpaperUrl, CUSTOM_WALLPAPER_I
 import { blockUser, unblockUser, isBlockedByMe } from '@/lib/db/safety';
 import { EmojiPicker } from '@/components/emoji-picker';
 import { useRequireAuth } from '@/lib/auth/use-require-auth';
-import { listChats, sendMessage, deleteMessage, hideMessageForMe, editMessage, pinMessage, unpinMessage, searchMessages, getChatMuted, setChatMuteUntil, toggleReaction, createPoll, votePoll, setDisappearingMessages, enableChatEncryption, chatMustEncrypt, clearChatForMe, getGroupMeta, markMessageViewed, getChatMessageViews, setEventRsvp, getChatEventRsvps, type EventRsvpStatus, EncryptionRequiredError, type GroupMeta } from '@/lib/db/chats';
+import { listChats, sendMessage, deleteMessage, hideMessageForMe, editMessage, pinMessage, unpinMessage, searchMessages, getChatMuted, setChatMuteUntil, toggleReaction, createPoll, votePoll, setDisappearingMessages, enableChatEncryption, chatMustEncrypt, clearChatForMe, getGroupMeta, markMessageViewed, getChatMessageViews, markChannelSeen, setEventRsvp, getChatEventRsvps, type EventRsvpStatus, EncryptionRequiredError, type GroupMeta } from '@/lib/db/chats';
 import { initKeystore, isUnlocked } from '@/lib/crypto/keystore';
 import { uploadChatImage, uploadChatMedia, uploadChatAudio, uploadChatFile, createSignedChatMediaUrl, fetchCachedMediaUrl, uploadEncryptedChatMedia, fetchDecryptedMediaUrl } from '@/lib/storage/upload';
 import { decryptMedia, type MediaEnc } from '@/lib/crypto/media';
@@ -566,6 +566,8 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
   const [composeViewOnce, setComposeViewOnce] = useState(false);
   const [myViewedIds, setMyViewedIds] = useState<Set<string>>(new Set());
   const [openedByOthers, setOpenedByOthers] = useState<Set<string>>(new Set());
+  // Distinct viewers per message (channel post reach, shown to the owner).
+  const [viewCounts, setViewCounts] = useState<Map<string, number>>(new Map());
   const [viewOnceOpen, setViewOnceOpen] = useState<{ url: string; kind: 'photo' | 'video'; blob: boolean } | null>(null);
   const [viewOnceLoadingId, setViewOnceLoadingId] = useState<string | null>(null);
   const [showScrollDown, setShowScrollDown] = useState(false);
@@ -1791,9 +1793,14 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
         if (!alive) return;
         const mine = new Set<string>();
         const others = new Set<string>();
-        for (const r of rows) (r.userId === myId ? mine : others).add(r.messageId);
+        const counts = new Map<string, number>();
+        for (const r of rows) {
+          (r.userId === myId ? mine : others).add(r.messageId);
+          counts.set(r.messageId, (counts.get(r.messageId) ?? 0) + 1);
+        }
         setMyViewedIds(mine);
         setOpenedByOthers(others);
+        setViewCounts(counts);
       });
     load();
     const supabase = browserSupabase();
@@ -1807,6 +1814,7 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
           if (!row) return;
           if (row.user_id === myId) setMyViewedIds((p) => new Set(p).add(row.message_id));
           else setOpenedByOthers((p) => new Set(p).add(row.message_id));
+          setViewCounts((p) => new Map(p).set(row.message_id, (p.get(row.message_id) ?? 0) + 1));
         },
       )
       .subscribe();
@@ -1815,6 +1823,13 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
       supabase.removeChannel(ch);
     };
   }, [chatId, myId]);
+
+  // Channel followers record that they've seen the posts, so the owner sees
+  // per-post reach. Idempotent server-side; re-runs as new posts arrive.
+  useEffect(() => {
+    if (!isChannel || !myId || !chat || chat.created_by === myId || items.length === 0) return;
+    markChannelSeen(chatId).catch(() => {});
+  }, [isChannel, myId, chat, chatId, items.length]);
 
   // Event RSVPs: load the chat's RSVPs and keep them live (own isolated channel,
   // like message_views, to avoid threading through the shared realtime hook).
@@ -3993,6 +4008,19 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
                               </div>
                             )}
                           </div>
+                        </div>
+                      )}
+
+                      {/* Channel post metrics — only the owner sees reach. */}
+                      {isChannel && chat?.created_by === myId && isMine(m) && m.sender_type !== 'system' && !m.body.is_deleted && (
+                        <div className="mt-1 flex items-center gap-3 text-[11px] text-slate-400">
+                          <span className="inline-flex items-center gap-1" title={t('channels.views')}>
+                            👁 {viewCounts.get(m.id) ?? 0}
+                          </span>
+                          {(() => {
+                            const total = (reactionsByMessage.get(m.id) ?? []).reduce((a, g) => a + g.count, 0);
+                            return total > 0 ? <span className="inline-flex items-center gap-1">❤ {total}</span> : null;
+                          })()}
                         </div>
                       )}
                     </>

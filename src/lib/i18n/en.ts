@@ -74,6 +74,7 @@ const en = {
     unfollow: 'Unfollow',
     unfollowing: 'Leaving…',
     readOnlyNotice: 'Only the channel owner can post here.',
+    views: 'Views',
     category: 'Category',
     catAll: 'All',
     cat_news: 'News',

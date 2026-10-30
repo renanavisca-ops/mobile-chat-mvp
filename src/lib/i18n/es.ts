@@ -76,6 +76,7 @@ const es: Dictionary = {
     unfollow: 'Dejar de seguir',
     unfollowing: 'Saliendo…',
     readOnlyNotice: 'Solo el propietario del canal puede publicar aquí.',
+    views: 'Vistas',
     category: 'Categoría',
     catAll: 'Todos',
     cat_news: 'Noticias',
