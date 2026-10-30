@@ -377,12 +377,19 @@ export async function createGroupChat(title: string, memberIds: string[]): Promi
 
 /* ------------------------------ Channels ----------------------------- */
 
+/** Fixed set of channel categories for the discovery directory. */
+export const CHANNEL_CATEGORIES = [
+  'news', 'tech', 'business', 'education', 'entertainment', 'sports', 'community', 'other',
+] as const;
+export type ChannelCategory = (typeof CHANNEL_CATEGORIES)[number];
+
 /** Create a public broadcast channel; returns its chat id. */
-export async function createChannel(title: string, description?: string): Promise<string> {
+export async function createChannel(title: string, description?: string, category?: string): Promise<string> {
   const supabase = browserSupabase();
-  const { data, error } = await supabase.rpc('create_channel', {
+  const { data, error } = await (supabase as any).rpc('create_channel', {
     p_title: title,
     p_description: description ?? undefined,
+    p_category: category ?? undefined,
   });
   if (error) throw error;
   return data as string;
@@ -394,17 +401,18 @@ export type ChannelSummary = {
   description: string | null;
   avatar_url: string | null;
   created_by: string | null;
+  category: string | null;
   joined: boolean;
 };
 
 /** List public channels for discovery, flagging which ones you've joined. */
-export async function listPublicChannels(search?: string): Promise<ChannelSummary[]> {
+export async function listPublicChannels(search?: string, category?: string): Promise<ChannelSummary[]> {
   const supabase = browserSupabase();
   const { data: me } = await supabase.auth.getUser();
 
-  let query = supabase
+  let query = (supabase as any)
     .from('chats')
-    .select('id, title, description, avatar_url, created_by')
+    .select('id, title, description, avatar_url, created_by, category')
     .eq('kind', 'channel')
     .eq('is_public', true)
     .order('created_at', { ascending: false })
@@ -412,11 +420,12 @@ export async function listPublicChannels(search?: string): Promise<ChannelSummar
 
   const q = (search ?? '').trim();
   if (q) query = query.ilike('title', `%${q}%`);
+  if (category) query = query.eq('category', category);
 
   const { data, error } = await query;
   if (error) throw error;
 
-  const channels = data ?? [];
+  const channels = (data ?? []) as any[];
   let joinedIds = new Set<string>();
   if (me.user && channels.length > 0) {
     const { data: mems } = await supabase
@@ -433,6 +442,7 @@ export async function listPublicChannels(search?: string): Promise<ChannelSummar
     description: c.description,
     avatar_url: c.avatar_url,
     created_by: c.created_by,
+    category: c.category ?? null,
     joined: joinedIds.has(c.id),
   }));
 }
