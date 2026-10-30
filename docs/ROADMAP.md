@@ -85,7 +85,7 @@ Alto valor, bajo riesgo, sin dependencias externas.
 - [x] **Bloqueo de chats sensibles** individual con el PIN: bloquear/desbloquear desde el menú del chat, pide PIN al abrir y enmascara la vista previa en la lista (reusa el PIN del bloqueo de app)
 - [ ] **Copias de seguridad cifradas** opcionales y restauración con clave 🔒 _(diferido por decisión del usuario — 2026-10; retomar: ya existe base `key_backups`/`hasServerBackup`)_
 - [x] **Restricciones**: quién puede agregarme a grupos (Todos/Mis contactos/Nadie, con trigger en el servidor) y llamadas 1:1 de desconocidos (Todos/Mis contactos, auto-rechazo en el receptor) · Ajustes → Privacidad
-- [ ] **Protección frente a enlaces peligrosos** (avisos) y reporte de spam
+- [x] **Protección frente a enlaces peligrosos** (aviso + confirmación antes de abrir enlaces con credenciales embebidas, punycode o IP) y reporte de spam (reporte por mensaje/usuario con motivo "spam", ya disponible)
 - [ ] **Permisos granulares** (cámara, micrófono, contactos, ubicación, archivos) revisables en Ajustes
 - [ ] **Protección de capturas** donde sea técnicamente posible 📱 (sin garantizar)
 

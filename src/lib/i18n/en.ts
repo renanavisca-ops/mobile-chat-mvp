@@ -827,6 +827,15 @@ const en = {
     wrongPin: 'Wrong PIN',
     forgot: 'Forgot your PIN? Sign out',
   },
+  linkSafety: {
+    title: 'Suspicious link',
+    warnBadge: 'This link may be deceptive',
+    openAnyway: 'Open anyway',
+    reason_userinfo: 'This link hides its real destination behind an "@": where it leads is not what it appears.',
+    reason_punycode: 'The domain uses special characters that can imitate a well-known brand (homograph attack).',
+    reason_ip: 'The link points to an IP address instead of a domain, which is unusual for legitimate sites.',
+    reason_generic: 'This link may be deceptive. Check the address carefully before continuing.',
+  },
   chatLock: {
     lockChat: 'Lock chat',
     unlockChat: 'Remove chat lock',

@@ -2,6 +2,7 @@
 
 import { apiFetch } from '@/lib/api/client';
 import { useEffect, useState } from 'react';
+import { assessLink } from '@/lib/link-safety';
 
 type Preview = {
   url: string;
@@ -44,9 +45,13 @@ async function loadPreview(url: string): Promise<Preview | null> {
  * back — so a plain link with no metadata just stays a plain link.
  */
 export function LinkPreview({ url, mine }: { url: string; mine?: boolean }) {
-  const [data, setData] = useState<Preview | null>(() => cache.get(url) ?? null);
+  // Don't render a rich, clickable card for a deceptive link — the inline
+  // warning link (with its confirmation) is the only way in.
+  const skip = assessLink(url).risky;
+  const [data, setData] = useState<Preview | null>(() => (skip ? null : cache.get(url) ?? null));
 
   useEffect(() => {
+    if (skip) return;
     let alive = true;
     if (!cache.has(url)) {
       loadPreview(url).then((d) => {
@@ -58,7 +63,7 @@ export function LinkPreview({ url, mine }: { url: string; mine?: boolean }) {
     return () => {
       alive = false;
     };
-  }, [url]);
+  }, [url, skip]);
 
   if (!data) return null;
 
