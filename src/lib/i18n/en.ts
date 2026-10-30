@@ -859,6 +859,17 @@ const en = {
     use_contacts: 'Share a contact card',
     use_files: 'Attach and download files',
   },
+  devices: {
+    title: 'Your devices',
+    desc: "Devices where you've used your account. Revoke any you don't recognize.",
+    none: 'No registered devices.',
+    unnamed: 'Device',
+    thisDevice: 'This device',
+    added: 'Added {{date}}',
+    revoke: 'Revoke',
+    revoking: 'Revoking…',
+    signOutHint: 'To sign out on all devices, use "Sign out everywhere".',
+  },
   screenSecurity: {
     title: 'Screenshot protection',
     desc: 'Block screenshots and screen recording while using Toky.',

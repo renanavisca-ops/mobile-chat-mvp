@@ -91,8 +91,8 @@ Alto valor, bajo riesgo, sin dependencias externas.
 
 ## Etapa 4 — Multidispositivo y sincronización
 
-- [ ] **Vincular dispositivos** adicionales por QR (sesión web/escritorio como dispositivo enlazado) 🔒
-- [ ] **Revocar dispositivos** perdidos y administrar sesiones (ampliar lo actual)
+- [ ] **Vincular dispositivos** adicionales por QR (sesión web/escritorio como dispositivo enlazado) 🔒 _(diferido — depende de la arquitectura multidispositivo/E2EE, aún no decidida)_
+- [x] **Revocar dispositivos** perdidos y administrar sesiones: lista de dispositivos de la cuenta (con etiqueta por plataforma y fecha), "este dispositivo" y revocar los demás · Ajustes → Dispositivo (además de "Cerrar sesión en todos")
 - [ ] **Cola de envío offline** y reintentos idempotentes
 - [ ] **Resolución de conflictos** y reconciliación al reconectar
 - [ ] **Cliente de escritorio** (empaquetar la web como app de escritorio) 🔒
