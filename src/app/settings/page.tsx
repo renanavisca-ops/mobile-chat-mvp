@@ -22,13 +22,17 @@ import { AppLockSettings } from '@/components/app-lock-settings';
 import { PermissionsSettings } from '@/components/permissions-settings';
 import { ScreenSecuritySettings } from '@/components/screen-security-settings';
 import { DeviceManager } from '@/components/device-manager';
-import { BusinessProfileSettings } from '@/components/business-profile-settings';
-import { CatalogSettings } from '@/components/catalog-settings';
-import { QuickRepliesSettings } from '@/components/quick-replies-settings';
-import { LabelsSettings } from '@/components/labels-settings';
-import { StaffSettings } from '@/components/staff-settings';
-import { TemplatesSettings } from '@/components/templates-settings';
-import { StatsSettings } from '@/components/stats-settings';
+import dynamic from 'next/dynamic';
+// Store-admin tools: lazy-loaded so the ~majority of users (not store admins)
+// never download this code. Each component self-gates and renders null when the
+// user isn't a store admin, so no loading placeholder is needed.
+const BusinessProfileSettings = dynamic(() => import('@/components/business-profile-settings').then((m) => m.BusinessProfileSettings), { ssr: false });
+const CatalogSettings = dynamic(() => import('@/components/catalog-settings').then((m) => m.CatalogSettings), { ssr: false });
+const QuickRepliesSettings = dynamic(() => import('@/components/quick-replies-settings').then((m) => m.QuickRepliesSettings), { ssr: false });
+const LabelsSettings = dynamic(() => import('@/components/labels-settings').then((m) => m.LabelsSettings), { ssr: false });
+const StaffSettings = dynamic(() => import('@/components/staff-settings').then((m) => m.StaffSettings), { ssr: false });
+const TemplatesSettings = dynamic(() => import('@/components/templates-settings').then((m) => m.TemplatesSettings), { ssr: false });
+const StatsSettings = dynamic(() => import('@/components/stats-settings').then((m) => m.StatsSettings), { ssr: false });
 import {
   initKeystore,
   isUnlocked,

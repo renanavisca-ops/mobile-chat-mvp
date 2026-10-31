@@ -137,7 +137,7 @@ Alto valor, bajo riesgo, sin dependencias externas.
 - [ ] **Panel administrativo** y auditoría de acciones 🔒 _(diferido: UI de administración + tabla de auditoría, alcance grande)_
 - [ ] **Rate limiting** y anti-spam reforzados 🔒 _(diferido: requiere almacén de límites por IP/token; abordable como slice futuro sobre el endpoint público de soporte)_
 - [~] **Pruebas** de carga, seguridad, accesibilidad y compatibilidad: ampliada la cobertura de pruebas unitarias de lógica crítica (seguridad de enlaces `assessLink`, política de contraseñas `validatePassword`/`passwordStrength`, formatos i18n) + revisión de seguridad del código de la sesión (hallazgo crítico corregido en #187). _Pendiente: pruebas de carga y compatibilidad de dispositivos (requieren infra)._
-- [ ] **Optimización** de batería, memoria y tiempos de carga
+- [~] **Optimización** de batería, memoria y tiempos de carga: code-splitting de las 7 secciones de administración de tienda en Ajustes (lazy `next/dynamic`), que solo descarga el admin — `/settings` baja de 26.9 kB/235 kB a 22.2 kB/229 kB de First Load. _Pendiente: perfilado de batería/memoria y más lazy-loading de editores pesados del chat._
 
 ## Etapa 9 — Pagos (condicional) 🔒
 
