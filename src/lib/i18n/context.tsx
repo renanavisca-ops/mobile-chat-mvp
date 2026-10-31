@@ -4,10 +4,16 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import en from './en';
 import es from './es';
 import type { Dictionary } from './en';
+import * as fmt from './format';
 
 export type LangCode = 'en' | 'es';
 export type LangPreference = 'auto' | LangCode;
 
+// Adding a language: create ./<code>.ts exporting a Dictionary (copy en.ts and
+// translate), then (1) add the code to LangCode, (2) import and add it here,
+// (3) add a regional locale in format.ts' LOCALE_BY_LANG if it differs from the
+// code, and (4) add the option to Settings → Language. Dates/times/numbers then
+// format for that locale automatically via useFormatters().
 const DICTS: Record<LangCode, Dictionary> = { en, es };
 const PREF_KEY = 'toky_lang_pref';
 
@@ -119,6 +125,21 @@ export function useLanguage() {
 
 export function useT() {
   return useContext(LanguageContext).t;
+}
+
+/**
+ * Locale-aware formatters bound to the active UI language (and the device's
+ * time zone). Use these instead of calling toLocale* with a hardcoded locale.
+ */
+export function useFormatters() {
+  const { lang } = useContext(LanguageContext);
+  return useMemo(() => ({
+    time: (d: Date | string | number) => fmt.formatTime(d, lang),
+    date: (d: Date | string | number, opts?: Intl.DateTimeFormatOptions) => fmt.formatDate(d, lang, opts),
+    dateTime: (d: Date | string | number) => fmt.formatDateTime(d, lang),
+    number: (n: number, opts?: Intl.NumberFormatOptions) => fmt.formatNumber(n, lang, opts),
+    relative: (d: Date | string | number) => fmt.formatRelativeTime(d, lang),
+  }), [lang]);
 }
 
 /**
