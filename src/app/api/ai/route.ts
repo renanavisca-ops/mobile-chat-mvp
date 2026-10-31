@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { reportServerError } from '@/lib/observability';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { rateLimit, rateLimitHeaders } from '@/lib/rate-limit';
 
@@ -125,6 +126,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Unknown type' }, { status: 400 });
   } catch (e: any) {
     console.error('AI route error:', e);
+    reportServerError(e, { route: 'ai' });
     return NextResponse.json({ error: 'AI request failed', detail: String(e?.message ?? e).slice(0, 240) }, { status: 502 });
   }
 }

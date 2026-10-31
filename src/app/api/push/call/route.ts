@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { reportServerError } from '@/lib/observability';
 import webpush from 'web-push';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { sendToTokens } from '@/lib/fcm';
@@ -104,6 +105,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true, sent: webSent + nativeSent, web: webSent, native: nativeSent });
   } catch (error: any) {
     console.error('Error sending call push:', error);
+    reportServerError(error, { route: 'push/call' });
     return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
   }
 }

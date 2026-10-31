@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { reportServerError } from '@/lib/observability';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 
 export async function PATCH(
@@ -90,6 +91,7 @@ export async function PATCH(
 
   } catch (error: any) {
     console.error('Error updating status:', error);
+    reportServerError(error, { route: 'chat/status' });
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
