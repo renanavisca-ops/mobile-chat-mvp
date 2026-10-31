@@ -23,6 +23,7 @@ import { PermissionsSettings } from '@/components/permissions-settings';
 import { ScreenSecuritySettings } from '@/components/screen-security-settings';
 import { DeviceManager } from '@/components/device-manager';
 import { BusinessProfileSettings } from '@/components/business-profile-settings';
+import { CatalogSettings } from '@/components/catalog-settings';
 import {
   initKeystore,
   isUnlocked,
@@ -1072,9 +1073,12 @@ export default function SettingsPage() {
             </button>
           </section>
 
-          {/* Commercial profile — renders only for store admins. */}
+          {/* Commercial profile + catalog — render only for store admins. */}
           <section className="space-y-3">
             <BusinessProfileSettings />
+          </section>
+          <section className="space-y-3">
+            <CatalogSettings />
           </section>
 
           <section className="space-y-3">
