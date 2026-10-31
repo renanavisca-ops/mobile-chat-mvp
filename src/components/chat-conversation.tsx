@@ -45,6 +45,7 @@ import { starMessage, unstarMessage, getStarredIdsForChat } from '@/lib/db/stars
 import { listQuickReplies, type QuickReply } from '@/lib/db/quick-replies';
 import { listLabels, getChatLabelIds, addChatLabel, removeChatLabel, labelChipClasses, type Label } from '@/lib/db/labels';
 import { listStoreStaff, type StaffMember } from '@/lib/db/staff';
+import { listTemplates, type MessageTemplate } from '@/lib/db/templates';
 import { ImageEditor } from '@/components/image-editor';
 import { MessageEffects, detectEffect } from '@/components/message-effects';
 import { wasCelebrated, markCelebrated } from '@/lib/effects-seen';
@@ -100,6 +101,8 @@ type Payload = {
   call?: { video: boolean; outcome: 'answered' | 'no_answer' | 'declined' | 'cancelled'; duration?: number; isGroup?: boolean };
   /** Per-path media encryption metadata (toky-media-v1) for encrypted chats. */
   enc?: Record<string, MediaEnc>;
+  /** Interactive message: tappable options (buttons/list) for the recipient. */
+  options?: { id: string; label: string }[];
 };
 
 function formatBytes(bytes?: number): string {
@@ -664,6 +667,25 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
     } catch {
       // Revert on failure.
       setChatLabelIds((prev) => (applied ? [...prev, labelId] : prev.filter((x) => x !== labelId)));
+    }
+  }
+
+  // Interactive message templates (store chats): staff send them with one tap.
+  const [templates, setTemplates] = useState<MessageTemplate[]>([]);
+  const [templatesOpen, setTemplatesOpen] = useState(false);
+  useEffect(() => {
+    if (!storeId) { setTemplates([]); return; }
+    let alive = true;
+    listTemplates(storeId).then((tp) => { if (alive) setTemplates(tp); }).catch(() => { if (alive) setTemplates([]); });
+    return () => { alive = false; };
+  }, [storeId]);
+
+  async function sendTemplate(tpl: MessageTemplate) {
+    setTemplatesOpen(false);
+    try {
+      await sendMessage(chatId, { text: tpl.body, options: tpl.options });
+    } catch {
+      setErr(t('templates.sendError'));
     }
   }
 
@@ -3818,6 +3840,15 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
                             );
                           })()}
                           {m.body.text ? <div className="text-sm mt-1 whitespace-pre-wrap break-words"><MessageText text={m.body.text} mentions={mentionNames} /></div> : null}
+                          {Array.isArray(m.body.options) && m.body.options.length > 0 && (
+                            <div className="mt-2 flex flex-col gap-1.5">
+                              {m.body.options.map((o) => (
+                                <span key={o.id} className={`rounded-lg border px-3 py-1.5 text-center text-sm ${isMine(m) ? 'border-white/30 text-white/90' : 'border-slate-700 text-slate-200'}`}>
+                                  {o.label}
+                                </span>
+                              ))}
+                            </div>
+                          )}
                           {(() => {
                             const link = m.body.text ? firstUrl(m.body.text) : null;
                             return link ? <LinkPreview url={link} mine={isMine(m)} /> : null;
@@ -4554,6 +4585,46 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
                           >
                             <div className="truncate text-sm text-slate-100">{q.title}</div>
                             <div className="line-clamp-1 text-xs text-slate-400">{q.body}</div>
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {templates.length > 0 && (
+                <div className="relative shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => { setEmojiOpen(false); setTemplatesOpen((v) => !v); }}
+                    className="grid h-9 w-9 place-items-center rounded-full text-slate-400 hover:text-slate-200 disabled:opacity-40"
+                    title={t('templates.send')}
+                    aria-label={t('templates.send')}
+                    disabled={busy}
+                  >
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M3 9h18M9 21V9" /></svg>
+                  </button>
+                  {templatesOpen && (
+                    <>
+                      <div className="fixed inset-0 z-20" onClick={() => setTemplatesOpen(false)} />
+                      <div className="absolute bottom-full left-0 z-30 mb-2 max-h-64 w-64 overflow-y-auto rounded-2xl border border-slate-800 bg-slate-900 p-1 shadow-xl">
+                        {templates.map((tpl) => (
+                          <button
+                            key={tpl.id}
+                            type="button"
+                            onClick={() => sendTemplate(tpl)}
+                            className="block w-full rounded-xl px-3 py-2 text-left hover:bg-slate-800"
+                          >
+                            <div className="truncate text-sm text-slate-100">{tpl.title}</div>
+                            <div className="line-clamp-1 text-xs text-slate-400">{tpl.body}</div>
+                            {tpl.options.length > 0 && (
+                              <div className="mt-1 flex flex-wrap gap-1">
+                                {tpl.options.map((o) => (
+                                  <span key={o.id} className="rounded border border-slate-700 px-1.5 py-0.5 text-[10px] text-slate-400">{o.label}</span>
+                                ))}
+                              </div>
+                            )}
                           </button>
                         ))}
                       </div>

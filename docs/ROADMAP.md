@@ -123,7 +123,7 @@ Alto valor, bajo riesgo, sin dependencias externas.
 - [x] **Mensajes de bienvenida/ausencia** y **respuestas rápidas**: bienvenida automática al primer mensaje del cliente y mensaje de ausencia (toggle) desde Ajustes del admin; respuestas rápidas (canned) que el staff inserta desde el compositor en chats de tienda. Tabla `store_quick_replies` + columnas `welcome_message/away_message/away_active` en `stores`.
 - [x] **Etiquetas** para clientes y conversaciones: definiciones por tienda con color (gestor en Ajustes para admins) y aplicación/quita de etiquetas sobre cada conversación de tienda desde la consola de soporte (chips + selector). Tablas `store_labels` + `chat_labels` con RLS (admin define; el staff etiqueta).
 - [x] **Multiagente**: asignación de conversaciones y roles (amplía el staff actual). "Tomar" asigna el chat a quien lo toma; selector de asignado (reasignar a otro miembro) y estado sin-asignar en la consola de soporte; gestor "Equipo y roles" en Ajustes para admins (cambia agente↔admin vía RPC `set_store_member_role`). El agente puede tomar chats sin asignar de su tienda.
-- [ ] **Mensajes interactivos**: botones, listas y plantillas
+- [x] **Mensajes interactivos**: botones, listas y plantillas. El admin define plantillas (texto + opciones) en Ajustes; el staff las envía con un toque desde el compositor en chats de tienda; el cliente ve las opciones como botones tocables en el chat de soporte y al tocar una responde con esa opción. Tabla `store_message_templates`; payload `options[]` en el mensaje.
 - [ ] **Estadísticas** de entrega/lectura/atención
 - [ ] **Automatizaciones / API / CRM** 🔒
 - [ ] **Campañas** con consentimiento, límites y baja 🔒

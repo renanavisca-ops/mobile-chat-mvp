@@ -6,7 +6,7 @@ import { createSignedChatMediaUrl } from '@/lib/storage/upload';
 import { useLanguage } from '@/lib/i18n/context';
 import { Linkify } from '@/components/linkify';
 
-type Payload = { v?: number; text?: string; imagePath?: string; imagePaths?: string[]; videoPath?: string; audioPath?: string; gifUrl?: string; filePath?: string; fileName?: string; reply_to?: string; is_deleted?: boolean; };
+type Payload = { v?: number; text?: string; imagePath?: string; imagePaths?: string[]; videoPath?: string; audioPath?: string; gifUrl?: string; filePath?: string; fileName?: string; reply_to?: string; is_deleted?: boolean; options?: { id: string; label: string }[]; };
 
 function parseCipher(ciphertext: string | undefined | null): Payload {
   if (!ciphertext) return {};
@@ -180,6 +180,36 @@ export function PublicChatView({ token }: { token: string }) {
     }
   };
 
+  // Tap an interactive option: send its label back as a customer message.
+  const sendOption = async (label: string) => {
+    const trimmed = label.trim();
+    if (!trimmed || busy) return;
+    setBusy(true);
+    try {
+      const tempId = `local-${Date.now()}`;
+      setMessages(prev => [...prev, {
+        id: tempId,
+        chat_id: sessionData.chat_id,
+        content: trimmed,
+        ciphertext: JSON.stringify({ v: 1, text: trimmed }),
+        created_at: new Date().toISOString(),
+        sender_type: 'customer',
+        sender_id: sessionData.customer_id,
+        read: false
+      }]);
+      const res = await apiFetch(`/api/public-chat/${token}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: trimmed })
+      });
+      if (!res.ok) throw new Error(t('publicChat.errorSendFailed'));
+    } catch (e: any) {
+      console.error(e);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   if (loading) {
     return <div className="min-h-screen flex items-center justify-center bg-slate-950 text-slate-300">{t('publicChat.loading')}</div>;
   }
@@ -307,6 +337,23 @@ export function PublicChatView({ token }: { token: string }) {
                   isCustomer ? 'toky-grad text-white rounded-br-md shadow-[0_4px_14px_-6px_rgba(79,70,229,0.7)]' : 'bg-slate-800 text-slate-100 border border-slate-800 rounded-bl-md shadow-sm'
                 }`}>
                   {m.body.text && <div className="text-sm whitespace-pre-wrap break-words"><Linkify text={m.body.text} /></div>}
+
+                  {/* Interactive options (buttons/list) — tappable on business messages */}
+                  {!isCustomer && Array.isArray(m.body.options) && m.body.options.length > 0 && (
+                    <div className="mt-2 flex flex-col gap-1.5">
+                      {m.body.options.map((o: { id: string; label: string }) => (
+                        <button
+                          key={o.id}
+                          type="button"
+                          onClick={() => sendOption(o.label)}
+                          disabled={busy}
+                          className="rounded-lg border border-indigo-500/50 bg-indigo-500/10 px-3 py-1.5 text-center text-sm text-indigo-200 hover:bg-indigo-500/20 disabled:opacity-50"
+                        >
+                          {o.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
 
                   {m.body.gifUrl && (
                     // eslint-disable-next-line @next/next/no-img-element
