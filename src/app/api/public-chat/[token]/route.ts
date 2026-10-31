@@ -82,6 +82,21 @@ export async function POST(req: Request, { params }: { params: { token: string }
       return NextResponse.json({ error: 'Token is required' }, { status: 400 });
     }
 
+    // Anti-spam: cap how fast a single customer session can post (20 / minute).
+    // Fail open — a limiter error must never block a legitimate conversation.
+    try {
+      const { data: allowed } = await (supabaseAdmin as any).rpc('rate_limit_hit', {
+        p_bucket: `public-chat:${token}`,
+        p_limit: 20,
+        p_window_seconds: 60,
+      });
+      if (allowed === false) {
+        return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
+      }
+    } catch {
+      // limiter unavailable — allow the message through
+    }
+
     const payload = await req.json();
 
     // 1. Validar token
