@@ -1307,6 +1307,16 @@ const en = {
     offlineQueued: 'No connection — {{count}} message(s) waiting to send',
     reconnected: 'Back online',
   },
+  audit: {
+    title: 'Activity log',
+    desc: 'Recent sensitive actions by your team.',
+    roleChange: '{{actor}} changed {{target}}’s role: {{from}} → {{to}}',
+    chatAssigned: '{{actor}} reassigned a conversation',
+    chatUnassigned: '{{actor}} unassigned a conversation',
+    chatStatus: '{{actor}} set a conversation to {{status}}',
+    loadError: 'Could not load the activity log',
+    empty: 'No activity yet.',
+  },
 };
 
 export default en;

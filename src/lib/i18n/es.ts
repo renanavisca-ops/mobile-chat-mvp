@@ -1309,6 +1309,16 @@ const es: Dictionary = {
     offlineQueued: 'Sin conexión — {{count}} mensaje(s) en espera de envío',
     reconnected: 'Conexión restablecida',
   },
+  audit: {
+    title: 'Registro de actividad',
+    desc: 'Acciones sensibles recientes de tu equipo.',
+    roleChange: '{{actor}} cambió el rol de {{target}}: {{from}} → {{to}}',
+    chatAssigned: '{{actor}} reasignó una conversación',
+    chatUnassigned: '{{actor}} quitó la asignación de una conversación',
+    chatStatus: '{{actor}} cambió una conversación a {{status}}',
+    loadError: 'No se pudo cargar el registro de actividad',
+    empty: 'Aún no hay actividad.',
+  },
 };
 
 export default es;
