@@ -125,12 +125,12 @@ Alto valor, bajo riesgo, sin dependencias externas.
 - [x] **Multiagente**: asignación de conversaciones y roles (amplía el staff actual). "Tomar" asigna el chat a quien lo toma; selector de asignado (reasignar a otro miembro) y estado sin-asignar en la consola de soporte; gestor "Equipo y roles" en Ajustes para admins (cambia agente↔admin vía RPC `set_store_member_role`). El agente puede tomar chats sin asignar de su tienda.
 - [x] **Mensajes interactivos**: botones, listas y plantillas. El admin define plantillas (texto + opciones) en Ajustes; el staff las envía con un toque desde el compositor en chats de tienda; el cliente ve las opciones como botones tocables en el chat de soporte y al tocar una responde con esa opción. Tabla `store_message_templates`; payload `options[]` en el mensaje.
 - [x] **Estadísticas** de entrega/lectura/atención: panel en Ajustes (solo admins) con conversaciones por estado (abiertas/en curso/cerradas), clientes, mensajes sin leer, volumen de mensajes a 7 días (total/cliente/equipo) y desglose por agente (activas/cerradas). RPC `store_support_stats` autorizada a admins.
-- [ ] **Automatizaciones / API / CRM** 🔒
-- [ ] **Campañas** con consentimiento, límites y baja 🔒
+- [ ] **Automatizaciones / API / CRM** 🔒 _(diferido: requiere proveedor/infra externa y decisiones de costo)_
+- [ ] **Campañas** con consentimiento, límites y baja 🔒 _(diferido: requiere infra de envío masivo, consentimiento/baja y cumplimiento)_
 
 ## Etapa 8 — Accesibilidad, i18n, calidad e infraestructura
 
-- [ ] **Lectores de pantalla** y navegación accesible (auditoría + correcciones)
+- [x] **Lectores de pantalla** y navegación accesible (auditoría + correcciones): auditoría — `lang` del documento ya se actualiza con el idioma, imágenes con `alt` OK, botones de ícono mayormente con `aria-label`. Correcciones: región viva (`role="status" aria-live`) para avisos/errores del chat (cubre todos los toasts), y semántica de diálogo (`role="dialog"`/`aria-modal`/`aria-label`) en modales clave (acciones de mensaje, info de grupo, reenviar, reportar, "visto por"). _Pendiente follow-up: extender `role=dialog` + trampa de foco al resto de modales._
 - [ ] **Más idiomas** y formatos regionales/husos horarios
 - [ ] **Estados claros** de conexión/envío/error/reintento en toda la app
 - [ ] **Observabilidad**: métricas, trazas y alertas (sin contenido sensible) 🔒
