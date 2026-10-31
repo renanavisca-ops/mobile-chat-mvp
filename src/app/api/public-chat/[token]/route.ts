@@ -31,6 +31,27 @@ export async function GET(req: Request, { params }: { params: { token: string } 
       if (s) store = s;
     }
 
+    // 1c. Catálogo visible de la tienda (con URL pública de la imagen).
+    let products: any[] = [];
+    if (storeId) {
+      const { data: rows } = await (supabaseAdmin as any)
+        .from('store_products')
+        .select('id, name, description, price, image_path, sort')
+        .eq('store_id', storeId)
+        .eq('active', true)
+        .order('sort', { ascending: true })
+        .order('created_at', { ascending: true });
+      products = (rows || []).map((r: any) => ({
+        id: r.id,
+        name: r.name,
+        description: r.description,
+        price: r.price,
+        image_url: r.image_path
+          ? supabaseAdmin.storage.from('catalog').getPublicUrl(r.image_path).data.publicUrl
+          : null,
+      }));
+    }
+
     // 2. Obtener mensajes recientes
     const { data: messages, error: messagesError } = await supabaseAdmin
       .from('messages')
@@ -44,6 +65,7 @@ export async function GET(req: Request, { params }: { params: { token: string } 
     return NextResponse.json({
       session,
       store,
+      products,
       messages: (messages || []).reverse()
     });
 

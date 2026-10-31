@@ -31,6 +31,8 @@ export function PublicChatView({ token }: { token: string }) {
   const [sessionData, setSessionData] = useState<any>(null);
   const [store, setStore] = useState<any>(null);
   const [storeOpen, setStoreOpen] = useState(false);
+  const [products, setProducts] = useState<any[]>([]);
+  const [catalogOpen, setCatalogOpen] = useState(false);
   const [messages, setMessages] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -51,6 +53,7 @@ export function PublicChatView({ token }: { token: string }) {
         if (alive) {
           setSessionData(data.session);
           setStore(data.store || null);
+          setProducts(data.products || []);
           setMessages(data.messages || []);
           setLoading(false);
         }
@@ -239,6 +242,41 @@ export function PublicChatView({ token }: { token: string }) {
                   <a className="break-all text-indigo-300 hover:underline" href={/^https?:\/\//.test(store.website) ? store.website : `https://${store.website}`} target="_blank" rel="noreferrer">{store.website}</a>
                 </p>
               )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Catalog — shown to the customer when the store has visible products */}
+      {products.length > 0 && (
+        <div className="border-b border-slate-800 bg-slate-900/40">
+          <button
+            type="button"
+            onClick={() => setCatalogOpen((o) => !o)}
+            className="flex w-full items-center justify-between gap-2 px-4 py-2.5 text-left"
+          >
+            <span className="flex items-center gap-2 text-sm text-slate-200">
+              <span>🛍️</span>
+              <span className="font-medium">{t('catalog.cardTitle')}</span>
+              <span className="text-xs text-slate-500">· {products.length}</span>
+            </span>
+            <span className="shrink-0 text-slate-500">{catalogOpen ? '▴' : '▾'}</span>
+          </button>
+          {catalogOpen && (
+            <div className="grid grid-cols-2 gap-2 px-4 pb-3">
+              {products.map((p) => (
+                <div key={p.id} className="overflow-hidden rounded-xl border border-slate-800 bg-slate-950/50">
+                  {p.image_url && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={p.image_url} alt={p.name} className="h-24 w-full object-cover" />
+                  )}
+                  <div className="p-2">
+                    <div className="truncate text-sm text-slate-100">{p.name}</div>
+                    {p.price && <div className="text-xs font-medium text-emerald-300">{p.price}</div>}
+                    {p.description && <div className="mt-0.5 line-clamp-2 text-[11px] text-slate-400">{p.description}</div>}
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </div>
