@@ -132,7 +132,7 @@ Alto valor, bajo riesgo, sin dependencias externas.
 
 - [x] **Lectores de pantalla** y navegación accesible (auditoría + correcciones): auditoría — `lang` del documento ya se actualiza con el idioma, imágenes con `alt` OK, botones de ícono mayormente con `aria-label`. Correcciones: región viva (`role="status" aria-live`) para avisos/errores del chat (cubre todos los toasts), y semántica de diálogo (`role="dialog"`/`aria-modal`/`aria-label`) en modales clave (acciones de mensaje, info de grupo, reenviar, reportar, "visto por"). _Pendiente follow-up: extender `role=dialog` + trampa de foco al resto de modales._
 - [~] **Más idiomas** y formatos regionales/husos horarios: formateo central locale-aware (`src/lib/i18n/format.ts` + hook `useFormatters`) para fechas/horas/números y tiempo relativo, respetando el huso horario del dispositivo; base lista para sumar idiomas (registro `DICTS`/`LOCALE_BY_LANG` documentado). Tests de formato. _Pendiente: traducir un 3er idioma completo (diferido a decisión)._
-- [ ] **Estados claros** de conexión/envío/error/reintento en toda la app
+- [x] **Estados claros** de conexión/envío/error/reintento en toda la app: banner global de conexión (sin conexión / reconectado) con contador de mensajes en espera, como región viva accesible; se suma a lo ya existente (enviado/entregado/leído por mensaje y cola offline que reenvía al reconectar).
 - [ ] **Observabilidad**: métricas, trazas y alertas (sin contenido sensible) 🔒
 - [ ] **Panel administrativo** y auditoría de acciones 🔒
 - [ ] **Rate limiting** y anti-spam reforzados 🔒

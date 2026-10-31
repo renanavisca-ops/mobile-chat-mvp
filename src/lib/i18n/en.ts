@@ -1302,6 +1302,11 @@ const en = {
     closedShort: 'Closed',
     loadError: 'Could not load the statistics',
   },
+  connection: {
+    offline: 'No connection — messages will send when you reconnect',
+    offlineQueued: 'No connection — {{count}} message(s) waiting to send',
+    reconnected: 'Back online',
+  },
 };
 
 export default en;

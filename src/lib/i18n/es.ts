@@ -1304,6 +1304,11 @@ const es: Dictionary = {
     closedShort: 'Cerradas',
     loadError: 'No se pudieron cargar las estadísticas',
   },
+  connection: {
+    offline: 'Sin conexión — los mensajes se enviarán al reconectar',
+    offlineQueued: 'Sin conexión — {{count}} mensaje(s) en espera de envío',
+    reconnected: 'Conexión restablecida',
+  },
 };
 
 export default es;
