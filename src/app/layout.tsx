@@ -34,6 +34,7 @@ import { BackButtonHandler } from '@/components/back-button-handler';
 import { AppLockGate } from '@/components/app-lock-gate';
 import { ScreenSecurityApplier } from '@/components/screen-security-applier';
 import { SendQueueFlusher } from '@/components/send-queue-flusher';
+import { ConnectionBanner } from '@/components/connection-banner';
 
 export const metadata: Metadata = {
   title: 'Toky Chat',
@@ -77,6 +78,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <AppLockGate />
             <ScreenSecurityApplier />
             <SendQueueFlusher />
+            <ConnectionBanner />
             <ConsentGate />
             <NotificationRouter />
             <PushBanner />
