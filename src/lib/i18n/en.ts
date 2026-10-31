@@ -1234,6 +1234,21 @@ const en = {
     insert: 'Quick replies',
     none: 'No quick replies yet.',
   },
+  labels: {
+    title: 'Labels',
+    desc: 'Tag conversations to organize your support queue.',
+    add: 'Add label',
+    name: 'Name',
+    namePlaceholder: 'e.g. New customer',
+    color: 'Color',
+    saved: 'Label saved',
+    saveError: 'Could not save the label',
+    loadError: 'Could not load the labels',
+    required: 'Add a name',
+    deleteConfirm: 'Delete this label? It will be removed from every chat.',
+    deleteError: 'Could not delete the label',
+    apply: 'Label',
+  },
 };
 
 export default en;
