@@ -43,6 +43,7 @@ import { peerFingerprint } from '@/lib/crypto/keystore';
 import { isChatLocked, isChatLockAvailable, lockChat, unlockChat, verifyChatPin } from '@/lib/chat-lock';
 import { starMessage, unstarMessage, getStarredIdsForChat } from '@/lib/db/stars';
 import { listQuickReplies, type QuickReply } from '@/lib/db/quick-replies';
+import { listLabels, getChatLabelIds, addChatLabel, removeChatLabel, labelChipClasses, type Label } from '@/lib/db/labels';
 import { ImageEditor } from '@/components/image-editor';
 import { MessageEffects, detectEffect } from '@/components/message-effects';
 import { wasCelebrated, markCelebrated } from '@/lib/effects-seen';
@@ -633,6 +634,37 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
       .catch(() => { if (alive) setQuickReplies([]); });
     return () => { alive = false; };
   }, [storeId]);
+
+  // Conversation labels (store chats): definitions + which are applied here.
+  const [storeLabels, setStoreLabels] = useState<Label[]>([]);
+  const [chatLabelIds, setChatLabelIds] = useState<string[]>([]);
+  const [labelsPickerOpen, setLabelsPickerOpen] = useState(false);
+  useEffect(() => {
+    if (!storeId) { setStoreLabels([]); return; }
+    let alive = true;
+    listLabels(storeId).then((l) => { if (alive) setStoreLabels(l); }).catch(() => { if (alive) setStoreLabels([]); });
+    return () => { alive = false; };
+  }, [storeId]);
+  useEffect(() => {
+    if (!storeId || !chatId) { setChatLabelIds([]); return; }
+    let alive = true;
+    getChatLabelIds(chatId).then((ids) => { if (alive) setChatLabelIds(ids); }).catch(() => { if (alive) setChatLabelIds([]); });
+    return () => { alive = false; };
+  }, [storeId, chatId]);
+
+  async function toggleChatLabel(labelId: string) {
+    if (!chatId) return;
+    const applied = chatLabelIds.includes(labelId);
+    // Optimistic.
+    setChatLabelIds((prev) => (applied ? prev.filter((x) => x !== labelId) : [...prev, labelId]));
+    try {
+      if (applied) await removeChatLabel(chatId, labelId);
+      else await addChatLabel(chatId, labelId);
+    } catch {
+      // Revert on failure.
+      setChatLabelIds((prev) => (applied ? [...prev, labelId] : prev.filter((x) => x !== labelId)));
+    }
+  }
 
   // Reactions quick-picker
   const [reactionPickerFor, setReactionPickerFor] = useState<string | null>(null);
@@ -3408,6 +3440,43 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
                 <button onClick={() => updateStatus('closed')} className="rounded bg-slate-700 px-2 py-1 text-white hover:bg-slate-600">
                   {t('chat.closeChat')}
                 </button>
+              )}
+            </div>
+          )}
+
+          {/* Conversation labels (store chats): applied chips + a picker. */}
+          {chat && chat.store_id && storeLabels.length > 0 && (
+            <div className="relative flex flex-wrap items-center gap-1.5 px-1">
+              {chatLabelIds.map((id) => {
+                const l = storeLabels.find((x) => x.id === id);
+                if (!l) return null;
+                return (
+                  <span key={id} className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] ring-1 ${labelChipClasses(l.color)}`}>
+                    {l.name}
+                    <button type="button" onClick={() => toggleChatLabel(id)} aria-label={t('common.remove')} className="opacity-70 hover:opacity-100">✕</button>
+                  </span>
+                );
+              })}
+              <button type="button" onClick={() => setLabelsPickerOpen((v) => !v)}
+                className="rounded-full border border-slate-700 px-2 py-0.5 text-[11px] text-slate-300 hover:bg-slate-800">
+                + {t('labels.apply')}
+              </button>
+              {labelsPickerOpen && (
+                <>
+                  <div className="fixed inset-0 z-20" onClick={() => setLabelsPickerOpen(false)} />
+                  <div className="absolute left-1 top-full z-30 mt-1 max-h-56 w-56 overflow-y-auto rounded-2xl border border-slate-800 bg-slate-900 p-1 shadow-xl">
+                    {storeLabels.map((l) => {
+                      const on = chatLabelIds.includes(l.id);
+                      return (
+                        <button key={l.id} type="button" onClick={() => toggleChatLabel(l.id)}
+                          className="flex w-full items-center justify-between gap-2 rounded-xl px-3 py-2 text-left hover:bg-slate-800">
+                          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] ring-1 ${labelChipClasses(l.color)}`}>{l.name}</span>
+                          {on && <span className="text-emerald-400">✓</span>}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </>
               )}
             </div>
           )}

@@ -121,7 +121,7 @@ Alto valor, bajo riesgo, sin dependencias externas.
 - [x] **Perfil comercial**: categoría, descripción, dirección, horario, sitio web y teléfono sobre la tienda (`stores`). Editor en Ajustes solo para administradores de la tienda (`private.is_store_admin` + policy `stores_update_admin`); el cliente ve el perfil en una tarjeta plegable dentro del chat de soporte público.
 - [x] **Catálogo** de productos/servicios (imágenes, precios, descripción): tabla `store_products` + bucket público `catalog`; gestor en Ajustes para admins de la tienda (agregar/editar/ocultar/eliminar con foto) y vitrina plegable para el cliente en el chat de soporte. Requiere aplicar `202610310002_store_catalog.sql`.
 - [x] **Mensajes de bienvenida/ausencia** y **respuestas rápidas**: bienvenida automática al primer mensaje del cliente y mensaje de ausencia (toggle) desde Ajustes del admin; respuestas rápidas (canned) que el staff inserta desde el compositor en chats de tienda. Tabla `store_quick_replies` + columnas `welcome_message/away_message/away_active` en `stores`.
-- [ ] **Etiquetas** para clientes y conversaciones
+- [x] **Etiquetas** para clientes y conversaciones: definiciones por tienda con color (gestor en Ajustes para admins) y aplicación/quita de etiquetas sobre cada conversación de tienda desde la consola de soporte (chips + selector). Tablas `store_labels` + `chat_labels` con RLS (admin define; el staff etiqueta).
 - [ ] **Multiagente**: asignación de conversaciones y roles (ampliar staff actual)
 - [ ] **Mensajes interactivos**: botones, listas y plantillas
 - [ ] **Estadísticas** de entrega/lectura/atención

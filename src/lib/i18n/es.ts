@@ -1236,6 +1236,21 @@ const es: Dictionary = {
     insert: 'Respuestas rápidas',
     none: 'Aún no hay respuestas rápidas.',
   },
+  labels: {
+    title: 'Etiquetas',
+    desc: 'Etiqueta conversaciones para organizar tu bandeja de soporte.',
+    add: 'Agregar etiqueta',
+    name: 'Nombre',
+    namePlaceholder: 'ej. Cliente nuevo',
+    color: 'Color',
+    saved: 'Etiqueta guardada',
+    saveError: 'No se pudo guardar la etiqueta',
+    loadError: 'No se pudieron cargar las etiquetas',
+    required: 'Agrega un nombre',
+    deleteConfirm: '¿Eliminar esta etiqueta? Se quitará de todas las conversaciones.',
+    deleteError: 'No se pudo eliminar la etiqueta',
+    apply: 'Etiquetar',
+  },
 };
 
 export default es;
