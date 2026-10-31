@@ -69,7 +69,7 @@ export function ReportModal({
         }
       }}
     >
-      <div className="w-full max-w-sm rounded-3xl border border-slate-800 toky-glass toky-elev p-4">
+      <div role="dialog" aria-modal="true" aria-label={t('reportModal.title')} className="w-full max-w-sm rounded-3xl border border-slate-800 toky-glass toky-elev p-4">
         <div className="text-base font-semibold text-slate-100">{t('reportModal.title')}</div>
 
         {done ? (

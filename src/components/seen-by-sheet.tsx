@@ -83,7 +83,7 @@ export function SeenBySheet({
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="toky-glass toky-elev flex max-h-[80vh] w-full max-w-sm flex-col rounded-t-3xl border border-slate-800 sm:rounded-3xl">
+      <div role="dialog" aria-modal="true" aria-label={t('chat.seenBy')} className="toky-glass toky-elev flex max-h-[80vh] w-full max-w-sm flex-col rounded-t-3xl border border-slate-800 sm:rounded-3xl">
         <div className="flex items-center justify-between border-b border-slate-800 px-4 py-3">
           <h2 className="text-base font-semibold text-slate-100">{t('chat.seenBy')}</h2>
           <button onClick={onClose} aria-label={t('common.close')} className="text-slate-400 hover:text-slate-200">

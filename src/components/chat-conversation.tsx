@@ -3590,7 +3590,7 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
             </div>
           )}
 
-          {err ? <p className="text-sm text-red-300">{err}</p> : null}
+          <p className="text-sm text-red-300" role="status" aria-live="polite">{err}</p>
 
           {searchOpen && (
             <div className="rounded-xl border border-slate-900 bg-slate-950/60 p-3">
