@@ -1209,6 +1209,33 @@ const es: Dictionary = {
     cardTitle: 'Catálogo',
     empty: 'Aún no hay productos.',
   },
+  autoMsg: {
+    title: 'Mensajes automáticos',
+    desc: 'Saluda al cliente automáticamente y responde cuando no estás.',
+    welcome: 'Mensaje de bienvenida',
+    welcomePlaceholder: '¡Hola! Gracias por escribirnos. ¿En qué te ayudamos?',
+    away: 'Mensaje de ausencia',
+    awayPlaceholder: 'Ahora no estamos disponibles; te responderemos a la brevedad.',
+    awayActive: 'Enviar el mensaje de ausencia automáticamente',
+    saveError: 'No se pudieron guardar los mensajes automáticos',
+  },
+  quickReplies: {
+    title: 'Respuestas rápidas',
+    desc: 'Respuestas predefinidas que tu equipo inserta al conversar.',
+    add: 'Agregar respuesta rápida',
+    shortcut: 'Título',
+    shortcutPlaceholder: 'ej. Tiempos de envío',
+    message: 'Mensaje',
+    messagePlaceholder: 'El texto a insertar',
+    saved: 'Respuesta rápida guardada',
+    saveError: 'No se pudo guardar la respuesta rápida',
+    loadError: 'No se pudieron cargar las respuestas rápidas',
+    required: 'Agrega un título y un mensaje',
+    deleteConfirm: '¿Eliminar esta respuesta rápida?',
+    deleteError: 'No se pudo eliminar la respuesta rápida',
+    insert: 'Respuestas rápidas',
+    none: 'Aún no hay respuestas rápidas.',
+  },
 };
 
 export default es;

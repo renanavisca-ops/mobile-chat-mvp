@@ -24,6 +24,7 @@ import { ScreenSecuritySettings } from '@/components/screen-security-settings';
 import { DeviceManager } from '@/components/device-manager';
 import { BusinessProfileSettings } from '@/components/business-profile-settings';
 import { CatalogSettings } from '@/components/catalog-settings';
+import { QuickRepliesSettings } from '@/components/quick-replies-settings';
 import {
   initKeystore,
   isUnlocked,
@@ -1079,6 +1080,9 @@ export default function SettingsPage() {
           </section>
           <section className="space-y-3">
             <CatalogSettings />
+          </section>
+          <section className="space-y-3">
+            <QuickRepliesSettings />
           </section>
 
           <section className="space-y-3">
