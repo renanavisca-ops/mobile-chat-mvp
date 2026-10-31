@@ -1263,6 +1263,26 @@ const en = {
     unassigned: 'Unassigned',
     assignError: 'Could not assign the conversation',
   },
+  templates: {
+    title: 'Interactive messages',
+    desc: 'Templates with tappable options customers can choose from.',
+    add: 'Add template',
+    name: 'Title',
+    namePlaceholder: 'e.g. Choose an option',
+    body: 'Message',
+    bodyPlaceholder: 'What to ask the customer',
+    options: 'Options',
+    optionPlaceholder: 'Option label',
+    addOption: 'Add option',
+    saved: 'Template saved',
+    saveError: 'Could not save the template',
+    loadError: 'Could not load the templates',
+    required: 'Add a title and a message',
+    deleteConfirm: 'Delete this template?',
+    deleteError: 'Could not delete the template',
+    send: 'Interactive message',
+    sendError: 'Could not send the message',
+  },
 };
 
 export default en;

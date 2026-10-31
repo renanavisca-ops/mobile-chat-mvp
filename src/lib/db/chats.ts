@@ -556,6 +556,8 @@ export type MessagePayload = {
   contact?: { userId: string; name: string; username: string | null; avatarUrl: string | null };
   /** A shared one-time location. */
   location?: { lat: number; lng: number };
+  /** Interactive message: tappable options (buttons/list) for the recipient. */
+  options?: { id: string; label: string }[];
 };
 
 export async function sendMessage(chatId: string, payload: MessagePayload, clientId?: string) {

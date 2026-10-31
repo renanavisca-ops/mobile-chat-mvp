@@ -1265,6 +1265,26 @@ const es: Dictionary = {
     unassigned: 'Sin asignar',
     assignError: 'No se pudo asignar la conversación',
   },
+  templates: {
+    title: 'Mensajes interactivos',
+    desc: 'Plantillas con opciones tocables que el cliente puede elegir.',
+    add: 'Agregar plantilla',
+    name: 'Título',
+    namePlaceholder: 'ej. Elige una opción',
+    body: 'Mensaje',
+    bodyPlaceholder: 'Qué preguntarle al cliente',
+    options: 'Opciones',
+    optionPlaceholder: 'Texto de la opción',
+    addOption: 'Agregar opción',
+    saved: 'Plantilla guardada',
+    saveError: 'No se pudo guardar la plantilla',
+    loadError: 'No se pudieron cargar las plantillas',
+    required: 'Agrega un título y un mensaje',
+    deleteConfirm: '¿Eliminar esta plantilla?',
+    deleteError: 'No se pudo eliminar la plantilla',
+    send: 'Mensaje interactivo',
+    sendError: 'No se pudo enviar el mensaje',
+  },
 };
 
 export default es;
