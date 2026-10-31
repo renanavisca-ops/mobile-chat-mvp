@@ -118,7 +118,7 @@ Alto valor, bajo riesgo, sin dependencias externas.
 
 ## Etapa 7 — Herramientas empresariales
 
-- [ ] **Perfil comercial**: categoría, dirección, horario, sitio web
+- [x] **Perfil comercial**: categoría, descripción, dirección, horario, sitio web y teléfono sobre la tienda (`stores`). Editor en Ajustes solo para administradores de la tienda (`private.is_store_admin` + policy `stores_update_admin`); el cliente ve el perfil en una tarjeta plegable dentro del chat de soporte público. (Falta aplicar la migración `202610310001_store_business_profile.sql` en la BD.)
 - [ ] **Catálogo** de productos/servicios (imágenes, precios, descripción)
 - [ ] **Mensajes de bienvenida/ausencia** y **respuestas rápidas**
 - [ ] **Etiquetas** para clientes y conversaciones

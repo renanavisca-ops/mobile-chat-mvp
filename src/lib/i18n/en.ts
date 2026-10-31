@@ -1162,6 +1162,27 @@ const en = {
     signOutAllConfirm: 'This will sign you out on ALL your devices. Continue?',
     signedOut: 'Signed out',
   },
+  business: {
+    title: 'Business profile',
+    desc: 'Describe your business. Customers see this in the support chat.',
+    category: 'Category',
+    categoryPlaceholder: 'e.g. Restaurant, Store, Services',
+    about: 'Description',
+    aboutPlaceholder: 'What your business does',
+    address: 'Address',
+    addressPlaceholder: 'Street, city',
+    hours: 'Business hours',
+    hoursPlaceholder: 'e.g. Mon–Fri 9:00–18:00',
+    website: 'Website',
+    websitePlaceholder: 'https://…',
+    phone: 'Phone',
+    phonePlaceholder: '+1 555 000 0000',
+    save: 'Save business profile',
+    saved: 'Business profile saved',
+    saveError: 'Could not save the business profile',
+    loadError: 'Could not load the business profile',
+    cardTitle: 'About this business',
+  },
 };
 
 export default en;

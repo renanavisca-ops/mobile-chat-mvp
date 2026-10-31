@@ -22,6 +22,7 @@ import { AppLockSettings } from '@/components/app-lock-settings';
 import { PermissionsSettings } from '@/components/permissions-settings';
 import { ScreenSecuritySettings } from '@/components/screen-security-settings';
 import { DeviceManager } from '@/components/device-manager';
+import { BusinessProfileSettings } from '@/components/business-profile-settings';
 import {
   initKeystore,
   isUnlocked,
@@ -1069,6 +1070,11 @@ export default function SettingsPage() {
               </div>
               <span className="shrink-0 text-slate-500">›</span>
             </button>
+          </section>
+
+          {/* Commercial profile — renders only for store admins. */}
+          <section className="space-y-3">
+            <BusinessProfileSettings />
           </section>
 
           <section className="space-y-3">

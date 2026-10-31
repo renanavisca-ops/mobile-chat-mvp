@@ -1164,6 +1164,27 @@ const es: Dictionary = {
     signOutAllConfirm: 'Se cerrará la sesión en TODOS tus dispositivos. ¿Continuar?',
     signedOut: 'Sesión cerrada',
   },
+  business: {
+    title: 'Perfil comercial',
+    desc: 'Describe tu negocio. El cliente lo verá en el chat de soporte.',
+    category: 'Categoría',
+    categoryPlaceholder: 'ej. Restaurante, Tienda, Servicios',
+    about: 'Descripción',
+    aboutPlaceholder: 'A qué se dedica tu negocio',
+    address: 'Dirección',
+    addressPlaceholder: 'Calle, ciudad',
+    hours: 'Horario de atención',
+    hoursPlaceholder: 'ej. Lun–Vie 9:00–18:00',
+    website: 'Sitio web',
+    websitePlaceholder: 'https://…',
+    phone: 'Teléfono',
+    phonePlaceholder: '+56 9 0000 0000',
+    save: 'Guardar perfil comercial',
+    saved: 'Perfil comercial guardado',
+    saveError: 'No se pudo guardar el perfil comercial',
+    loadError: 'No se pudo cargar el perfil comercial',
+    cardTitle: 'Sobre este negocio',
+  },
 };
 
 export default es;
