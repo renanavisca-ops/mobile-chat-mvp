@@ -29,6 +29,8 @@ export function PublicChatView({ token }: { token: string }) {
   const { t, lang } = useLanguage();
 
   const [sessionData, setSessionData] = useState<any>(null);
+  const [store, setStore] = useState<any>(null);
+  const [storeOpen, setStoreOpen] = useState(false);
   const [messages, setMessages] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -48,6 +50,7 @@ export function PublicChatView({ token }: { token: string }) {
         const data = await res.json();
         if (alive) {
           setSessionData(data.session);
+          setStore(data.store || null);
           setMessages(data.messages || []);
           setLoading(false);
         }
@@ -203,6 +206,43 @@ export function PublicChatView({ token }: { token: string }) {
           <span className="text-xl">🎧</span>
         </div>
       </div>
+
+      {/* Business profile — shown to the customer when the store filled it in */}
+      {store && (store.category || store.about || store.address || store.business_hours || store.website || store.phone) && (
+        <div className="border-b border-slate-800 bg-slate-900/40">
+          <button
+            type="button"
+            onClick={() => setStoreOpen((o) => !o)}
+            className="flex w-full items-center justify-between gap-2 px-4 py-2.5 text-left"
+          >
+            <span className="flex items-center gap-2 text-sm text-slate-200">
+              <span>🏬</span>
+              <span className="font-medium">{t('business.cardTitle')}</span>
+              {store.category && <span className="text-xs text-slate-500">· {store.category}</span>}
+            </span>
+            <span className="shrink-0 text-slate-500">{storeOpen ? '▴' : '▾'}</span>
+          </button>
+          {storeOpen && (
+            <div className="space-y-2 px-4 pb-3 text-sm text-slate-300">
+              {store.about && <p className="whitespace-pre-wrap break-words text-slate-300">{store.about}</p>}
+              {store.address && (
+                <p className="flex items-start gap-2"><span className="text-slate-500">📍</span><span className="break-words">{store.address}</span></p>
+              )}
+              {store.business_hours && (
+                <p className="flex items-start gap-2"><span className="text-slate-500">🕒</span><span className="break-words">{store.business_hours}</span></p>
+              )}
+              {store.phone && (
+                <p className="flex items-start gap-2"><span className="text-slate-500">📞</span><a className="text-indigo-300 hover:underline" href={`tel:${store.phone}`}>{store.phone}</a></p>
+              )}
+              {store.website && (
+                <p className="flex items-start gap-2"><span className="text-slate-500">🔗</span>
+                  <a className="break-all text-indigo-300 hover:underline" href={/^https?:\/\//.test(store.website) ? store.website : `https://${store.website}`} target="_blank" rel="noreferrer">{store.website}</a>
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Messages */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-950/40">

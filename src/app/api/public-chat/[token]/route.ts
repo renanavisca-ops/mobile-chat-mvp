@@ -11,12 +11,24 @@ export async function GET(req: Request, { params }: { params: { token: string } 
     // 1. Validar token
     const { data: session, error: sessionError } = await supabaseAdmin
       .from('customer_chat_sessions')
-      .select('chat_id, customer_id, customers(name, phone, country), chats(title, status)')
+      .select('chat_id, customer_id, customers(name, phone, country), chats(title, status, store_id)')
       .eq('public_token', token)
       .single();
 
     if (sessionError || !session || !session.chat_id) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
+    }
+
+    // 1b. Perfil comercial de la tienda, para mostrárselo al cliente.
+    let store = null;
+    const storeId = (session as any)?.chats?.store_id;
+    if (storeId) {
+      const { data: s } = await supabaseAdmin
+        .from('stores')
+        .select('id, name, category, about, address, website, phone, business_hours')
+        .eq('id', storeId)
+        .single();
+      if (s) store = s;
     }
 
     // 2. Obtener mensajes recientes
@@ -31,6 +43,7 @@ export async function GET(req: Request, { params }: { params: { token: string } 
 
     return NextResponse.json({
       session,
+      store,
       messages: (messages || []).reverse()
     });
 
