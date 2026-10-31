@@ -43,16 +43,25 @@ export async function PATCH(
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
 
-    // Permisos: superadmin siempre; admin de la tienda; agente de la tienda si
-    // el chat está sin asignar o ya es suyo (así puede tomar chats nuevos).
+    // Este endpoint es solo para chats de soporte (de una tienda). Rechazar
+    // cualquier otro chat evita que store_id null coincida con store_id null y
+    // deje pasar a usuarios comunes (todos tienen role 'agent' y store_id null).
+    if (!chat.store_id) {
+      return NextResponse.json({ error: 'Not a support chat' }, { status: 403 });
+    }
+
+    // Permisos: superadmin siempre; admin/agente SOLO de la misma tienda (con
+    // store_id no nulo). El agente además solo si el chat está sin asignar o ya
+    // es suyo (para poder tomar chats nuevos).
     let allowed = false;
     if (profile.role === 'superadmin') {
       allowed = true;
-    } else if (profile.role === 'admin') {
-      allowed = profile.store_id === chat.store_id;
-    } else if (profile.role === 'agent') {
-      allowed = profile.store_id === chat.store_id &&
-        ((chat as any).assigned_to === user.id || (chat as any).assigned_to == null);
+    } else if (profile.store_id && profile.store_id === chat.store_id) {
+      if (profile.role === 'admin') {
+        allowed = true;
+      } else if (profile.role === 'agent') {
+        allowed = (chat as any).assigned_to === user.id || (chat as any).assigned_to == null;
+      }
     }
     if (!allowed) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
