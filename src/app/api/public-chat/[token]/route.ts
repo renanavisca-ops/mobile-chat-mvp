@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { reportServerError } from '@/lib/observability';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 
 export async function GET(req: Request, { params }: { params: { token: string } }) {
@@ -71,6 +72,7 @@ export async function GET(req: Request, { params }: { params: { token: string } 
 
   } catch (error: any) {
     console.error('Error in GET /api/public-chat/[token]:', error);
+    reportServerError(error, { route: 'public-chat/GET' });
     return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
   }
 }
@@ -172,6 +174,7 @@ export async function POST(req: Request, { params }: { params: { token: string }
 
   } catch (error: any) {
     console.error('Error in POST /api/public-chat/[token]:', error);
+    reportServerError(error, { route: 'public-chat/POST' });
     return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
   }
 }

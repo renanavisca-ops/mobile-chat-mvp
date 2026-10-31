@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { reportServerError } from '@/lib/observability';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 
 /**
@@ -53,6 +54,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true });
   } catch (error: any) {
     console.error('Error deleting account:', error);
+    reportServerError(error, { route: 'account/delete' });
     return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
   }
 }

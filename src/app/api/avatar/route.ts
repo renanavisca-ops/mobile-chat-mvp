@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { reportServerError } from '@/lib/observability';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 
 // Avatar upload runs server-side on purpose. Uploading straight from the browser
@@ -46,6 +47,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ url: data.publicUrl });
   } catch (error: any) {
     console.error('Avatar upload failed:', error);
+    reportServerError(error, { route: 'avatar' });
     return NextResponse.json({ error: error?.message || 'Upload failed' }, { status: 500 });
   }
 }

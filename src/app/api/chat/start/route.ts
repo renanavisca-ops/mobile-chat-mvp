@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { reportServerError } from '@/lib/observability';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import crypto from 'crypto';
 
@@ -133,6 +134,7 @@ export async function POST(req: Request) {
 
   } catch (error: any) {
     console.error('Error in /api/chat/start:', error);
+    reportServerError(error, { route: 'chat/start' });
     return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
   }
 }

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { reportServerError } from '@/lib/observability';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 
 /**
@@ -67,6 +68,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ iceServers });
   } catch (error: any) {
     console.error('TURN route error:', error);
+    reportServerError(error, { route: 'turn' });
     return NextResponse.json({ iceServers: [PUBLIC_STUN] });
   }
 }
