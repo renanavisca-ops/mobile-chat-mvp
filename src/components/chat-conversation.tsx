@@ -42,6 +42,7 @@ import { SafetyNumberModal } from '@/components/safety-number-modal';
 import { peerFingerprint } from '@/lib/crypto/keystore';
 import { isChatLocked, isChatLockAvailable, lockChat, unlockChat, verifyChatPin } from '@/lib/chat-lock';
 import { starMessage, unstarMessage, getStarredIdsForChat } from '@/lib/db/stars';
+import { listQuickReplies, type QuickReply } from '@/lib/db/quick-replies';
 import { ImageEditor } from '@/components/image-editor';
 import { MessageEffects, detectEffect } from '@/components/message-effects';
 import { wasCelebrated, markCelebrated } from '@/lib/effects-seen';
@@ -619,6 +620,19 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
 
   // Emoji picker
   const [emojiOpen, setEmojiOpen] = useState(false);
+
+  // Quick replies (store chats only): canned responses staff can insert.
+  const [quickReplies, setQuickReplies] = useState<QuickReply[]>([]);
+  const [quickRepliesOpen, setQuickRepliesOpen] = useState(false);
+  const storeId = chat?.store_id ?? null;
+  useEffect(() => {
+    if (!storeId) { setQuickReplies([]); return; }
+    let alive = true;
+    listQuickReplies(storeId)
+      .then((qr) => { if (alive) setQuickReplies(qr); })
+      .catch(() => { if (alive) setQuickReplies([]); });
+    return () => { alive = false; };
+  }, [storeId]);
 
   // Reactions quick-picker
   const [reactionPickerFor, setReactionPickerFor] = useState<string | null>(null);
@@ -2249,6 +2263,13 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
         input.setSelectionRange(pos, pos);
       } catch {}
     });
+  }
+
+  // Insert a quick reply into the composer (append below any existing draft).
+  function insertQuickReply(body: string) {
+    setText((prev) => (prev && prev.trim() ? prev.replace(/\s*$/, '') + '\n' + body : body));
+    setQuickRepliesOpen(false);
+    requestAnimationFrame(() => textInputRef.current?.focus());
   }
 
   // -------- Pending cleanup
@@ -4351,6 +4372,39 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
                   }}
                 />
               </div>
+
+              {quickReplies.length > 0 && (
+                <div className="relative shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => { setEmojiOpen(false); setQuickRepliesOpen((v) => !v); }}
+                    className="grid h-9 w-9 place-items-center rounded-full text-slate-400 hover:text-slate-200 disabled:opacity-40"
+                    title={t('quickReplies.insert')}
+                    aria-label={t('quickReplies.insert')}
+                    disabled={busy}
+                  >
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" /></svg>
+                  </button>
+                  {quickRepliesOpen && (
+                    <>
+                      <div className="fixed inset-0 z-20" onClick={() => setQuickRepliesOpen(false)} />
+                      <div className="absolute bottom-full left-0 z-30 mb-2 max-h-64 w-64 overflow-y-auto rounded-2xl border border-slate-800 bg-slate-900 p-1 shadow-xl">
+                        {quickReplies.map((q) => (
+                          <button
+                            key={q.id}
+                            type="button"
+                            onClick={() => insertQuickReply(q.body)}
+                            className="block w-full rounded-xl px-3 py-2 text-left hover:bg-slate-800"
+                          >
+                            <div className="truncate text-sm text-slate-100">{q.title}</div>
+                            <div className="line-clamp-1 text-xs text-slate-400">{q.body}</div>
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
 
               <textarea
                 ref={textInputRef}

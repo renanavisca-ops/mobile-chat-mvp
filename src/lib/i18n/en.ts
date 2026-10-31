@@ -1207,6 +1207,33 @@ const en = {
     cardTitle: 'Catalog',
     empty: 'No products yet.',
   },
+  autoMsg: {
+    title: 'Automated messages',
+    desc: 'Greet customers automatically and reply when you are away.',
+    welcome: 'Welcome message',
+    welcomePlaceholder: 'Hi! Thanks for reaching out. How can we help?',
+    away: 'Away message',
+    awayPlaceholder: 'We are away right now and will reply as soon as we can.',
+    awayActive: 'Send the away message automatically',
+    saveError: 'Could not save the automated messages',
+  },
+  quickReplies: {
+    title: 'Quick replies',
+    desc: 'Canned responses your team can insert while chatting.',
+    add: 'Add quick reply',
+    shortcut: 'Title',
+    shortcutPlaceholder: 'e.g. Shipping times',
+    message: 'Message',
+    messagePlaceholder: 'The text to insert',
+    saved: 'Quick reply saved',
+    saveError: 'Could not save the quick reply',
+    loadError: 'Could not load the quick replies',
+    required: 'Add a title and a message',
+    deleteConfirm: 'Delete this quick reply?',
+    deleteError: 'Could not delete the quick reply',
+    insert: 'Quick replies',
+    none: 'No quick replies yet.',
+  },
 };
 
 export default en;

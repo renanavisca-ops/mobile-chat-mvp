@@ -87,7 +87,7 @@ export async function POST(req: Request, { params }: { params: { token: string }
     // 1. Validar token
     const { data: session, error: sessionError } = await supabaseAdmin
       .from('customer_chat_sessions')
-      .select('chat_id, customer_id')
+      .select('chat_id, customer_id, chats(store_id)')
       .eq('public_token', token)
       .single();
 
@@ -95,7 +95,15 @@ export async function POST(req: Request, { params }: { params: { token: string }
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
-    // 2. Guardar mensaje
+    // 2a. ¿Es el primer mensaje del cliente? (para la bienvenida automática)
+    const { count: priorCustomer } = await supabaseAdmin
+      .from('messages')
+      .select('id', { count: 'exact', head: true })
+      .eq('chat_id', session.chat_id)
+      .eq('sender_type', 'customer');
+    const isFirstCustomerMessage = (priorCustomer ?? 0) === 0;
+
+    // 2b. Guardar el mensaje del cliente
     const ciphertext = JSON.stringify({ v: 1, ...payload });
     const content = payload.text || null;
     const nonce = crypto.randomUUID();
@@ -116,6 +124,34 @@ export async function POST(req: Request, { params }: { params: { token: string }
       .single();
 
     if (msgError) throw msgError;
+
+    // 3. Mensajes automáticos de la tienda (bienvenida / ausencia).
+    const storeId = (session as any)?.chats?.store_id;
+    if (storeId) {
+      const { data: s } = await (supabaseAdmin as any)
+        .from('stores')
+        .select('welcome_message, away_message, away_active')
+        .eq('id', storeId)
+        .single();
+      const insertAuto = async (text: string) => {
+        try {
+          await (supabaseAdmin as any).from('messages').insert({
+            chat_id: session.chat_id,
+            content: text,
+            ciphertext: JSON.stringify({ v: 1, text }),
+            message_type: 'whisper',
+            sender_type: 'agent',
+            sender_id: null,
+            nonce: crypto.randomUUID(),
+            read: false,
+          });
+        } catch { /* best effort — never fail the customer's send */ }
+      };
+      if (s) {
+        if (isFirstCustomerMessage && s.welcome_message) await insertAuto(s.welcome_message);
+        if (s.away_active && s.away_message) await insertAuto(s.away_message);
+      }
+    }
 
     return NextResponse.json(msg);
 

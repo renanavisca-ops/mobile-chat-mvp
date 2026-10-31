@@ -12,6 +12,9 @@ export type StoreProfile = {
   website: string | null;
   phone: string | null;
   businessHours: string | null;
+  welcomeMessage: string | null;
+  awayMessage: string | null;
+  awayActive: boolean;
 };
 
 /** The editable fields of a store's commercial profile. */
@@ -22,6 +25,13 @@ export type StoreProfileFields = {
   website: string | null;
   phone: string | null;
   businessHours: string | null;
+};
+
+/** Automated greeting/away settings, edited separately from the profile. */
+export type StoreAutoMessages = {
+  welcomeMessage: string | null;
+  awayMessage: string | null;
+  awayActive: boolean;
 };
 
 // The business-profile columns aren't in the generated types yet, so the
@@ -36,6 +46,9 @@ function mapRow(row: any): StoreProfile {
     website: row.website ?? null,
     phone: row.phone ?? null,
     businessHours: row.business_hours ?? null,
+    welcomeMessage: row.welcome_message ?? null,
+    awayMessage: row.away_message ?? null,
+    awayActive: row.away_active === true,
   };
 }
 
@@ -44,12 +57,30 @@ export async function getStoreProfile(storeId: string): Promise<StoreProfile | n
   const supabase = browserSupabase();
   const { data, error } = await (supabase as any)
     .from('stores')
-    .select('id, name, category, about, address, website, phone, business_hours')
+    .select('id, name, category, about, address, website, phone, business_hours, welcome_message, away_message, away_active')
     .eq('id', storeId)
     .limit(1);
   if (error) throw error;
   const row = (data as any[])?.[0];
   return row ? mapRow(row) : null;
+}
+
+/** Update a store's automated greeting/away messages. RLS limits to admins. */
+export async function updateStoreAutoMessages(storeId: string, m: StoreAutoMessages): Promise<void> {
+  const supabase = browserSupabase();
+  const norm = (v: string | null) => {
+    const s = (v ?? '').trim();
+    return s.length ? s : null;
+  };
+  const { error } = await (supabase as any)
+    .from('stores')
+    .update({
+      welcome_message: norm(m.welcomeMessage),
+      away_message: norm(m.awayMessage),
+      away_active: !!m.awayActive,
+    })
+    .eq('id', storeId);
+  if (error) throw error;
 }
 
 /** Update a store's commercial profile. RLS limits this to store admins. */

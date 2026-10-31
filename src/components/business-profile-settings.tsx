@@ -3,11 +3,13 @@
 import { useEffect, useState } from 'react';
 import { useT } from '@/lib/i18n/context';
 import { browserSupabase } from '@/lib/supabase/client';
-import { getStoreProfile, updateStoreProfile, type StoreProfileFields } from '@/lib/db/store-profile';
+import { getStoreProfile, updateStoreProfile, updateStoreAutoMessages, type StoreProfileFields, type StoreAutoMessages } from '@/lib/db/store-profile';
 
 const EMPTY: StoreProfileFields = {
   category: '', about: '', address: '', website: '', phone: '', businessHours: '',
 };
+
+const EMPTY_AUTO: StoreAutoMessages = { welcomeMessage: '', awayMessage: '', awayActive: false };
 
 /**
  * Settings card for a store's commercial profile. Only rendered for store
@@ -18,9 +20,12 @@ export function BusinessProfileSettings() {
   const t = useT();
   const [storeId, setStoreId] = useState<string | null>(null);
   const [fields, setFields] = useState<StoreProfileFields>(EMPTY);
+  const [auto, setAuto] = useState<StoreAutoMessages>(EMPTY_AUTO);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [savingAuto, setSavingAuto] = useState(false);
   const [status, setStatus] = useState('');
+  const [statusAuto, setStatusAuto] = useState('');
 
   useEffect(() => {
     let alive = true;
@@ -53,6 +58,11 @@ export function BusinessProfileSettings() {
             phone: profile.phone ?? '',
             businessHours: profile.businessHours ?? '',
           });
+          setAuto({
+            welcomeMessage: profile.welcomeMessage ?? '',
+            awayMessage: profile.awayMessage ?? '',
+            awayActive: profile.awayActive,
+          });
         }
       } catch {
         if (alive) setStatus(`❌ ${t('business.loadError')}`);
@@ -80,6 +90,20 @@ export function BusinessProfileSettings() {
       setStatus(`❌ ${t('business.saveError')}`);
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function onSaveAuto() {
+    if (!storeId) return;
+    setSavingAuto(true);
+    setStatusAuto('');
+    try {
+      await updateStoreAutoMessages(storeId, auto);
+      setStatusAuto(`✅ ${t('business.saved')}`);
+    } catch {
+      setStatusAuto(`❌ ${t('autoMsg.saveError')}`);
+    } finally {
+      setSavingAuto(false);
     }
   }
 
@@ -121,6 +145,37 @@ export function BusinessProfileSettings() {
             {saving ? t('common.saving') : t('business.save')}
           </button>
           {status && <span className="text-xs text-slate-400">{status}</span>}
+        </div>
+      </div>
+
+      {/* Automated messages */}
+      <div className="rounded-xl border border-slate-900 bg-slate-950/50 p-4 shadow-sm">
+        <div className="text-sm font-medium text-slate-200">{t('autoMsg.title')}</div>
+        <div className="mt-1 text-xs text-slate-400">{t('autoMsg.desc')}</div>
+      </div>
+      <div className="space-y-3 rounded-xl border border-slate-900 bg-slate-950/40 p-4">
+        <label className="block">
+          <span className="mb-1 block text-xs text-slate-400">{t('autoMsg.welcome')}</span>
+          <textarea rows={2} className={inputCls} placeholder={t('autoMsg.welcomePlaceholder')} value={auto.welcomeMessage ?? ''} onChange={(e) => setAuto({ ...auto, welcomeMessage: e.target.value })} />
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-xs text-slate-400">{t('autoMsg.away')}</span>
+          <textarea rows={2} className={inputCls} placeholder={t('autoMsg.awayPlaceholder')} value={auto.awayMessage ?? ''} onChange={(e) => setAuto({ ...auto, awayMessage: e.target.value })} />
+        </label>
+        <label className="flex items-center gap-2 text-sm text-slate-300">
+          <input type="checkbox" checked={auto.awayActive} onChange={(e) => setAuto({ ...auto, awayActive: e.target.checked })} />
+          {t('autoMsg.awayActive')}
+        </label>
+        <div className="flex items-center gap-3 pt-1">
+          <button
+            type="button"
+            onClick={onSaveAuto}
+            disabled={savingAuto}
+            className="toky-grad rounded-lg px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+          >
+            {savingAuto ? t('common.saving') : t('common.save')}
+          </button>
+          {statusAuto && <span className="text-xs text-slate-400">{statusAuto}</span>}
         </div>
       </div>
     </div>
