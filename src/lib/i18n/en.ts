@@ -1249,6 +1249,20 @@ const en = {
     deleteError: 'Could not delete the label',
     apply: 'Label',
   },
+  staff: {
+    title: 'Team and roles',
+    desc: 'Manage your store staff and assign conversations.',
+    roleAgent: 'Agent',
+    roleAdmin: 'Admin',
+    roleSuperadmin: 'Owner',
+    saved: 'Role updated',
+    saveError: 'Could not update the role',
+    loadError: 'Could not load the team',
+    empty: 'No staff yet.',
+    assignee: 'Assigned',
+    unassigned: 'Unassigned',
+    assignError: 'Could not assign the conversation',
+  },
 };
 
 export default en;

@@ -44,6 +44,7 @@ import { isChatLocked, isChatLockAvailable, lockChat, unlockChat, verifyChatPin 
 import { starMessage, unstarMessage, getStarredIdsForChat } from '@/lib/db/stars';
 import { listQuickReplies, type QuickReply } from '@/lib/db/quick-replies';
 import { listLabels, getChatLabelIds, addChatLabel, removeChatLabel, labelChipClasses, type Label } from '@/lib/db/labels';
+import { listStoreStaff, type StaffMember } from '@/lib/db/staff';
 import { ImageEditor } from '@/components/image-editor';
 import { MessageEffects, detectEffect } from '@/components/message-effects';
 import { wasCelebrated, markCelebrated } from '@/lib/effects-seen';
@@ -663,6 +664,58 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
     } catch {
       // Revert on failure.
       setChatLabelIds((prev) => (applied ? [...prev, labelId] : prev.filter((x) => x !== labelId)));
+    }
+  }
+
+  // Multiagent: the store's staff, for assigning this conversation.
+  const [staff, setStaff] = useState<StaffMember[]>([]);
+  const [assignOpen, setAssignOpen] = useState(false);
+  useEffect(() => {
+    if (!storeId) { setStaff([]); return; }
+    let alive = true;
+    listStoreStaff(storeId).then((s) => { if (alive) setStaff(s); }).catch(() => { if (alive) setStaff([]); });
+    return () => { alive = false; };
+  }, [storeId]);
+
+  // Assign (or unassign with null) this chat to a staff member via the API.
+  async function assignChat(assignedTo: string | null) {
+    const prev = (chat as any)?.assigned_to ?? null;
+    setChat((c) => (c ? ({ ...c, assigned_to: assignedTo } as typeof c) : c));
+    setAssignOpen(false);
+    try {
+      const { data: { session } } = await browserSupabase().auth.getSession();
+      const res = await apiFetch(`/api/chat/${chatId}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ assigned_to: assignedTo }),
+      });
+      if (!res.ok) throw new Error('assign failed');
+    } catch {
+      setChat((c) => (c ? ({ ...c, assigned_to: prev } as typeof c) : c));
+      setErr(t('staff.assignError'));
+    }
+  }
+
+  // Take the chat: mark in progress and assign it to me in one request.
+  async function takeChat() {
+    const myId = user?.id ?? null;
+    setBusy(true);
+    try {
+      const { data: { session } } = await browserSupabase().auth.getSession();
+      const res = await apiFetch(`/api/chat/${chatId}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ status: 'in_progress', assigned_to: myId }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(d.error || t('chat.errorUpdatingStatus'));
+      }
+      setChat((c) => (c ? ({ ...c, status: 'in_progress', assigned_to: myId } as typeof c) : c));
+    } catch (e: any) {
+      setErr(e.message);
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -3432,7 +3485,7 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
                 {chat.status === 'open' ? t('common.statusOpen') : chat.status === 'in_progress' ? t('common.statusInProgress') : t('common.statusClosed')}
               </span>
               {chat.status === 'open' && (
-                <button onClick={() => updateStatus('in_progress')} className="toky-grad rounded-lg px-2.5 py-1 text-white">
+                <button onClick={takeChat} className="toky-grad rounded-lg px-2.5 py-1 text-white">
                   {t('chat.take')}
                 </button>
               )}
@@ -3441,6 +3494,40 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
                   {t('chat.closeChat')}
                 </button>
               )}
+
+              {/* Assignee (multiagent): who's handling this conversation. */}
+              <div className="relative ml-auto">
+                <button
+                  type="button"
+                  onClick={() => setAssignOpen((v) => !v)}
+                  className="rounded-full border border-slate-700 px-2 py-0.5 text-[11px] text-slate-300 hover:bg-slate-800"
+                >
+                  {(() => {
+                    const a = (chat as any).assigned_to as string | null;
+                    const who = a ? (staff.find((s) => s.id === a)?.name ?? t('staff.assignee')) : t('staff.unassigned');
+                    return `👤 ${who}`;
+                  })()}
+                </button>
+                {assignOpen && (
+                  <>
+                    <div className="fixed inset-0 z-20" onClick={() => setAssignOpen(false)} />
+                    <div className="absolute right-0 top-full z-30 mt-1 max-h-56 w-52 overflow-y-auto rounded-2xl border border-slate-800 bg-slate-900 p-1 shadow-xl">
+                      <button type="button" onClick={() => assignChat(null)}
+                        className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm text-slate-300 hover:bg-slate-800">
+                        {t('staff.unassigned')}
+                        {!(chat as any).assigned_to && <span className="text-emerald-400">✓</span>}
+                      </button>
+                      {staff.map((s) => (
+                        <button key={s.id} type="button" onClick={() => assignChat(s.id)}
+                          className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm text-slate-100 hover:bg-slate-800">
+                          <span className="truncate">{s.name}</span>
+                          {(chat as any).assigned_to === s.id && <span className="text-emerald-400">✓</span>}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
           )}
 

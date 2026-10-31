@@ -122,7 +122,7 @@ Alto valor, bajo riesgo, sin dependencias externas.
 - [x] **Catálogo** de productos/servicios (imágenes, precios, descripción): tabla `store_products` + bucket público `catalog`; gestor en Ajustes para admins de la tienda (agregar/editar/ocultar/eliminar con foto) y vitrina plegable para el cliente en el chat de soporte. Requiere aplicar `202610310002_store_catalog.sql`.
 - [x] **Mensajes de bienvenida/ausencia** y **respuestas rápidas**: bienvenida automática al primer mensaje del cliente y mensaje de ausencia (toggle) desde Ajustes del admin; respuestas rápidas (canned) que el staff inserta desde el compositor en chats de tienda. Tabla `store_quick_replies` + columnas `welcome_message/away_message/away_active` en `stores`.
 - [x] **Etiquetas** para clientes y conversaciones: definiciones por tienda con color (gestor en Ajustes para admins) y aplicación/quita de etiquetas sobre cada conversación de tienda desde la consola de soporte (chips + selector). Tablas `store_labels` + `chat_labels` con RLS (admin define; el staff etiqueta).
-- [ ] **Multiagente**: asignación de conversaciones y roles (ampliar staff actual)
+- [x] **Multiagente**: asignación de conversaciones y roles (amplía el staff actual). "Tomar" asigna el chat a quien lo toma; selector de asignado (reasignar a otro miembro) y estado sin-asignar en la consola de soporte; gestor "Equipo y roles" en Ajustes para admins (cambia agente↔admin vía RPC `set_store_member_role`). El agente puede tomar chats sin asignar de su tienda.
 - [ ] **Mensajes interactivos**: botones, listas y plantillas
 - [ ] **Estadísticas** de entrega/lectura/atención
 - [ ] **Automatizaciones / API / CRM** 🔒
