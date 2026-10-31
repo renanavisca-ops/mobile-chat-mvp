@@ -1251,6 +1251,20 @@ const es: Dictionary = {
     deleteError: 'No se pudo eliminar la etiqueta',
     apply: 'Etiquetar',
   },
+  staff: {
+    title: 'Equipo y roles',
+    desc: 'Administra el staff de tu tienda y asigna conversaciones.',
+    roleAgent: 'Agente',
+    roleAdmin: 'Administrador',
+    roleSuperadmin: 'Dueño',
+    saved: 'Rol actualizado',
+    saveError: 'No se pudo actualizar el rol',
+    loadError: 'No se pudo cargar el equipo',
+    empty: 'Aún no hay staff.',
+    assignee: 'Asignado',
+    unassigned: 'Sin asignar',
+    assignError: 'No se pudo asignar la conversación',
+  },
 };
 
 export default es;
