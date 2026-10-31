@@ -28,6 +28,7 @@ import { QuickRepliesSettings } from '@/components/quick-replies-settings';
 import { LabelsSettings } from '@/components/labels-settings';
 import { StaffSettings } from '@/components/staff-settings';
 import { TemplatesSettings } from '@/components/templates-settings';
+import { StatsSettings } from '@/components/stats-settings';
 import {
   initKeystore,
   isUnlocked,
@@ -1095,6 +1096,9 @@ export default function SettingsPage() {
           </section>
           <section className="space-y-3">
             <TemplatesSettings />
+          </section>
+          <section className="space-y-3">
+            <StatsSettings />
           </section>
 
           <section className="space-y-3">
