@@ -87,6 +87,18 @@ export async function PATCH(
     const { error } = await (supabase as any).from('chats').update(patch).eq('id', id);
     if (error) throw error;
 
+    // Auditoría (best-effort): registrar la acción del staff sin romper la respuesta.
+    try {
+      const entries: any[] = [];
+      if (status !== undefined) {
+        entries.push({ store_id: chat.store_id, actor_id: user.id, action: 'chat_status', target_id: id, detail: { status } });
+      }
+      if (hasAssignee) {
+        entries.push({ store_id: chat.store_id, actor_id: user.id, action: 'chat_assigned', target_id: id, detail: { assigned_to: assignedTo } });
+      }
+      if (entries.length) await (supabase as any).from('audit_log').insert(entries);
+    } catch { /* no bloquear por telemetría */ }
+
     return NextResponse.json({ ok: true });
 
   } catch (error: any) {

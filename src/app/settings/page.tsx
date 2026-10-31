@@ -33,6 +33,7 @@ const LabelsSettings = dynamic(() => import('@/components/labels-settings').then
 const StaffSettings = dynamic(() => import('@/components/staff-settings').then((m) => m.StaffSettings), { ssr: false });
 const TemplatesSettings = dynamic(() => import('@/components/templates-settings').then((m) => m.TemplatesSettings), { ssr: false });
 const StatsSettings = dynamic(() => import('@/components/stats-settings').then((m) => m.StatsSettings), { ssr: false });
+const AuditLogSettings = dynamic(() => import('@/components/audit-log-settings').then((m) => m.AuditLogSettings), { ssr: false });
 import {
   initKeystore,
   isUnlocked,
@@ -1103,6 +1104,9 @@ export default function SettingsPage() {
           </section>
           <section className="space-y-3">
             <StatsSettings />
+          </section>
+          <section className="space-y-3">
+            <AuditLogSettings />
           </section>
 
           <section className="space-y-3">
