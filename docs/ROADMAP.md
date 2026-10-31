@@ -124,7 +124,7 @@ Alto valor, bajo riesgo, sin dependencias externas.
 - [x] **Etiquetas** para clientes y conversaciones: definiciones por tienda con color (gestor en Ajustes para admins) y aplicación/quita de etiquetas sobre cada conversación de tienda desde la consola de soporte (chips + selector). Tablas `store_labels` + `chat_labels` con RLS (admin define; el staff etiqueta).
 - [x] **Multiagente**: asignación de conversaciones y roles (amplía el staff actual). "Tomar" asigna el chat a quien lo toma; selector de asignado (reasignar a otro miembro) y estado sin-asignar en la consola de soporte; gestor "Equipo y roles" en Ajustes para admins (cambia agente↔admin vía RPC `set_store_member_role`). El agente puede tomar chats sin asignar de su tienda.
 - [x] **Mensajes interactivos**: botones, listas y plantillas. El admin define plantillas (texto + opciones) en Ajustes; el staff las envía con un toque desde el compositor en chats de tienda; el cliente ve las opciones como botones tocables en el chat de soporte y al tocar una responde con esa opción. Tabla `store_message_templates`; payload `options[]` en el mensaje.
-- [ ] **Estadísticas** de entrega/lectura/atención
+- [x] **Estadísticas** de entrega/lectura/atención: panel en Ajustes (solo admins) con conversaciones por estado (abiertas/en curso/cerradas), clientes, mensajes sin leer, volumen de mensajes a 7 días (total/cliente/equipo) y desglose por agente (activas/cerradas). RPC `store_support_stats` autorizada a admins.
 - [ ] **Automatizaciones / API / CRM** 🔒
 - [ ] **Campañas** con consentimiento, límites y baja 🔒
 

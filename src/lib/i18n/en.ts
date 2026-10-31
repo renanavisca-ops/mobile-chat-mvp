@@ -1283,6 +1283,25 @@ const en = {
     send: 'Interactive message',
     sendError: 'Could not send the message',
   },
+  stats: {
+    title: 'Statistics',
+    desc: 'Attention and message volume for your store.',
+    open: 'Open',
+    inProgress: 'In progress',
+    closed: 'Closed',
+    customers: 'Customers',
+    unread: 'Unread',
+    total: 'Total chats',
+    messages7d: 'Messages (last 7 days)',
+    msgsTotal: 'Total',
+    msgsCustomer: 'From customers',
+    msgsStaff: 'From team',
+    byAgent: 'By agent',
+    agent: 'Agent',
+    active: 'Active',
+    closedShort: 'Closed',
+    loadError: 'Could not load the statistics',
+  },
 };
 
 export default en;

@@ -1285,6 +1285,25 @@ const es: Dictionary = {
     send: 'Mensaje interactivo',
     sendError: 'No se pudo enviar el mensaje',
   },
+  stats: {
+    title: 'Estadísticas',
+    desc: 'Atención y volumen de mensajes de tu tienda.',
+    open: 'Abiertas',
+    inProgress: 'En curso',
+    closed: 'Cerradas',
+    customers: 'Clientes',
+    unread: 'Sin leer',
+    total: 'Chats totales',
+    messages7d: 'Mensajes (últimos 7 días)',
+    msgsTotal: 'Total',
+    msgsCustomer: 'De clientes',
+    msgsStaff: 'Del equipo',
+    byAgent: 'Por agente',
+    agent: 'Agente',
+    active: 'Activas',
+    closedShort: 'Cerradas',
+    loadError: 'No se pudieron cargar las estadísticas',
+  },
 };
 
 export default es;
