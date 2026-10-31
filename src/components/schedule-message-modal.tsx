@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useT } from '@/lib/i18n/context';
+import { useT, useFormatters } from '@/lib/i18n/context';
 import { browserSupabase } from '@/lib/supabase/client';
 import {
   addScheduled,
@@ -29,6 +29,7 @@ export function ScheduleMessageModal({
   chatLabel: string;
 }) {
   const t = useT();
+  const fmts = useFormatters();
   const [text, setText] = useState('');
   const [when, setWhen] = useState('');
   const [error, setError] = useState('');
@@ -133,7 +134,7 @@ export function ScheduleMessageModal({
                 <li key={s.id} className="flex items-center gap-2 rounded-lg border border-slate-900 bg-slate-950/60 px-3 py-2">
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm text-slate-200">{s.text}</span>
-                    <span className="block text-xs text-slate-500">{new Date(s.at).toLocaleString()}</span>
+                    <span className="block text-xs text-slate-500">{fmts.dateTime(s.at)}</span>
                   </span>
                   <button
                     type="button"
