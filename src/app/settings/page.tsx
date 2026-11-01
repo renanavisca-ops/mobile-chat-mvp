@@ -34,6 +34,7 @@ const StaffSettings = dynamic(() => import('@/components/staff-settings').then((
 const TemplatesSettings = dynamic(() => import('@/components/templates-settings').then((m) => m.TemplatesSettings), { ssr: false });
 const StatsSettings = dynamic(() => import('@/components/stats-settings').then((m) => m.StatsSettings), { ssr: false });
 const AuditLogSettings = dynamic(() => import('@/components/audit-log-settings').then((m) => m.AuditLogSettings), { ssr: false });
+const AutomationsSettings = dynamic(() => import('@/components/automations-settings').then((m) => m.AutomationsSettings), { ssr: false });
 import {
   initKeystore,
   isUnlocked,
@@ -1104,6 +1105,9 @@ export default function SettingsPage() {
           </section>
           <section className="space-y-3">
             <StatsSettings />
+          </section>
+          <section className="space-y-3">
+            <AutomationsSettings />
           </section>
           <section className="space-y-3">
             <AuditLogSettings />

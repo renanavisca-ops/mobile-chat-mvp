@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { reportServerError } from '@/lib/observability';
+import { matchingRules } from '@/lib/automations/match';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 
 export async function GET(req: Request, { params }: { params: { token: string } }) {
@@ -167,6 +168,48 @@ export async function POST(req: Request, { params }: { params: { token: string }
       if (s) {
         if (isFirstCustomerMessage && s.welcome_message) await insertAuto(s.welcome_message);
         if (s.away_active && s.away_message) await insertAuto(s.away_message);
+      }
+
+      // 4. Automatizaciones por palabra clave. Solo sobre el texto plano del
+      //    cliente (los chats E2EE nunca pasan por aquí). Controles: evaluamos
+      //    únicamente el mensaje entrante del cliente (no de agente/sistema), la
+      //    respuesta se inserta como 'agent' (no re-dispara reglas → sin bucles),
+      //    y un limitador evita duplicados (máx. 1 activación por regla/chat/2min).
+      if (content) {
+        try {
+          const { data: rules } = await (supabaseAdmin as any)
+            .from('automation_rules')
+            .select('id, enabled, match_type, keywords, case_sensitive, action_reply, action_label_id')
+            .eq('store_id', storeId)
+            .eq('enabled', true)
+            .order('sort', { ascending: true });
+          const mapped = ((rules as any[]) || []).map((r) => ({
+            id: r.id as string,
+            enabled: true,
+            matchType: r.match_type,
+            keywords: Array.isArray(r.keywords) ? r.keywords : [],
+            caseSensitive: !!r.case_sensitive,
+            actionReply: r.action_reply as string | null,
+            actionLabelId: r.action_label_id as string | null,
+          }));
+          for (const rule of matchingRules(content, mapped)) {
+            let allow = true;
+            try {
+              const { data: ok } = await (supabaseAdmin as any).rpc('rate_limit_hit', {
+                p_bucket: `auto:${session.chat_id}:${rule.id}`, p_limit: 1, p_window_seconds: 120,
+              });
+              allow = ok !== false;
+            } catch { allow = true; }
+            if (!allow) continue;
+            if (rule.actionReply) await insertAuto(rule.actionReply);
+            if (rule.actionLabelId) {
+              try {
+                await (supabaseAdmin as any).from('chat_labels')
+                  .upsert({ chat_id: session.chat_id, label_id: rule.actionLabelId }, { onConflict: 'chat_id,label_id', ignoreDuplicates: true });
+              } catch { /* etiqueta best-effort */ }
+            }
+          }
+        } catch { /* automatizaciones best-effort — nunca rompen el envío */ }
       }
     }
 
