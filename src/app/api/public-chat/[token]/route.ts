@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { reportServerError } from '@/lib/observability';
 import { matchingRules } from '@/lib/automations/match';
+import { recordIntegrationEvent } from '@/lib/integrations/dispatch';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 
 export async function GET(req: Request, { params }: { params: { token: string } }) {
@@ -211,6 +212,11 @@ export async function POST(req: Request, { params }: { params: { token: string }
           }
         } catch { /* automatizaciones best-effort — nunca rompen el envío */ }
       }
+
+      // Integraciones (outbox): evento no sensible — nunca el contenido.
+      await recordIntegrationEvent(supabaseAdmin, storeId, 'support.message_received', {
+        chatId: session.chat_id, messageId: (msg as any)?.id, hasText: !!content,
+      });
     }
 
     return NextResponse.json(msg);

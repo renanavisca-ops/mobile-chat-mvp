@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { reportServerError } from '@/lib/observability';
+import { recordIntegrationEvent } from '@/lib/integrations/dispatch';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 
 export async function PATCH(
@@ -98,6 +99,14 @@ export async function PATCH(
       }
       if (entries.length) await (supabase as any).from('audit_log').insert(entries);
     } catch { /* no bloquear por telemetría */ }
+
+    // Integraciones (outbox): eventos no sensibles.
+    if (status !== undefined) {
+      await recordIntegrationEvent(supabase, chat.store_id, 'support.chat_status_changed', { chatId: id, status });
+    }
+    if (hasAssignee) {
+      await recordIntegrationEvent(supabase, chat.store_id, 'support.chat_assigned', { chatId: id, assigned: !!assignedTo });
+    }
 
     return NextResponse.json({ ok: true });
 
