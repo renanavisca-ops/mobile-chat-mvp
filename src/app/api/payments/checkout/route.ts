@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
+import { paymentsEnabled, paymentsProvider } from '@/lib/payments/config';
 
 /**
  * Payments checkout — SCAFFOLD ONLY.
@@ -23,6 +24,11 @@ export async function POST(req: Request) {
   } = await supabaseAdmin.auth.getUser(token);
   if (error || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  // No processor configured yet.
-  return NextResponse.json({ error: 'Payments are not configured yet.', code: 'not_configured' }, { status: 501 });
+  // Disabled by default; a provider is turned on by configuration (see
+  // docs/PAYMENTS.md). Even when enabled, no provider integration is shipped
+  // yet — nothing processes money today.
+  if (!paymentsEnabled() || !paymentsProvider()) {
+    return NextResponse.json({ error: 'Payments are not configured yet.', code: 'not_configured' }, { status: 501 });
+  }
+  return NextResponse.json({ error: 'Payments provider not implemented.', code: 'provider_not_implemented' }, { status: 501 });
 }
