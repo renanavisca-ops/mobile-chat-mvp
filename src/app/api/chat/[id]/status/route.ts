@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { reportServerError } from '@/lib/observability';
 import { recordIntegrationEvent } from '@/lib/integrations/dispatch';
+import { canModifySupportChat, canBeAssigned } from '@/lib/authz/chat-access';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 
 export async function PATCH(
@@ -45,26 +46,16 @@ export async function PATCH(
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
 
-    // Este endpoint es solo para chats de soporte (de una tienda). Rechazar
-    // cualquier otro chat evita que store_id null coincida con store_id null y
-    // deje pasar a usuarios comunes (todos tienen role 'agent' y store_id null).
-    if (!chat.store_id) {
-      return NextResponse.json({ error: 'Not a support chat' }, { status: 403 });
-    }
-
-    // Permisos: superadmin siempre; admin/agente SOLO de la misma tienda (con
-    // store_id no nulo). El agente además solo si el chat está sin asignar o ya
-    // es suyo (para poder tomar chats nuevos).
-    let allowed = false;
-    if (profile.role === 'superadmin') {
-      allowed = true;
-    } else if (profile.store_id && profile.store_id === chat.store_id) {
-      if (profile.role === 'admin') {
-        allowed = true;
-      } else if (profile.role === 'agent') {
-        allowed = (chat as any).assigned_to === user.id || (chat as any).assigned_to == null;
-      }
-    }
+    // Autorización (función pura y testeada en tests/chat-access.test.ts):
+    // solo chats de soporte; superadmin siempre; admin/agente solo de su propia
+    // tienda; el agente además solo si el chat está sin asignar o ya es suyo.
+    const allowed = canModifySupportChat({
+      userId: user.id,
+      role: (profile as any).role ?? null,
+      userStoreId: (profile as any).store_id ?? null,
+      chatStoreId: chat.store_id ?? null,
+      chatAssignedTo: (chat as any).assigned_to ?? null,
+    });
     if (!allowed) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
@@ -73,9 +64,7 @@ export async function PATCH(
     if (hasAssignee && assignedTo) {
       const { data: target } = await supabase
         .from('profiles').select('role, store_id').eq('id', assignedTo).single();
-      const okTarget = target &&
-        (target as any).store_id === chat.store_id &&
-        ['agent', 'admin', 'superadmin'].includes((target as any).role);
+      const okTarget = !!target && canBeAssigned((target as any).role ?? null, (target as any).store_id ?? null, chat.store_id ?? null);
       if (!okTarget) {
         return NextResponse.json({ error: 'Invalid assignee' }, { status: 400 });
       }
