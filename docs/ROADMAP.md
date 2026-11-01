@@ -143,9 +143,16 @@ Alto valor, bajo riesgo, sin dependencias externas.
 
 Depende de proveedor regulado por país; se activa por configuración.
 
-- [ ] Transferencias entre personas / pagos a comercios / solicitudes de pago
-- [ ] Historial y comprobantes · verificación de identidad y antifraude
-- [ ] Integración con proveedores autorizados según país
+**Estructura mínima preparada y DESACTIVADA** (sin procesar dinero): tabla
+`payments` con RLS, contrato cliente (`src/lib/payments`), rutas `checkout` y
+`webhook` en scaffold (501), y gate por variables de entorno
+(`PAYMENTS_ENABLED`/`PAYMENTS_PROVIDER`, apagado por defecto). No hay UI
+operativa ni recolección de datos bancarios/identidad. Activación y variables en
+`docs/PAYMENTS.md`.
+
+- [~] Transferencias entre personas / pagos a comercios / solicitudes de pago _(estructura; desactivado hasta elegir proveedor)_
+- [ ] Historial y comprobantes · verificación de identidad y antifraude _(pendiente: proveedor + cumplimiento)_
+- [ ] Integración con proveedores autorizados según país _(pendiente: decisión por país)_
 
 ---
 
