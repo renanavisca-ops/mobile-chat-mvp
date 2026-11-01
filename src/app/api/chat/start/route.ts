@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { reportServerError } from '@/lib/observability';
+import { recordIntegrationEvent } from '@/lib/integrations/dispatch';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import crypto from 'crypto';
 
@@ -87,6 +88,9 @@ export async function POST(req: Request) {
       .single();
 
     if (chatError || !chat) throw chatError;
+
+    // Integraciones (adaptador local / outbox): evento no sensible.
+    await recordIntegrationEvent(supabaseAdmin, store.id, 'support.chat_created', { chatId: chat.id });
 
     // 6b. Add the assigned agent as a chat member so they can see the chat
     //     under membership-based RLS (in addition to store-level visibility).
