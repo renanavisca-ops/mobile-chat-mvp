@@ -88,6 +88,7 @@ export type Story = {
   id: string;
   user_id: string;
   media_path: string | null;
+  media_type?: 'image' | 'video' | 'audio' | null;
   text_content: string | null;
   background: string | null;
   created_at: string;

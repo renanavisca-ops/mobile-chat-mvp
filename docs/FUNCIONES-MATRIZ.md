@@ -119,7 +119,7 @@ Guías de activación: `docs/INTEGRATIONS.md`, `docs/CAMPAIGNS.md`, `docs/PAYMEN
 | Requisito | Estado | Archivos | Pendiente | Evidencia | Dependencia |
 |---|---|---|---|---|---|
 | Publicar con expiración (foto/texto) | ✅ | story-composer, stories.ts | — | — | — |
-| **Video/audio en historia** | ❌ | — | Soporte video/audio en composer+visor | — | — |
+| **Video en historia** | ✅ | stories.ts, story-composer, story-viewer, migration 202611050004 (aplicada) | audio opcional (visor ya lo soporta) | migración + bucket aplicados, build | — |
 | **Audiencia fina por historia** | 🧩 | status-privacy-modal | Selección por historia (incluir/excluir/lista) | — | — |
 | Ver + responder en privado | 🧩 | story-viewer | Responder en privado | — | — |
 | Reacciones + registro de vistas | 🧩 | — | Reacciones + vistas | — | — |

@@ -791,6 +791,7 @@ const en = {
     you: 'You',
     addTitle: 'Add to your story',
     photo: 'Photo',
+    video: 'Video',
     text: 'Text',
     textPlaceholder: 'Type something…',
     background: 'Background',
