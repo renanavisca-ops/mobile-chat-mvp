@@ -456,6 +456,43 @@ export async function joinChannel(chatId: string): Promise<void> {
   if (error && !String(error.message).includes('duplicate')) throw error;
 }
 
+export type ChannelPreview = { id: string; title: string | null; description: string | null; avatarUrl: string | null; joined: boolean };
+
+/** Preview a public channel by id (works for non-members; relies on the public
+ *  channel being globally readable via RLS). Returns null if it isn't a public
+ *  channel. */
+export async function channelPreview(chatId: string): Promise<ChannelPreview | null> {
+  const supabase = browserSupabase();
+  const { data, error } = await (supabase as any)
+    .from('chats')
+    .select('id, title, description, avatar_url')
+    .eq('id', chatId)
+    .eq('kind', 'channel')
+    .eq('is_public', true)
+    .limit(1);
+  if (error) return null;
+  const row = (data as any[])?.[0];
+  if (!row) return null;
+  let joined = false;
+  const { data: me } = await supabase.auth.getUser();
+  if (me.user) {
+    const { data: mem } = await supabase
+      .from('chat_members')
+      .select('chat_id')
+      .eq('chat_id', chatId)
+      .eq('user_id', me.user.id)
+      .maybeSingle();
+    joined = !!mem;
+  }
+  return { id: row.id, title: row.title, description: row.description, avatarUrl: row.avatar_url, joined };
+}
+
+/** Build the shareable link to a public channel (origin resolved at runtime). */
+export function channelShareLink(chatId: string): string {
+  const origin = typeof window !== 'undefined' ? window.location.origin : 'https://mobile-chat-mvp.vercel.app';
+  return `${origin}/c?id=${encodeURIComponent(chatId)}`;
+}
+
 /** When the current user "cleared" this chat, only messages after this instant
  *  are shown to them. Null when they never cleared it. */
 export async function myChatClearedAt(chatId: string): Promise<string | null> {

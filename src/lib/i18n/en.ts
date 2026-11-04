@@ -107,6 +107,16 @@ const en = {
     cat_community: 'Community',
     cat_other: 'Other',
   },
+  channelPreview: {
+    title: 'Channel',
+    needAuth: 'Sign in to follow this channel.',
+    invalidTitle: 'Channel not found',
+    invalidBody: 'This channel link is invalid or the channel is no longer public.',
+    browse: 'Browse channels',
+    open: 'Open channel',
+    follow: 'Follow channel',
+    following: 'Following…',
+  },
   consent: {
     welcome: 'Welcome to Toky Chat',
     notice: 'You must be at least {{age}} years old to use Toky Chat. By continuing you confirm your age and agree to our {{terms}} and {{privacy}}.',
@@ -436,6 +446,7 @@ const en = {
   groupInfo: {
     title: 'Group info',
     channelTitle: 'Channel info',
+    channelShare: 'Share channel',
     changePhoto: 'Change photo',
     uploading: 'Uploading…',
     groupName: 'Group name',
