@@ -383,14 +383,52 @@ export const CHANNEL_CATEGORIES = [
 ] as const;
 export type ChannelCategory = (typeof CHANNEL_CATEGORIES)[number];
 
-/** Create a public broadcast channel; returns its chat id. */
-export async function createChannel(title: string, description?: string, category?: string): Promise<string> {
+/** Create a broadcast channel; returns its chat id. `isPublic=false` makes a
+ *  private channel (invitation only, hidden from discovery). */
+export async function createChannel(title: string, description?: string, category?: string, isPublic = true): Promise<string> {
   const supabase = browserSupabase();
   const { data, error } = await (supabase as any).rpc('create_channel', {
     p_title: title,
     p_description: description ?? undefined,
     p_category: category ?? undefined,
+    p_is_public: isPublic,
   });
+  if (error) throw error;
+  return data as string;
+}
+
+/** The invite code of a private channel, if any (readable by its members). */
+export async function getChannelInviteCode(chatId: string): Promise<string | null> {
+  const { data } = await (browserSupabase() as any).from('chats').select('invite_code, is_public').eq('id', chatId).limit(1);
+  const row = (data as any[])?.[0];
+  return row && row.is_public === false ? (row.invite_code ?? null) : null;
+}
+
+/** Build the invite link for a private channel code (origin resolved at runtime). */
+export function channelInviteLink(code: string): string {
+  const origin = typeof window !== 'undefined' ? window.location.origin : 'https://mobile-chat-mvp.vercel.app';
+  return `${origin}/c?code=${encodeURIComponent(code)}`;
+}
+
+/** Preview a channel from an invite code (works for non-members). */
+export async function channelInvitePreview(code: string): Promise<ChannelPreview | null> {
+  const supabase = browserSupabase();
+  const { data, error } = await (supabase as any).rpc('channel_invite_preview', { p_code: code });
+  if (error) return null;
+  const row = Array.isArray(data) ? data[0] : null;
+  if (!row) return null;
+  let joined = false;
+  const { data: me } = await supabase.auth.getUser();
+  if (me.user) {
+    const { data: mem } = await supabase.from('chat_members').select('chat_id').eq('chat_id', row.id).eq('user_id', me.user.id).maybeSingle();
+    joined = !!mem;
+  }
+  return { id: row.id, title: row.title, description: row.description, avatarUrl: row.avatar_url, joined };
+}
+
+/** Join a channel via its invite code. Returns the chat id. */
+export async function joinChannelByCode(code: string): Promise<string> {
+  const { data, error } = await (browserSupabase() as any).rpc('join_channel_by_code', { p_code: code });
   if (error) throw error;
   return data as string;
 }

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { searchUsers } from '@/lib/db/contacts';
-import { updateGroupInfo, addGroupMembers, removeGroupMember, leaveChat, getChatMuted, setChatMuteUntil, setDisappearingMessages, getGroupMeta, setGroupRole, setGroupPerms, getGroupInvite, rotateGroupInvite, revokeGroupInvite, inviteLinkFor, getGroupRequireApproval, setGroupRequireApproval, listGroupJoinRequests, approveGroupJoin, rejectGroupJoin, channelShareLink, getGroupMaxMembers, setGroupMaxMembers, type GroupMeta, type GroupPerm, type GroupJoinRequest } from '@/lib/db/chats';
+import { updateGroupInfo, addGroupMembers, removeGroupMember, leaveChat, getChatMuted, setChatMuteUntil, setDisappearingMessages, getGroupMeta, setGroupRole, setGroupPerms, getGroupInvite, rotateGroupInvite, revokeGroupInvite, inviteLinkFor, getGroupRequireApproval, setGroupRequireApproval, listGroupJoinRequests, approveGroupJoin, rejectGroupJoin, channelShareLink, getGroupMaxMembers, setGroupMaxMembers, getChannelInviteCode, channelInviteLink, type GroupMeta, type GroupPerm, type GroupJoinRequest } from '@/lib/db/chats';
 import { QrCode } from '@/components/qr-code';
 import { uploadGroupAvatar } from '@/lib/db/groupAvatar';
 import { useT } from '@/lib/i18n/context';
@@ -97,6 +97,7 @@ export function GroupInfoModal({
   const [copied, setCopied] = useState(false);
   const [channelShowQr, setChannelShowQr] = useState(false);
   const [channelCopied, setChannelCopied] = useState(false);
+  const [channelCode, setChannelCode] = useState<string | null>(null);
   const [requireApproval, setRequireApproval] = useState(false);
   const [approvalBusy, setApprovalBusy] = useState(false);
   const [joinRequests, setJoinRequests] = useState<GroupJoinRequest[]>([]);
@@ -126,6 +127,7 @@ export function GroupInfoModal({
       getGroupRequireApproval(chatId).then(setRequireApproval).catch(() => {});
       listGroupJoinRequests(chatId).then(setJoinRequests).catch(() => setJoinRequests([]));
       getGroupMaxMembers(chatId).then((v) => { setMaxMembers(v); setLimitInput(v != null ? String(v) : ''); }).catch(() => {});
+      if (isChannel) getChannelInviteCode(chatId).then(setChannelCode).catch(() => setChannelCode(null));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, title, description, chatId, disappearingSeconds]);
@@ -293,9 +295,10 @@ export function GroupInfoModal({
       window.setTimeout(() => setCopied(false), 1800);
     } catch { /* ignore */ }
   }
+  const channelLink = channelCode ? channelInviteLink(channelCode) : channelShareLink(chatId);
   async function copyChannelLink() {
     try {
-      await navigator.clipboard.writeText(channelShareLink(chatId));
+      await navigator.clipboard.writeText(channelLink);
       setChannelCopied(true);
       window.setTimeout(() => setChannelCopied(false), 1800);
     } catch { /* ignore */ }
@@ -603,10 +606,11 @@ export function GroupInfoModal({
         {isChannel && (
           <div className="mt-4 space-y-2 rounded-xl border border-slate-800 bg-slate-900/40 p-3">
             <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">{t('groupInfo.channelShare')}</div>
+            {channelCode && <p className="text-xs text-slate-500">{t('groupInfo.channelPrivateShare')}</p>}
             <div className="flex items-center gap-2">
               <input
                 readOnly
-                value={channelShareLink(chatId)}
+                value={channelLink}
                 onFocus={(e) => e.currentTarget.select()}
                 className="min-w-0 flex-1 truncate rounded-lg border border-slate-800 bg-slate-950/60 px-2 py-1.5 text-xs text-slate-300"
               />
@@ -619,7 +623,7 @@ export function GroupInfoModal({
             </button>
             {channelShowQr && (
               <div className="flex justify-center py-1">
-                <QrCode value={channelShareLink(chatId)} />
+                <QrCode value={channelLink} />
               </div>
             )}
           </div>

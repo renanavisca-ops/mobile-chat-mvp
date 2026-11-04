@@ -29,6 +29,7 @@ export default function ChannelsPage() {
   const [newTitle, setNewTitle] = useState('');
   const [newDesc, setNewDesc] = useState('');
   const [newCat, setNewCat] = useState<string>('other');
+  const [newPublic, setNewPublic] = useState(true);
   const [creating, setCreating] = useState(false);
 
   function load(search?: string, category?: string) {
@@ -83,7 +84,7 @@ export default function ChannelsPage() {
     setCreating(true);
     setErr('');
     try {
-      const id = await createChannel(title, newDesc.trim() || undefined, newCat);
+      const id = await createChannel(title, newDesc.trim() || undefined, newCat, newPublic);
       router.push(`/chats/view?c=${id}`);
     } catch (e: any) {
       setErr(e?.message ?? String(e));
@@ -277,7 +278,23 @@ export default function ChannelsPage() {
                 ))}
               </div>
             </div>
-            <p className="mt-2 text-xs text-slate-500">{t('channels.createNote')}</p>
+            <div className="mt-3 flex items-center justify-between rounded-lg border border-slate-900 bg-slate-950/40 p-2.5">
+              <div className="min-w-0">
+                <div className="text-sm text-slate-200">{t('channels.privateTitle')}</div>
+                <div className="text-xs text-slate-500">{t('channels.privateDesc')}</div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setNewPublic((v) => !v)}
+                role="switch"
+                aria-checked={!newPublic}
+                aria-label={t('channels.privateTitle')}
+                className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${!newPublic ? 'bg-emerald-600' : 'bg-slate-700'}`}
+              >
+                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${!newPublic ? 'translate-x-6' : 'translate-x-1'}`} />
+              </button>
+            </div>
+            <p className="mt-2 text-xs text-slate-500">{newPublic ? t('channels.createNote') : t('channels.createNotePrivate')}</p>
             <div className="mt-4 flex gap-2">
               <button
                 type="button"
