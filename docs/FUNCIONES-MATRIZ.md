@@ -101,7 +101,8 @@ Guías de activación: `docs/INTEGRATIONS.md`, `docs/CAMPAIGNS.md`, `docs/PAYMEN
 | **Aprobación de ingreso** | ✅ | approval migration (#203) | — | migración verificada | — |
 | Historial / respuestas / menciones / encuestas / fijados | ✅ | — | — | — | — |
 | Llamadas grupales / silenciar / abandonar / reportar | ✅ | — | — | — | — |
-| Comunidades (varios grupos + admin central) | 🧩 | communities | Anuncios por comunidad + permisos finos | — | — |
+| Comunidades (varios grupos + admin central) | ✅ | communities, migration 202611050003 (aplicada) | Permisos finos (v2) | migración aplicada | — |
+| └ Anuncios por comunidad (fan-out a grupos) | ✅ | post_community_announcement, communities page | — | migración aplicada + build | — |
 
 ## 6. Llamadas y comunicación en vivo
 | Requisito | Estado | Archivos | Pendiente | Evidencia | Dependencia |
@@ -256,7 +257,7 @@ Guías de activación: `docs/INTEGRATIONS.md`, `docs/CAMPAIGNS.md`, `docs/PAYMEN
 1. **Matriz** (este documento). ✅
 2. **§3** Búsqueda por tipo/fecha ✅ (#209) · **§15** extender trampa de foco · **§16** unificar rate limiter. _(limpiezas + búsqueda)_
 3. **§4** Descripciones accesibles de medios (alt/caption al enviar). ✅ (#210)
-4. **§5** Límite de miembros configurable · **§8** canales privados + recomendaciones · **§5** anuncios de comunidad.
+4. **§5** Límite de miembros ✅ (#211) · **§8** canales privados ✅ (#213) + recomendaciones ✅ (#212) · **§5** anuncios de comunidad ✅ (#214). _(Etapa 4 completa)_
 5. **§7** Historias: video/audio, audiencia fina, vistas/reacciones, silenciar autor.
 6. **§12** Pedidos/carrito desde catálogo (flujo completo).
 7. **§12/§13** Pagos: simulador de proveedor + historial/comprobantes + compartir enlace (desactivado por defecto).

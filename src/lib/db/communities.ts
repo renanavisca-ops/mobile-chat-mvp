@@ -33,6 +33,17 @@ export async function listMyCommunities(): Promise<Community[]> {
   }));
 }
 
+/** Broadcast an announcement to every group in a community (owner only).
+ *  Returns how many groups received it. */
+export async function postCommunityAnnouncement(communityId: string, text: string): Promise<number> {
+  const { data, error } = await (browserSupabase() as any).rpc('post_community_announcement', {
+    p_community: communityId,
+    p_text: text,
+  });
+  if (error) throw error;
+  return (data as number) ?? 0;
+}
+
 export async function createCommunity(name: string, description?: string): Promise<string> {
   const supabase = browserSupabase();
   const { data: me } = await supabase.auth.getUser();
