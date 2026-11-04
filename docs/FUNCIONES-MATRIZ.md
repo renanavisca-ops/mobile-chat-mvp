@@ -83,7 +83,7 @@ Guías de activación: `docs/INTEGRATIONS.md`, `docs/CAMPAIGNS.md`, `docs/PAYMEN
 | Compresión + calidad | ✅ | — | — | — | — |
 | Documentos/PDF/visor + impresión | ✅ 📱 | document-preview | — | — | — |
 | Audios/voz velocidad variable, pausa, preview | ✅ | — | — | — | — |
-| **Subtítulos/descripciones accesibles de medios** | ❌ | — | Descripción/alt al enviar + render | — | — |
+| **Subtítulos/descripciones accesibles de medios** | ✅ | chat-conversation, video-trimmer | — | export 30/30 | — |
 | Guardar/descargar/reenviar/eliminar + auto-descarga + espacio | ✅ | storage-manager | — | — | — |
 | Ubicación puntual | ✅ | — | — | — | — |
 | **Ubicación en tiempo real** | ❌ | — | Lógica propia + simulador (sin API de mapas de pago) | — | API de mapas (opcional) |
@@ -255,7 +255,7 @@ Guías de activación: `docs/INTEGRATIONS.md`, `docs/CAMPAIGNS.md`, `docs/PAYMEN
 
 1. **Matriz** (este documento). ✅
 2. **§3** Búsqueda por tipo/fecha ✅ (#209) · **§15** extender trampa de foco · **§16** unificar rate limiter. _(limpiezas + búsqueda)_
-3. **§4** Descripciones accesibles de medios (alt/caption al enviar).
+3. **§4** Descripciones accesibles de medios (alt/caption al enviar). ✅ (#210)
 4. **§5** Límite de miembros configurable · **§8** canales privados + recomendaciones · **§5** anuncios de comunidad.
 5. **§7** Historias: video/audio, audiencia fina, vistas/reacciones, silenciar autor.
 6. **§12** Pedidos/carrito desde catálogo (flujo completo).
