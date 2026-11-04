@@ -797,6 +797,7 @@ const en = {
     reply: 'Send',
     replyPlaceholder: 'Reply privately…',
     replySent: 'Reply sent',
+    mute: 'Mute these stories',
     textPlaceholder: 'Type something…',
     background: 'Background',
     post: 'Post',

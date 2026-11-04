@@ -123,7 +123,7 @@ Guías de activación: `docs/INTEGRATIONS.md`, `docs/CAMPAIGNS.md`, `docs/PAYMEN
 | **Audiencia fina por historia** | 🧩 | status-privacy-modal | Selección por historia (incluir/excluir/lista) | — | — |
 | Ver + responder en privado | ✅ | story-viewer, sendMessage | — | build | — |
 | Reacciones + registro de vistas | ✅ | story-viewer, migration 202611050005 (aplicada) | — | migración aplicada + build | — |
-| **Silenciar historias de ciertas personas** | ❌ | — | Mute por autor | — | — |
+| **Silenciar historias de ciertas personas** | ✅ | stories.ts, story-viewer, migration 202611050006 (aplicada) | — | migración aplicada + build | — |
 | Eliminar propias | ✅ | — | — | — | — |
 | Edición (texto/dibujo/emojis/fondos) | 🧩 | — | Edición avanzada | — | — |
 
