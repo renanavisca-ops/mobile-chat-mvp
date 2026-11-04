@@ -1,12 +1,14 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { createSignedStoryUrl, markStoryViewed, countStoryViews, deleteStory } from '@/lib/db/stories';
+import { createSignedStoryUrl, markStoryViewed, countStoryViews, deleteStory, myStoryReaction, reactToStory, listStoryReactions } from '@/lib/db/stories';
+import { createDirectChatWith, sendMessage } from '@/lib/db/chats';
 import { useT, useLanguage } from '@/lib/i18n/context';
 import { XIcon, TrashIcon, EyeIcon } from '@/components/icons';
 import type { StoryGroup } from '@/lib/db/types';
 
 const DURATION = 5000;
+const STORY_EMOJIS = ['❤️', '😂', '😮', '😢', '👍', '🔥'];
 
 /** Index of the first not-yet-seen story in a group (0 if all are seen). */
 function firstUnseen(g: StoryGroup | undefined): number {
@@ -40,6 +42,10 @@ export function StoryViewer({
   const [storyIndex, setStoryIndex] = useState(() => firstUnseen(groupsProp[startIndex]));
   const [mediaUrl, setMediaUrl] = useState<string | null>(null);
   const [viewCount, setViewCount] = useState<number | null>(null);
+  const [myReaction, setMyReaction] = useState<string | null>(null);
+  const [ownReactions, setOwnReactions] = useState<{ emoji: string; count: number }[]>([]);
+  const [replyText, setReplyText] = useState('');
+  const [replySent, setReplySent] = useState(false);
   // Only start the auto-advance countdown once the story's content is actually
   // on screen — otherwise a slow-loading image gets skipped before it appears.
   const [loaded, setLoaded] = useState(false);
@@ -120,8 +126,15 @@ export function StoryViewer({
     if (story.media_path) {
       createSignedStoryUrl(story.media_path).then((u) => alive && setMediaUrl(u)).catch(() => {});
     }
+    setMyReaction(null);
+    setOwnReactions([]);
+    setReplyText('');
+    setReplySent(false);
     if (group?.isMe) {
       countStoryViews(story.id).then((n) => alive && setViewCount(n)).catch(() => {});
+      listStoryReactions(story.id).then((r) => alive && setOwnReactions(r)).catch(() => {});
+    } else {
+      myStoryReaction(story.id).then((e) => alive && setMyReaction(e)).catch(() => {});
     }
 
     return () => {
@@ -207,6 +220,25 @@ export function StoryViewer({
     // Close after delete; the frozen snapshot still holds the removed story, so
     // re-clamping in place would show a stale item. The unmount effect refreshes.
     onClose();
+  }
+
+  async function onReact(emoji: string) {
+    if (!story) return;
+    const nextVal = myReaction === emoji ? null : emoji;
+    setMyReaction(nextVal);
+    try { await reactToStory(story.id, nextVal); } catch { /* ignore */ }
+  }
+
+  async function onReply() {
+    const text = replyText.trim();
+    if (!text || !story || !group) return;
+    try {
+      const chatId = await createDirectChatWith(group.user_id);
+      await sendMessage(chatId, { text } as any);
+      setReplyText('');
+      setReplySent(true);
+      window.setTimeout(() => setReplySent(false), 2200);
+    } catch { /* ignore */ }
   }
 
   if (!group || !story) return null;
@@ -321,11 +353,18 @@ export function StoryViewer({
           />
         </div>
 
-        {/* Footer (own story: views + delete) */}
+        {/* Footer (own story: views + reactions + delete) */}
         {group.isMe && (
-          <div className="absolute bottom-0 left-0 right-0 z-20 flex items-center justify-between px-4 py-3">
-            <span className="flex items-center gap-1.5 text-xs text-white/80">
-              <EyeIcon size={16} /> {viewCount ?? 0} {viewCount === 1 ? t('stories.view') : t('stories.views')}
+          <div className="absolute bottom-0 left-0 right-0 z-20 flex items-center justify-between gap-2 px-4 py-3">
+            <span className="flex items-center gap-2 text-xs text-white/80">
+              <span className="flex items-center gap-1.5"><EyeIcon size={16} /> {viewCount ?? 0}</span>
+              {ownReactions.length > 0 && (
+                <span className="flex items-center gap-1">
+                  {ownReactions.map((r) => (
+                    <span key={r.emoji}>{r.emoji}{r.count}</span>
+                  ))}
+                </span>
+              )}
             </span>
             <button
               type="button"
@@ -334,6 +373,48 @@ export function StoryViewer({
             >
               <TrashIcon size={16} /> {t('common.delete')}
             </button>
+          </div>
+        )}
+
+        {/* Footer (others' story: react + reply privately) */}
+        {!group.isMe && (
+          <div
+            className="absolute bottom-0 left-0 right-0 z-20 space-y-2 px-4 py-3"
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-center gap-3">
+              {STORY_EMOJIS.map((e) => (
+                <button
+                  key={e}
+                  type="button"
+                  onClick={() => onReact(e)}
+                  aria-label={t('stories.react')}
+                  className={`text-2xl transition-transform ${myReaction === e ? 'scale-125' : 'opacity-80 hover:scale-110'}`}
+                >
+                  {e}
+                </button>
+              ))}
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                value={replyText}
+                onChange={(ev) => setReplyText(ev.target.value)}
+                onFocus={() => setPaused(true)}
+                onBlur={() => setPaused(false)}
+                onKeyDown={(ev) => { if (ev.key === 'Enter') onReply(); }}
+                placeholder={t('stories.replyPlaceholder')}
+                className="min-w-0 flex-1 rounded-full border border-white/30 bg-black/50 px-4 py-2 text-sm text-white placeholder:text-white/60 focus:outline-none"
+              />
+              <button
+                type="button"
+                onClick={onReply}
+                disabled={!replyText.trim()}
+                className="shrink-0 rounded-full bg-white/90 px-4 py-2 text-sm font-semibold text-slate-900 disabled:opacity-50"
+              >
+                {t('stories.reply')}
+              </button>
+            </div>
+            {replySent && <p className="text-center text-xs text-emerald-300">{t('stories.replySent')}</p>}
           </div>
         )}
       </div>
