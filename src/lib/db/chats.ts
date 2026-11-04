@@ -1067,6 +1067,19 @@ export async function setGroupRequireApproval(chatId: string, value: boolean): P
   if (error) throw error;
 }
 
+/** Read a group's configurable member limit (null = no limit). */
+export async function getGroupMaxMembers(chatId: string): Promise<number | null> {
+  const { data } = await (browserSupabase() as any).from('chats').select('max_members').eq('id', chatId).limit(1);
+  const v = (data as any[])?.[0]?.max_members;
+  return typeof v === 'number' ? v : null;
+}
+
+/** Set (or clear, with null) a group's member limit (admins only). */
+export async function setGroupMaxMembers(chatId: string, value: number | null): Promise<void> {
+  const { error } = await (browserSupabase() as any).rpc('set_group_max_members', { p_chat: chatId, p_max: value });
+  if (error) throw error;
+}
+
 /** Build the shareable invite URL for a code (origin resolved at runtime). */
 export function inviteLinkFor(code: string): string {
   const origin = typeof window !== 'undefined' ? window.location.origin : 'https://mobile-chat-mvp.vercel.app';
