@@ -6,12 +6,13 @@ import { PageShell } from '@/components/page-shell';
 import { useRequireAuth } from '@/lib/auth/use-require-auth';
 import { browserSupabase } from '@/lib/supabase/client';
 import { createDirectChatWith } from '@/lib/db/chats';
-import { addContact, listMyContacts, searchUsers } from '@/lib/db/contacts';
+import { addContact, listMyContacts, searchUsers, myContactCard, contactLinkFor, type ContactCard } from '@/lib/db/contacts';
 import { blockUser } from '@/lib/db/safety';
 import { ReportModal } from '@/components/report-modal';
 import { EmptyState } from '@/components/empty-state';
 import { ChatListSkeleton } from '@/components/skeleton';
-import { UsersIcon, UserPlusIcon } from '@/components/icons';
+import { QrCode } from '@/components/qr-code';
+import { UsersIcon, UserPlusIcon, QrIcon } from '@/components/icons';
 import { useT, TransBold } from '@/lib/i18n/context';
 import type { ProfileLite } from '@/lib/db/types';
 
@@ -33,6 +34,26 @@ export default function ContactsPage() {
   const [q, setQ] = useState('');
   const [results, setResults] = useState<ProfileLite[]>([]);
   const inputRef = useRef<HTMLInputElement | null>(null);
+
+  // my-QR modal state
+  const [openQr, setOpenQr] = useState(false);
+  const [myCard, setMyCard] = useState<ContactCard | null>(null);
+  const [qrCopied, setQrCopied] = useState(false);
+
+  function openQrModal() {
+    setOpenQr(true);
+    setQrCopied(false);
+    if (!myCard) myContactCard().then(setMyCard).catch(() => {});
+  }
+  const myLink = myCard?.username ? contactLinkFor(myCard.username) : '';
+  async function copyMyLink() {
+    if (!myLink) return;
+    try {
+      await navigator.clipboard.writeText(myLink);
+      setQrCopied(true);
+      window.setTimeout(() => setQrCopied(false), 1800);
+    } catch { /* ignore */ }
+  }
 
   const canSearch = useMemo(() => q.trim().length >= 2, [q]);
 
@@ -119,12 +140,23 @@ export default function ContactsPage() {
     <PageShell
       title={t('contacts.title')}
       right={
-        <button
-          className="rounded-full toky-grad toky-ring-brand px-4 py-2 text-sm"
-          onClick={openModal}
-        >
-          {t('contacts.addContact')}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            aria-label={t('contacts.myQr')}
+            title={t('contacts.myQr')}
+            className="grid h-9 w-9 place-items-center rounded-full bg-slate-800 text-slate-200 hover:bg-slate-700"
+            onClick={openQrModal}
+          >
+            <QrIcon size={18} />
+          </button>
+          <button
+            className="rounded-full toky-grad toky-ring-brand px-4 py-2 text-sm"
+            onClick={openModal}
+          >
+            {t('contacts.addContact')}
+          </button>
+        </div>
       }
     >
       {err ? <p className="mb-3 text-sm text-red-300">{err}</p> : null}
@@ -231,6 +263,51 @@ export default function ContactsPage() {
               )
             ) : (
               <p className="mt-3 text-sm text-slate-500">{t('contacts.typeAtLeast2')}</p>
+            )}
+          </div>
+        </div>
+      ) : null}
+
+      {/* My QR modal */}
+      {openQr ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) setOpenQr(false);
+          }}
+        >
+          <div className="w-full max-w-sm rounded-2xl border border-slate-900 bg-slate-950 p-5 text-center shadow-xl">
+            <div className="flex items-center justify-between gap-3">
+              <div className="text-base font-semibold">{t('contacts.myQr')}</div>
+              <button
+                className="rounded bg-slate-800 px-3 py-1.5 text-sm hover:bg-slate-700"
+                onClick={() => setOpenQr(false)}
+              >
+                {t('common.close')}
+              </button>
+            </div>
+
+            <p className="mt-1 text-left text-xs text-slate-400">{t('contacts.myQrHint')}</p>
+
+            {myCard?.username ? (
+              <>
+                <div className="mt-4 flex justify-center">
+                  <QrCode value={myLink} />
+                </div>
+                <div className="mt-3 text-sm font-medium text-slate-200">
+                  {myCard.displayName || `@${myCard.username}`}
+                </div>
+                {myCard.displayName && <div className="text-xs text-slate-400">@{myCard.username}</div>}
+                <button
+                  type="button"
+                  onClick={copyMyLink}
+                  className="mt-4 w-full rounded-xl bg-slate-800 px-4 py-2.5 text-sm text-slate-200 hover:bg-slate-700"
+                >
+                  {qrCopied ? t('contacts.myQrCopied') : t('contacts.myQrCopy')}
+                </button>
+              </>
+            ) : (
+              <p className="mt-6 text-sm text-slate-400">{t('contacts.myQrNoUsername')}</p>
             )}
           </div>
         </div>
