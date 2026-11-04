@@ -79,7 +79,7 @@ export function ScheduleMessageModal({
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="max-h-[90vh] w-full max-w-sm overflow-auto rounded-3xl border border-slate-800 toky-glass toky-elev p-4">
+      <div role="dialog" aria-modal="true" className="max-h-[90vh] w-full max-w-sm overflow-auto rounded-3xl border border-slate-800 toky-glass toky-elev p-4">
         <div className="flex items-center justify-between">
           <div className="text-base font-semibold text-slate-100">{t('schedule.title')}</div>
           <button

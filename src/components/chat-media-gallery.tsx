@@ -106,7 +106,7 @@ export function ChatMediaGallery({
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="flex max-h-[90vh] w-full max-w-md flex-col overflow-hidden rounded-3xl border border-slate-800 toky-glass toky-elev">
+      <div role="dialog" aria-modal="true" className="flex max-h-[90vh] w-full max-w-md flex-col overflow-hidden rounded-3xl border border-slate-800 toky-glass toky-elev">
         <div className="flex items-center justify-between px-4 py-3">
           <div className="text-base font-semibold text-slate-100">{t('gallery.title')}</div>
           <button

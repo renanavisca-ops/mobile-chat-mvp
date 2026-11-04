@@ -59,6 +59,8 @@ export function AttachSheet(props: {
       onClick={onClose}
     >
       <div
+        role="dialog"
+        aria-modal="true"
         className="w-full max-w-md rounded-3xl border border-slate-800 toky-glass toky-elev"
         onClick={(e) => e.stopPropagation()}
       >

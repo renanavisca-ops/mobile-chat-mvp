@@ -103,6 +103,8 @@ export function StickerPicker({
     <>
       <div className="fixed inset-0 z-[85] flex items-end justify-center bg-black/60 p-0 backdrop-blur-sm sm:items-center sm:p-4" onClick={onClose}>
         <div
+          role="dialog"
+          aria-modal="true"
           className="toky-glass toky-elev flex max-h-[80vh] w-full max-w-md flex-col rounded-t-3xl border border-slate-800 sm:rounded-3xl"
           onClick={(e) => e.stopPropagation()}
         >

@@ -215,7 +215,7 @@ export function StoryViewer({
 
   return (
     <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black">
-      <div className="relative flex h-full w-full max-w-md flex-col">
+      <div role="dialog" aria-modal="true" className="relative flex h-full w-full max-w-md flex-col">
         {/* Progress bars */}
         <div className="absolute left-0 right-0 top-0 z-20 flex gap-1 p-2">
           {group.stories.map((s, i) => (

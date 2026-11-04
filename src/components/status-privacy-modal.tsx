@@ -55,7 +55,7 @@ export function StatusPrivacyModal({ open, onClose }: { open: boolean; onClose: 
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="flex max-h-[85vh] w-full max-w-sm flex-col overflow-hidden rounded-t-3xl border border-slate-800 toky-glass toky-elev sm:rounded-3xl">
+      <div role="dialog" aria-modal="true" className="flex max-h-[85vh] w-full max-w-sm flex-col overflow-hidden rounded-t-3xl border border-slate-800 toky-glass toky-elev sm:rounded-3xl">
         <div className="flex items-center justify-between border-b border-slate-800 p-4">
           <div>
             <div className="text-base font-semibold text-slate-100">{t('statusHide.title')}</div>
