@@ -1169,22 +1169,36 @@ export async function searchMessages(chatId: string, query: string, limit = 30):
  * server-side by design. Results are newest-first and carry their `chat_id` so
  * the caller can show which conversation each hit belongs to and jump to it.
  */
-export async function searchAllMessages(query: string, limit = 40): Promise<MessageRow[]> {
-  const q = query.trim();
-  if (!q) return [];
+/** Optional filters for global message search. `since`/`until` are ISO
+ *  timestamps applied server-side on created_at; type filtering is done by the
+ *  caller (the kind lives in the message body, not a queryable column). */
+export type MessageSearchOpts = { limit?: number; since?: string; until?: string; typeOnly?: boolean };
 
-  // Escape LIKE wildcards so a literal % or _ in the query doesn't match
-  // everything. ESCAPE '\' is PostgREST's default for ilike.
-  const safe = q.replace(/[\\%_]/g, (m) => `\\${m}`);
+export async function searchAllMessages(query: string, opts: MessageSearchOpts = {}): Promise<MessageRow[]> {
+  const q = query.trim();
+  const { since, until, typeOnly } = opts;
+  // Require at least a text query or a narrowing filter (date/type); never dump
+  // every message with no criteria.
+  if (!q && !since && !until && !typeOnly) return [];
+  // When filtering by type/date without text we scan more rows (the type is
+  // derived client-side), so widen the limit a bit for those.
+  const limit = opts.limit ?? (q ? 40 : 120);
 
   const supabase = browserSupabase();
-  const { data, error } = await supabase
+  let qb = supabase
     .from('messages')
-    .select('id, chat_id, sender_device_id, ciphertext, nonce, message_type, created_at, read, content, sender_type, sender_id, delivery_status, edited_at')
-    .ilike('content', `%${safe}%`)
-    .order('created_at', { ascending: false })
-    .limit(limit);
+    .select('id, chat_id, sender_device_id, ciphertext, nonce, message_type, created_at, read, content, sender_type, sender_id, delivery_status, edited_at');
 
+  if (q) {
+    // Escape LIKE wildcards so a literal % or _ in the query doesn't match
+    // everything. ESCAPE '\' is PostgREST's default for ilike.
+    const safe = q.replace(/[\\%_]/g, (m) => `\\${m}`);
+    qb = qb.ilike('content', `%${safe}%`);
+  }
+  if (since) qb = qb.gte('created_at', since);
+  if (until) qb = qb.lte('created_at', until);
+
+  const { data, error } = await qb.order('created_at', { ascending: false }).limit(limit);
   if (error) throw error;
   return (data ?? []) as unknown as MessageRow[];
 }
