@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { submitReport } from '@/lib/db/safety';
 import { useT } from '@/lib/i18n/context';
+import { useFocusTrap } from '@/lib/a11y/focus-trap';
 
 export function ReportModal({
   open,
@@ -32,6 +33,7 @@ export function ReportModal({
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
   const [err, setErr] = useState('');
+  const trapRef = useFocusTrap<HTMLDivElement>(open);
 
   if (!open) return null;
 
@@ -69,7 +71,7 @@ export function ReportModal({
         }
       }}
     >
-      <div role="dialog" aria-modal="true" aria-label={t('reportModal.title')} className="w-full max-w-sm rounded-3xl border border-slate-800 toky-glass toky-elev p-4">
+      <div ref={trapRef} role="dialog" aria-modal="true" aria-label={t('reportModal.title')} className="w-full max-w-sm rounded-3xl border border-slate-800 toky-glass toky-elev p-4">
         <div className="text-base font-semibold text-slate-100">{t('reportModal.title')}</div>
 
         {done ? (

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useT } from '@/lib/i18n/context';
+import { useFocusTrap } from '@/lib/a11y/focus-trap';
 import { myFingerprint, peerFingerprint } from '@/lib/crypto/keystore';
 
 /**
@@ -28,6 +29,7 @@ export function SafetyNumberModal({
   const [theirs, setTheirs] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [verified, setVerified] = useState(false);
+  const trapRef = useFocusTrap<HTMLDivElement>(open);
 
   useEffect(() => {
     if (!open) return;
@@ -64,6 +66,7 @@ export function SafetyNumberModal({
   return (
     <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/60 p-0 backdrop-blur-sm sm:items-center sm:p-4" onClick={onClose}>
       <div
+        ref={trapRef}
         className="toky-glass toky-elev w-full max-w-md rounded-t-3xl border border-slate-800 p-5 pb-safe sm:rounded-3xl"
         onClick={(e) => e.stopPropagation()}
         role="dialog"

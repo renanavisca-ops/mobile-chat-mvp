@@ -7,6 +7,7 @@ import { QrCode } from '@/components/qr-code';
 import { uploadGroupAvatar } from '@/lib/db/groupAvatar';
 import { useT } from '@/lib/i18n/context';
 import { useBackClose } from '@/lib/back';
+import { useFocusTrap } from '@/lib/a11y/focus-trap';
 import { ImageLightbox } from '@/components/image-lightbox';
 import type { ProfileLite } from '@/lib/db/types';
 
@@ -66,6 +67,7 @@ export function GroupInfoModal({
 }) {
   const t = useT();
   useBackClose(open, onClose);
+  const trapRef = useFocusTrap<HTMLDivElement>(open);
   const [name, setName] = useState(title ?? '');
   const [desc, setDesc] = useState(description ?? '');
   const [savingInfo, setSavingInfo] = useState(false);
@@ -312,7 +314,7 @@ export function GroupInfoModal({
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div role="dialog" aria-modal="true" aria-label={t('groupInfo.title')} className="max-h-[90vh] w-full max-w-sm overflow-auto rounded-3xl border border-slate-800 toky-glass toky-elev p-4">
+      <div ref={trapRef} role="dialog" aria-modal="true" aria-label={t('groupInfo.title')} className="max-h-[90vh] w-full max-w-sm overflow-auto rounded-3xl border border-slate-800 toky-glass toky-elev p-4">
         <div className="flex items-center justify-between">
           <div className="text-base font-semibold text-slate-100">{isChannel ? t('groupInfo.channelTitle') : t('groupInfo.title')}</div>
           <button type="button" onClick={onClose} className="rounded bg-slate-800 px-3 py-1.5 text-xs hover:bg-slate-700">

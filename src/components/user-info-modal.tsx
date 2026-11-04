@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useLanguage } from '@/lib/i18n/context';
 import { useBackClose } from '@/lib/back';
+import { useFocusTrap } from '@/lib/a11y/focus-trap';
 import { browserSupabase } from '@/lib/supabase/client';
 import { peerFingerprint } from '@/lib/crypto/keystore';
 import { blockUser, unblockUser, isBlockedByMe } from '@/lib/db/safety';
@@ -95,6 +96,7 @@ export function UserInfoModal({
 }) {
   const { t, lang } = useLanguage();
   useBackClose(open, onClose);
+  const trapRef = useFocusTrap<HTMLDivElement>(open && !!userId);
   const router = useRouter();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [photoOpen, setPhotoOpen] = useState(false);
@@ -184,7 +186,7 @@ export function UserInfoModal({
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div role="dialog" aria-modal="true" className="max-h-[90vh] w-full max-w-sm overflow-auto rounded-3xl border border-slate-800 toky-glass toky-elev p-4">
+      <div ref={trapRef} role="dialog" aria-modal="true" className="max-h-[90vh] w-full max-w-sm overflow-auto rounded-3xl border border-slate-800 toky-glass toky-elev p-4">
         <div className="flex items-center justify-between">
           <div className="text-base font-semibold text-slate-100">{t('userInfo.title')}</div>
           <button
