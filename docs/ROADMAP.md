@@ -59,7 +59,7 @@ Alto valor, bajo riesgo, sin dependencias externas.
 - [x] **Menciones** `@usuario` en grupos (autocompletar, resaltar, notificar al mencionado incluso en silencio)
 - [x] **Roles de grupo**: creador / administrador / miembro; asignar y revocar admins
 - [x] **Permisos de grupo**: quién puede editar datos, enviar mensajes, agregar miembros
-- [x] **Invitación a grupo por enlace/QR** con revocación (aprobación de ingreso: pendiente, v2)
+- [x] **Invitación a grupo por enlace/QR** con revocación y **aprobación de ingreso** (opción por grupo: las uniones por enlace quedan como solicitud pendiente hasta que un admin aprueba/rechaza)
 - [x] **Historial de grupo**: mensajes de sistema para creación, altas, bajas, salidas, uniones por enlace y cambios de admin
 - [x] **Pantalla de guardados/destacados**: lista central de mensajes destacados (Ajustes → Mensajes destacados)
 - [x] **Compartir ficha de contacto** dentro del chat (enviar un contacto como mensaje, tocar para ver/añadir)

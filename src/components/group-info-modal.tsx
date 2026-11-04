@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { searchUsers } from '@/lib/db/contacts';
-import { updateGroupInfo, addGroupMembers, removeGroupMember, leaveChat, getChatMuted, setChatMuteUntil, setDisappearingMessages, getGroupMeta, setGroupRole, setGroupPerms, getGroupInvite, rotateGroupInvite, revokeGroupInvite, inviteLinkFor, type GroupMeta, type GroupPerm } from '@/lib/db/chats';
+import { updateGroupInfo, addGroupMembers, removeGroupMember, leaveChat, getChatMuted, setChatMuteUntil, setDisappearingMessages, getGroupMeta, setGroupRole, setGroupPerms, getGroupInvite, rotateGroupInvite, revokeGroupInvite, inviteLinkFor, getGroupRequireApproval, setGroupRequireApproval, listGroupJoinRequests, approveGroupJoin, rejectGroupJoin, type GroupMeta, type GroupPerm, type GroupJoinRequest } from '@/lib/db/chats';
 import { QrCode } from '@/components/qr-code';
 import { uploadGroupAvatar } from '@/lib/db/groupAvatar';
 import { useT } from '@/lib/i18n/context';
@@ -93,6 +93,10 @@ export function GroupInfoModal({
   const [inviteBusy, setInviteBusy] = useState(false);
   const [showQr, setShowQr] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [requireApproval, setRequireApproval] = useState(false);
+  const [approvalBusy, setApprovalBusy] = useState(false);
+  const [joinRequests, setJoinRequests] = useState<GroupJoinRequest[]>([]);
+  const [reqBusyId, setReqBusyId] = useState<string | null>(null);
   const [leaving, setLeaving] = useState(false);
   const [confirmLeave, setConfirmLeave] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
@@ -112,6 +116,8 @@ export function GroupInfoModal({
       setShowQr(false);
       setCopied(false);
       getGroupInvite(chatId).then(setInviteCode).catch(() => {});
+      getGroupRequireApproval(chatId).then(setRequireApproval).catch(() => {});
+      listGroupJoinRequests(chatId).then(setJoinRequests).catch(() => setJoinRequests([]));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, title, description, chatId, disappearingSeconds]);
@@ -278,6 +284,35 @@ export function GroupInfoModal({
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1800);
     } catch { /* ignore */ }
+  }
+
+  async function toggleRequireApproval() {
+    const next = !requireApproval;
+    setApprovalBusy(true);
+    setRequireApproval(next); // optimistic
+    try {
+      await setGroupRequireApproval(chatId, next);
+    } catch (e: any) {
+      setRequireApproval(!next); // revert
+      setErr(e?.message ?? String(e));
+    } finally {
+      setApprovalBusy(false);
+    }
+  }
+
+  async function decideRequest(userId: string, approve: boolean) {
+    setReqBusyId(userId);
+    setErr('');
+    try {
+      if (approve) await approveGroupJoin(chatId, userId);
+      else await rejectGroupJoin(chatId, userId);
+      setJoinRequests((reqs) => reqs.filter((r) => r.userId !== userId));
+      if (approve) onMembersChanged();
+    } catch (e: any) {
+      setErr(e?.message ?? String(e));
+    } finally {
+      setReqBusyId(null);
+    }
   }
 
   async function changePerm(key: 'edit' | 'add' | 'send', value: GroupPerm) {
@@ -573,6 +608,58 @@ export function GroupInfoModal({
               <button type="button" onClick={createOrRotateInvite} disabled={inviteBusy} className="w-full rounded-lg bg-slate-800 px-3 py-2 text-sm text-slate-200 hover:bg-slate-700 disabled:opacity-50">
                 {inviteBusy ? t('groupInfo.saving') : t('groupInfo.inviteCreate')}
               </button>
+            )}
+          </div>
+        )}
+
+        {amAdmin && !isChannel && (
+          <div className="mt-4 space-y-3 rounded-xl border border-slate-800 bg-slate-900/40 p-3">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <div className="text-sm font-medium text-slate-200">{t('groupInfo.approvalTitle')}</div>
+                <div className="text-xs text-slate-500">{t('groupInfo.approvalDesc')}</div>
+              </div>
+              <button
+                type="button"
+                onClick={toggleRequireApproval}
+                disabled={approvalBusy}
+                role="switch"
+                aria-checked={requireApproval}
+                aria-label={t('groupInfo.approvalTitle')}
+                className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors disabled:opacity-50 ${requireApproval ? 'bg-emerald-600' : 'bg-slate-700'}`}
+              >
+                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${requireApproval ? 'translate-x-6' : 'translate-x-1'}`} />
+              </button>
+            </div>
+            {joinRequests.length > 0 && (
+              <div className="space-y-1.5 border-t border-slate-800 pt-3">
+                <div className="ml-1 text-xs text-slate-400">{t('groupInfo.pendingRequests')} ({joinRequests.length})</div>
+                <ul className="max-h-40 space-y-1 overflow-auto">
+                  {joinRequests.map((r) => (
+                    <li key={r.userId} className="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-sm text-slate-200 hover:bg-slate-900">
+                      <span className="min-w-0 flex-1 truncate">{r.username ? `@${r.username}` : r.name}</span>
+                      <span className="flex shrink-0 items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => decideRequest(r.userId, true)}
+                          disabled={reqBusyId === r.userId}
+                          className="text-xs text-emerald-400 hover:text-emerald-300 disabled:opacity-50"
+                        >
+                          {t('groupInfo.approve')}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => decideRequest(r.userId, false)}
+                          disabled={reqBusyId === r.userId}
+                          className="text-xs text-rose-400 hover:text-rose-300 disabled:opacity-50"
+                        >
+                          {t('groupInfo.reject')}
+                        </button>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             )}
           </div>
         )}
