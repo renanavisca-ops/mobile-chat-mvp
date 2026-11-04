@@ -33,6 +33,8 @@ export function PublicChatView({ token }: { token: string }) {
   const [storeOpen, setStoreOpen] = useState(false);
   const [products, setProducts] = useState<any[]>([]);
   const [catalogOpen, setCatalogOpen] = useState(false);
+  const [cart, setCart] = useState<Record<string, number>>({});
+  const [ordering, setOrdering] = useState(false);
   const [messages, setMessages] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -210,6 +212,49 @@ export function PublicChatView({ token }: { token: string }) {
     }
   };
 
+  const addToCart = (id: string) => setCart((c) => ({ ...c, [id]: Math.min(99, (c[id] ?? 0) + 1) }));
+  const decFromCart = (id: string) =>
+    setCart((c) => {
+      const next = { ...c };
+      const q = (next[id] ?? 0) - 1;
+      if (q <= 0) delete next[id];
+      else next[id] = q;
+      return next;
+    });
+  const cartCount = Object.values(cart).reduce((a, b) => a + b, 0);
+
+  const placeOrder = async () => {
+    const items = Object.entries(cart).map(([productId, qty]) => ({ productId, qty }));
+    if (items.length === 0 || ordering) return;
+    setOrdering(true);
+    try {
+      const names = products.filter((p) => cart[p.id]).map((p) => `• ${cart[p.id]}× ${p.name}${p.price ? ` (${p.price})` : ''}`);
+      const summary = `🛒 ${t('order.summaryTitle')}\n${names.join('\n')}`;
+      setMessages((prev) => [...prev, {
+        id: `local-${Date.now()}`,
+        chat_id: sessionData.chat_id,
+        content: summary,
+        ciphertext: JSON.stringify({ v: 1, text: summary }),
+        created_at: new Date().toISOString(),
+        sender_type: 'customer',
+        sender_id: sessionData.customer_id,
+        read: false,
+      }]);
+      setCart({});
+      setCatalogOpen(false);
+      const res = await apiFetch(`/api/public-chat/${token}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'order', items }),
+      });
+      if (!res.ok) throw new Error(t('publicChat.errorSendFailed'));
+    } catch (e: any) {
+      console.error(e);
+    } finally {
+      setOrdering(false);
+    }
+  };
+
   if (loading) {
     return <div className="min-h-screen flex items-center justify-center bg-slate-950 text-slate-300">{t('publicChat.loading')}</div>;
   }
@@ -304,9 +349,33 @@ export function PublicChatView({ token }: { token: string }) {
                     <div className="truncate text-sm text-slate-100">{p.name}</div>
                     {p.price && <div className="text-xs font-medium text-emerald-300">{p.price}</div>}
                     {p.description && <div className="mt-0.5 line-clamp-2 text-[11px] text-slate-400">{p.description}</div>}
+                    {cart[p.id] ? (
+                      <div className="mt-1.5 flex items-center justify-between gap-1">
+                        <button type="button" onClick={() => decFromCart(p.id)} aria-label={t('order.remove')} className="grid h-6 w-6 place-items-center rounded-full bg-slate-800 text-slate-200 hover:bg-slate-700">−</button>
+                        <span className="text-xs font-semibold text-slate-100">{cart[p.id]}</span>
+                        <button type="button" onClick={() => addToCart(p.id)} aria-label={t('order.add')} className="grid h-6 w-6 place-items-center rounded-full bg-slate-800 text-slate-200 hover:bg-slate-700">+</button>
+                      </div>
+                    ) : (
+                      <button type="button" onClick={() => addToCart(p.id)} className="mt-1.5 w-full rounded-lg bg-indigo-500/15 px-2 py-1 text-[11px] font-medium text-indigo-200 hover:bg-indigo-500/25">
+                        {t('order.add')}
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+          {cartCount > 0 && (
+            <div className="flex items-center gap-2 border-t border-slate-800 px-4 py-2.5">
+              <span className="flex-1 text-sm text-slate-200">{t('order.cartCount', { n: cartCount })}</span>
+              <button
+                type="button"
+                onClick={placeOrder}
+                disabled={ordering}
+                className="shrink-0 rounded-full toky-grad px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+              >
+                {ordering ? t('order.placing') : t('order.place')}
+              </button>
             </div>
           )}
         </div>

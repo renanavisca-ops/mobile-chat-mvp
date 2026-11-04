@@ -14,13 +14,16 @@ export type IntegrationEventType =
   | 'support.chat_assigned'
   | 'support.rule_triggered'
   | 'support.consent_opt_in'
-  | 'support.consent_opt_out';
+  | 'support.consent_opt_out'
+  | 'support.order_placed'
+  | 'support.order_status_changed';
 
 export type EventScalar = string | number | boolean | null;
 
 // Only ids, enums and booleans — never free text or message bodies.
 export const ALLOWED_KEYS = new Set<string>([
   'chatId', 'customerId', 'agentId', 'messageId', 'labelId', 'ruleId', 'status', 'hasText', 'assigned',
+  'orderId', 'itemCount',
 ]);
 
 /** Keep only whitelisted scalar fields; drop everything else. */
