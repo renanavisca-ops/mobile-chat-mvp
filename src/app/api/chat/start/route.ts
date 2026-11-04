@@ -2,10 +2,17 @@ import { NextResponse } from 'next/server';
 import { reportServerError } from '@/lib/observability';
 import { recordIntegrationEvent } from '@/lib/integrations/dispatch';
 import { supabaseAdmin } from '@/lib/supabase/admin';
+import { durableRateLimit, clientIp } from '@/lib/ratelimit-db';
 import crypto from 'crypto';
 
 export async function POST(req: Request) {
   try {
+    // Anti-spam: este endpoint es público (el cliente inicia un chat de soporte).
+    // Limitar por IP evita creación masiva de chats/clientes. Fail-open.
+    if (!(await durableRateLimit(supabaseAdmin, `chat-start:${clientIp(req)}`, 5, 60))) {
+      return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
+    }
+
     const body = await req.json();
     const { name, phone, country } = body;
 
