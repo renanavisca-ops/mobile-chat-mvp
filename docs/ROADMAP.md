@@ -100,7 +100,7 @@ Alto valor, bajo riesgo, sin dependencias externas.
 
 ## Etapa 5 — Canales, difusión y comunidades
 
-- [x] **Canales públicos** más allá de novedades: crear, seguir y **dejar de seguir** (nuevo) · Canales privados (invitación): pendiente v2
+- [x] **Canales públicos** más allá de novedades: crear, seguir y **dejar de seguir** · **enlaces de compartición** de canal (enlace + QR en el panel de info; `/c?id=…` abre una vista previa para seguir/abrir, con control de sesión) · Canales privados (invitación): pendiente v2
 - [x] **Descubrir/buscar canales**; directorio y categorías: búsqueda (ya existía) + filtro por categoría, selección de categoría al crear y etiqueta en cada canal
 - [x] **Publicar** en canal: texto, imagen, video, enlace, audio, encuesta (el dueño usa el compositor completo; los enlaces generan vista previa)
 - [x] **Reacciones y métricas** agregadas por publicación: reacciones (ya existían, por membresía) + métrica de alcance por post para el dueño (👁 vistas distintas vía `mark_channel_seen` + total de reacciones)

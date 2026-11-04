@@ -109,6 +109,16 @@ const es: Dictionary = {
     cat_community: 'Comunidad',
     cat_other: 'Otros',
   },
+  channelPreview: {
+    title: 'Canal',
+    needAuth: 'Inicia sesión para seguir este canal.',
+    invalidTitle: 'Canal no encontrado',
+    invalidBody: 'Este enlace de canal no es válido o el canal ya no es público.',
+    browse: 'Explorar canales',
+    open: 'Abrir canal',
+    follow: 'Seguir canal',
+    following: 'Siguiendo…',
+  },
   consent: {
     welcome: 'Bienvenido a Toky Chat',
     notice: 'Debes tener al menos {{age}} años para usar Toky Chat. Al continuar confirmas tu edad y aceptas nuestros {{terms}} y nuestra {{privacy}}.',
@@ -438,6 +448,7 @@ const es: Dictionary = {
   groupInfo: {
     title: 'Información del grupo',
     channelTitle: 'Información del canal',
+    channelShare: 'Compartir canal',
     changePhoto: 'Cambiar foto',
     uploading: 'Subiendo…',
     groupName: 'Nombre del grupo',
