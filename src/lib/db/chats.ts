@@ -970,6 +970,66 @@ export async function joinGroupByCode(code: string): Promise<string> {
   return data as string;
 }
 
+export type JoinOutcome = 'joined' | 'pending' | 'already_member';
+
+/** Request to join a group. When the group requires approval, this creates a
+ *  pending request instead of joining; returns which happened. */
+export async function requestGroupJoin(code: string): Promise<JoinOutcome> {
+  const { data, error } = await (browserSupabase() as any).rpc('request_group_join', { p_code: code });
+  if (error) throw error;
+  return (data as JoinOutcome) ?? 'joined';
+}
+
+export type GroupJoinRequest = { userId: string; name: string; username: string | null; createdAt: string };
+
+/** Pending join requests for a group (visible to its admins). */
+export async function listGroupJoinRequests(chatId: string): Promise<GroupJoinRequest[]> {
+  const supabase = browserSupabase();
+  const { data, error } = await (supabase as any)
+    .from('group_join_requests')
+    .select('user_id, created_at')
+    .eq('chat_id', chatId)
+    .order('created_at', { ascending: true });
+  if (error) throw error;
+  const rows = (data as any[]) ?? [];
+  const ids = rows.map((r) => r.user_id);
+  const names = new Map<string, { name: string; username: string | null }>();
+  if (ids.length) {
+    const { data: profs } = await (supabase as any).from('profiles').select('id, username, display_name').in('id', ids);
+    for (const p of (profs as any[]) ?? []) names.set(p.id, { name: p.display_name || p.username || '—', username: p.username ?? null });
+  }
+  return rows.map((r) => ({
+    userId: r.user_id,
+    name: names.get(r.user_id)?.name ?? '—',
+    username: names.get(r.user_id)?.username ?? null,
+    createdAt: r.created_at,
+  }));
+}
+
+/** Approve a pending join request (admins only; enforced server-side). */
+export async function approveGroupJoin(chatId: string, userId: string): Promise<void> {
+  const { error } = await (browserSupabase() as any).rpc('approve_group_join', { p_chat: chatId, p_user: userId });
+  if (error) throw error;
+}
+
+/** Reject a pending join request (admins only). */
+export async function rejectGroupJoin(chatId: string, userId: string): Promise<void> {
+  const { error } = await (browserSupabase() as any).rpc('reject_group_join', { p_chat: chatId, p_user: userId });
+  if (error) throw error;
+}
+
+/** Read whether a group requires approval to join. */
+export async function getGroupRequireApproval(chatId: string): Promise<boolean> {
+  const { data } = await (browserSupabase() as any).from('chats').select('require_approval').eq('id', chatId).limit(1);
+  return !!(data as any[])?.[0]?.require_approval;
+}
+
+/** Toggle whether a group requires approval to join (admins only). */
+export async function setGroupRequireApproval(chatId: string, value: boolean): Promise<void> {
+  const { error } = await (browserSupabase() as any).rpc('set_group_require_approval', { p_chat: chatId, p_value: value });
+  if (error) throw error;
+}
+
 /** Build the shareable invite URL for a code (origin resolved at runtime). */
 export function inviteLinkFor(code: string): string {
   const origin = typeof window !== 'undefined' ? window.location.origin : 'https://mobile-chat-mvp.vercel.app';
