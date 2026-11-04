@@ -180,6 +180,45 @@ export async function deleteStory(storyId: string): Promise<void> {
   if (error) throw error;
 }
 
+/** The current viewer's reaction emoji to a story (or null). */
+export async function myStoryReaction(storyId: string): Promise<string | null> {
+  const supabase = browserSupabase();
+  const { data: me } = await supabase.auth.getUser();
+  if (!me.user) return null;
+  const { data } = await (supabase as any)
+    .from('story_reactions')
+    .select('emoji')
+    .eq('story_id', storyId)
+    .eq('user_id', me.user.id)
+    .maybeSingle();
+  return (data as any)?.emoji ?? null;
+}
+
+/** Set or clear (emoji=null) the current viewer's reaction to a story. */
+export async function reactToStory(storyId: string, emoji: string | null): Promise<void> {
+  const supabase = browserSupabase();
+  const { data: me } = await supabase.auth.getUser();
+  if (!me.user) throw new Error('Not authenticated');
+  if (emoji === null) {
+    const { error } = await (supabase as any).from('story_reactions').delete().eq('story_id', storyId).eq('user_id', me.user.id);
+    if (error) throw error;
+    return;
+  }
+  const { error } = await (supabase as any)
+    .from('story_reactions')
+    .upsert({ story_id: storyId, user_id: me.user.id, emoji }, { onConflict: 'story_id,user_id' });
+  if (error) throw error;
+}
+
+/** Reactions to one of the author's own stories, grouped by emoji with counts. */
+export async function listStoryReactions(storyId: string): Promise<{ emoji: string; count: number }[]> {
+  const supabase = browserSupabase();
+  const { data } = await (supabase as any).from('story_reactions').select('emoji').eq('story_id', storyId);
+  const counts = new Map<string, number>();
+  for (const r of (data as any[]) ?? []) counts.set(r.emoji, (counts.get(r.emoji) ?? 0) + 1);
+  return Array.from(counts, ([emoji, count]) => ({ emoji, count })).sort((a, b) => b.count - a.count);
+}
+
 // -------- Status privacy: hide your status from specific people
 
 export type StatusAudiencePerson = {
