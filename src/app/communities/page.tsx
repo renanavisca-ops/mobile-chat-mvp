@@ -11,6 +11,7 @@ import { useT } from '@/lib/i18n/context';
 import {
   listMyCommunities, createCommunity, deleteCommunity,
   getCommunityGroups, addGroupToCommunity, removeGroupFromCommunity, listMyAdminGroups,
+  postCommunityAnnouncement,
   type Community, type CommunityGroup, type AdminGroup,
 } from '@/lib/db/communities';
 
@@ -121,6 +122,24 @@ function CommunityDetail({ community, onBack }: { community: Community; onBack: 
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState('');
+  const [announce, setAnnounce] = useState('');
+  const [announceBusy, setAnnounceBusy] = useState(false);
+  const [announceMsg, setAnnounceMsg] = useState('');
+
+  async function sendAnnouncement() {
+    const text = announce.trim();
+    if (!text) return;
+    setAnnounceBusy(true); setErr(''); setAnnounceMsg('');
+    try {
+      const n = await postCommunityAnnouncement(community.id, text);
+      setAnnounce('');
+      setAnnounceMsg(t('communities.announceSent', { n }));
+    } catch (e: any) {
+      setErr(e?.message ?? String(e));
+    } finally {
+      setAnnounceBusy(false);
+    }
+  }
 
   function load() {
     setLoading(true);
@@ -172,6 +191,30 @@ function CommunityDetail({ community, onBack }: { community: Community; onBack: 
             </li>
           ))}
         </ul>
+      )}
+
+      {community.isOwner && groups.length > 0 && (
+        <div className="mt-5 rounded-xl border border-slate-900 bg-slate-950/40 p-3">
+          <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">{t('communities.announceTitle')}</div>
+          <p className="mt-1 text-xs text-slate-500">{t('communities.announceDesc')}</p>
+          <textarea
+            value={announce}
+            onChange={(e) => setAnnounce(e.target.value)}
+            maxLength={1000}
+            rows={2}
+            placeholder={t('communities.announcePlaceholder')}
+            className="mt-2 w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-slate-100"
+          />
+          {announceMsg && <p className="mt-1 text-xs text-emerald-300">{announceMsg}</p>}
+          <button
+            type="button"
+            onClick={sendAnnouncement}
+            disabled={announceBusy || !announce.trim()}
+            className="mt-2 w-full rounded-xl toky-grad toky-ring-brand px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+          >
+            {announceBusy ? t('communities.announceSending') : t('communities.announceSend')}
+          </button>
+        </div>
       )}
 
       {community.isOwner && (
