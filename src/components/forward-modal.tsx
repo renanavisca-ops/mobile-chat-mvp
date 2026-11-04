@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useT } from '@/lib/i18n/context';
 import { useBackClose } from '@/lib/back';
+import { useFocusTrap } from '@/lib/a11y/focus-trap';
 import type { ChatSummary } from '@/lib/db/types';
 
 export function ForwardModal(props: {
@@ -15,6 +16,7 @@ export function ForwardModal(props: {
   const { open, chats, loading, onClose, onConfirm } = props;
   const t = useT();
   useBackClose(open, onClose);
+  const trapRef = useFocusTrap<HTMLDivElement>(open);
 
   const [q, setQ] = useState('');
   const [selected, setSelected] = useState<Record<string, boolean>>({});
@@ -47,7 +49,7 @@ export function ForwardModal(props: {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div role="dialog" aria-modal="true" aria-label={t('forward.title')} className="w-full max-w-lg rounded-3xl border border-slate-800 toky-glass toky-elev">
+      <div ref={trapRef} role="dialog" aria-modal="true" aria-label={t('forward.title')} className="w-full max-w-lg rounded-3xl border border-slate-800 toky-glass toky-elev">
         <div className="flex items-center justify-between border-b border-slate-900 p-4">
           <div>
             <div className="text-base font-semibold text-slate-100">{t('forward.title')}</div>
