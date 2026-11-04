@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { reportServerError } from '@/lib/observability';
 import { matchingRules } from '@/lib/automations/match';
 import { recordIntegrationEvent } from '@/lib/integrations/dispatch';
+import { classifyConsentKeyword } from '@/lib/campaigns/optout';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 
 export async function GET(req: Request, { params }: { params: { token: string } }) {
@@ -211,6 +212,32 @@ export async function POST(req: Request, { params }: { params: { token: string }
             }
           }
         } catch { /* automatizaciones best-effort — nunca rompen el envío */ }
+      }
+
+      // Consentimiento de campañas por palabra clave (opt-in / opt-out). La baja
+      // siempre se respeta; el alta es un opt-in explícito del cliente. Se graba
+      // en store_customer_consent (por tienda-cliente) y se confirma al cliente.
+      if (content && session.customer_id) {
+        const signal = classifyConsentKeyword(content);
+        if (signal) {
+          try {
+            const optedOut = signal === 'opt_out';
+            await (supabaseAdmin as any).from('store_customer_consent').upsert({
+              store_id: storeId,
+              customer_id: session.customer_id,
+              consent: !optedOut,
+              opted_out_at: optedOut ? new Date().toISOString() : null,
+              source: 'keyword',
+              updated_at: new Date().toISOString(),
+            }, { onConflict: 'store_id,customer_id' });
+            await insertAuto(optedOut
+              ? 'Listo: no recibirás más comunicaciones de difusión. Responde ALTA para volver a suscribirte.'
+              : '¡Gracias! Quedaste suscrito a nuestras comunicaciones. Responde BAJA para cancelar en cualquier momento.');
+            await recordIntegrationEvent(supabaseAdmin, storeId,
+              optedOut ? 'support.consent_opt_out' : 'support.consent_opt_in',
+              { customerId: session.customer_id });
+          } catch { /* best-effort — nunca rompe el envío del cliente */ }
+        }
       }
 
       // Integraciones (outbox): evento no sensible — nunca el contenido.

@@ -12,7 +12,9 @@ export type IntegrationEventType =
   | 'support.message_received'
   | 'support.chat_status_changed'
   | 'support.chat_assigned'
-  | 'support.rule_triggered';
+  | 'support.rule_triggered'
+  | 'support.consent_opt_in'
+  | 'support.consent_opt_out';
 
 export type EventScalar = string | number | boolean | null;
 
