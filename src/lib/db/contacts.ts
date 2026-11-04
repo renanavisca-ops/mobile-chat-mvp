@@ -126,3 +126,42 @@ export async function addContact(contactId: string): Promise<void> {
     }
   }
 }
+
+export type ContactCard = { id: string; username: string | null; displayName: string | null; avatarUrl: string | null };
+
+/** Build the shareable "add me" link for a username (origin resolved at runtime). */
+export function contactLinkFor(username: string): string {
+  const origin = typeof window !== 'undefined' ? window.location.origin : 'https://mobile-chat-mvp.vercel.app';
+  return `${origin}/add?u=${encodeURIComponent(username)}`;
+}
+
+/** The current user's public contact card (for showing their own QR). */
+export async function myContactCard(): Promise<ContactCard | null> {
+  const supabase = browserSupabase();
+  const { data: me } = await supabase.auth.getUser();
+  if (!me.user) return null;
+  const { data } = await supabase
+    .from('profiles')
+    .select('id, username, display_name, avatar_url')
+    .eq('id', me.user.id)
+    .maybeSingle();
+  if (!data) return null;
+  const row = data as any;
+  return { id: row.id, username: row.username ?? null, displayName: row.display_name ?? null, avatarUrl: row.avatar_url ?? null };
+}
+
+/** Look up a public contact card by username (for the /add deep link). */
+export async function profileByUsername(username: string): Promise<ContactCard | null> {
+  const supabase = browserSupabase();
+  const u = username.trim();
+  if (!u) return null;
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, username, display_name, avatar_url')
+    .ilike('username', u)
+    .limit(1);
+  if (error) return null;
+  const row = (data as any[])?.[0];
+  if (!row) return null;
+  return { id: row.id, username: row.username ?? null, displayName: row.display_name ?? null, avatarUrl: row.avatar_url ?? null };
+}

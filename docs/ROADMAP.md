@@ -23,6 +23,7 @@ a web/Android/iOS, que comparten el WebView remoto). Lo nativo requiere nuevo
 - [x] Privacidad: quién ve última conexión/en línea/foto · confirmaciones de lectura on/off
 - [x] Bloquear / desbloquear / reportar usuarios
 - [x] Contactos: agregar, buscar usuarios, iniciar chat
+- [x] **QR personal de contacto**: cada usuario muestra su QR/enlace (`/add?u=usuario`); abrirlo o escanearlo lleva a una pantalla para agregar y/o chatear
 - [x] Chats 1:1: texto en tiempo real, enviado/entregado/leído, escribiendo/borrando/grabando
 - [x] Responder, reenviar, copiar, editar, eliminar, reacciones con emoji
 - [x] Mensajes destacados/guardados y fijados · selección múltiple
