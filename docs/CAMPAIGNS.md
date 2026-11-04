@@ -23,22 +23,32 @@ construido y, sobre todo, **qué falta para enviar de forma fiable**.
   **borradores**, ver la audiencia y el estado. El botón **Enviar está
   deshabilitado** con un aviso.
 
+## Captura de consentimiento y baja (implementado)
+
+El cliente controla su consentimiento **por palabra clave** en el chat de
+soporte (`src/lib/campaigns/optout.ts`, evaluado en `/api/public-chat`):
+
+- **Baja / opt-out** (siempre se respeta): `baja`, `stop`, `cancelar`,
+  `unsubscribe`, `darme de baja`, `no molestar`…
+- **Alta / opt-in** (explícito): `alta`, `suscribir`, `quiero ofertas`…
+
+Al detectarlo se actualiza `store_customer_consent` (por tienda-cliente,
+`source='keyword'`), se confirma al cliente con un mensaje y se emite un evento
+de integración (`support.consent_opt_in`/`_opt_out`). La audiencia
+(`campaign_audience_count`) refleja estos cambios de inmediato. Es conservador
+con palabras sueltas para evitar bajas accidentales (p. ej. "no" no es baja).
+
 ## Qué NO hay (a propósito)
 
 - **No hay envío**: ni interno masivo ni a proveedores externos.
-- **No hay captura de consentimiento** del lado del cliente todavía (ver abajo).
 - **No hay materialización de destinatarios** por campaña (se haría al enviar).
 
 ## Qué falta para enviar de forma fiable (pendiente)
 
-1. **Punto de captura de consentimiento (opt-in).** Hoy nadie escribe en
-   `store_customer_consent`, así que la audiencia es 0 hasta definir **dónde y
-   cómo** el cliente acepta recibir comunicaciones (p. ej. una casilla al iniciar
-   el chat de soporte, o un mensaje de opt-in). Es una decisión de producto/legal.
-2. **Mecanismo de baja (opt-out) para el cliente.** Por ejemplo, detectar una
-   palabra clave ("BAJA"/"STOP") en el chat de soporte y marcar `opted_out_at`.
-   Se puede apoyar en el motor de automatizaciones ya existente.
-3. **Procesamiento en segundo plano.** No existe un worker/cron del lado del
+1. **Captura de consentimiento (opt-in) y baja (opt-out)** — ✅ **implementado**
+   por palabra clave en el chat de soporte (ver sección anterior). Opcional a
+   futuro: un opt-in más explícito (casilla al iniciar el chat).
+2. **Procesamiento en segundo plano.** No existe un worker/cron del lado del
    servidor para enviar en lotes con reintentos y respetar `daily_limit`. Hace
    falta:
    - Materializar destinatarios por campaña (tabla `campaign_recipients`:
