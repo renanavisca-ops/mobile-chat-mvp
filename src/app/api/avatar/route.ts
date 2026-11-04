@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { reportServerError } from '@/lib/observability';
 import { supabaseAdmin } from '@/lib/supabase/admin';
+import { durableRateLimit } from '@/lib/ratelimit-db';
 
 // Avatar upload runs server-side on purpose. Uploading straight from the browser
 // intermittently reaches Supabase Storage without the user's session attached,
@@ -17,6 +18,11 @@ export async function POST(req: Request) {
 
     const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
     if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    // Anti-spam: cap avatar uploads per user (10 / minute).
+    if (!(await durableRateLimit(supabaseAdmin, `avatar:${user.id}`, 10, 60))) {
+      return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
+    }
 
     const form = await req.formData();
     const file = form.get('file');
