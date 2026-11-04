@@ -64,7 +64,7 @@ Alto valor, bajo riesgo, sin dependencias externas.
 - [x] **Pantalla de guardados/destacados**: lista central de mensajes destacados (Ajustes → Mensajes destacados)
 - [x] **Compartir ficha de contacto** dentro del chat (enviar un contacto como mensaje, tocar para ver/añadir)
 - [x] **Compartir ubicación puntual** (GPS → tarjeta que abre Google Maps) · en tiempo real: pendiente 🔒 (API de mapas)
-- [x] **Filtros de chats** (Todos / No leídos / Grupos) · listas personalizadas y favoritos: v2
+- [x] **Filtros de chats** por tipo (Todos / No leídos / Favoritos / Grupos / Canales / Directos) y **listas personalizadas**: crear/renombrar/eliminar listas y elegir qué chats incluir; cada lista aparece como chip de filtro. Las listas se guardan en el dispositivo (misma base que las listas de difusión; sin backend, funcionan offline; _pendiente: sincronizar entre dispositivos vía Supabase_)
 - [x] **Chats favoritos** (marcar/desmarcar + filtro "Favoritos" + estrella en la lista)
 
 ## Etapa 2 — Multimedia y contenido

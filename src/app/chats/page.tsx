@@ -15,6 +15,8 @@ import { ensureIdentity } from '@/lib/crypto/keystore';
 import { browserSupabase } from '@/lib/supabase/client';
 import { listChats, markIncomingDelivered, setChatArchived, setChatFavorite, getOrCreateSelfChat, searchAllMessages } from '@/lib/db/chats';
 import { isChatLocked } from '@/lib/chat-lock';
+import { getChatLists, type ChatList } from '@/lib/chat-lists';
+import { ChatListsModal } from '@/components/chat-lists-modal';
 import { getCached, setCached } from '@/lib/cache';
 import { tap, impact } from '@/lib/haptics';
 import { useIsOnline } from '@/components/presence-provider';
@@ -135,7 +137,13 @@ export default function ChatsPage() {
   const [openedWhileUnread, setOpenedWhileUnread] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [search, setSearch] = useState('');
-  const [filter, setFilter] = useState<'all' | 'unread' | 'favorites' | 'groups'>('all');
+  // Built-in type filters, or `list:<id>` for a custom list.
+  const [filter, setFilter] = useState<string>('all');
+  const [lists, setLists] = useState<ChatList[]>([]);
+  const [listsModalOpen, setListsModalOpen] = useState(false);
+  useEffect(() => {
+    if (user) setLists(getChatLists(user.id));
+  }, [user]);
   // Global message search (across ALL chats, not just the open one). Results are
   // messages whose text matches; tapping one opens that chat at that message.
   const [msgResults, setMsgResults] = useState<MessageRow[]>([]);
@@ -628,6 +636,8 @@ export default function ChatsPage() {
                   ['unread', 'chatsList.filterUnread'],
                   ['favorites', 'chatsList.filterFavorites'],
                   ['groups', 'chatsList.filterGroups'],
+                  ['channels', 'chatsList.filterChannels'],
+                  ['direct', 'chatsList.filterDirect'],
                 ] as const).map(([key, labelKey]) => (
                   <button
                     key={key}
@@ -640,6 +650,27 @@ export default function ChatsPage() {
                     {t(labelKey)}
                   </button>
                 ))}
+                {lists.map((l) => (
+                  <button
+                    key={l.id}
+                    type="button"
+                    onClick={() => setFilter(`list:${l.id}`)}
+                    className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium transition ${
+                      filter === `list:${l.id}` ? 'toky-grad text-white' : 'bg-slate-800/70 text-slate-300 hover:bg-slate-800'
+                    }`}
+                  >
+                    {l.name}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => setListsModalOpen(true)}
+                  aria-label={t('chatLists.manage')}
+                  title={t('chatLists.manage')}
+                  className="shrink-0 rounded-full bg-slate-800/70 px-3 py-1 text-xs font-medium text-slate-300 transition hover:bg-slate-800"
+                >
+                  + {t('chatLists.listsChip')}
+                </button>
               </div>
             )}
 
@@ -693,6 +724,12 @@ export default function ChatsPage() {
                 if (filter === 'unread') return (c.unread_count ?? 0) > 0 || (c.id === selectedId && openedWhileUnread);
                 if (filter === 'favorites') return !!c.favorite;
                 if (filter === 'groups') return c.kind === 'group' && !c.is_self;
+                if (filter === 'channels') return c.kind === 'channel';
+                if (filter === 'direct') return c.kind === 'direct' && !c.is_self;
+                if (filter.startsWith('list:')) {
+                  const list = lists.find((l) => l.id === filter.slice(5));
+                  return list ? list.chatIds.includes(c.id) : true; // unknown/deleted list → show all
+                }
                 return true;
               };
               const base = showArchived ? archivedList : searched.filter((c) => !c.archived);
@@ -902,6 +939,21 @@ export default function ChatsPage() {
           </div>
         </div>
       )}
+
+      <ChatListsModal
+        open={listsModalOpen}
+        onClose={() => setListsModalOpen(false)}
+        ownerId={user?.id ?? ''}
+        chats={chats.filter((c) => !c.archived && !c.is_self).map((c) => ({
+          id: c.id,
+          title: c.title || (c.kind === 'group' ? t('chatsList.group') : t('chatsList.directChat')),
+        }))}
+        onChanged={() => {
+          const next = user ? getChatLists(user.id) : [];
+          setLists(next);
+          if (filter.startsWith('list:') && !next.some((l) => l.id === filter.slice(5))) setFilter('all');
+        }}
+      />
 
       <EffectsIntro />
 
