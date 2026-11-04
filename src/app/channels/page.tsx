@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { PageShell } from '@/components/page-shell';
 import { useRequireAuth } from '@/lib/auth/use-require-auth';
 import { listPublicChannels, createChannel, joinChannel, leaveChat, CHANNEL_CATEGORIES, type ChannelSummary } from '@/lib/db/chats';
+import { recommendChannels } from '@/lib/channels/recommend';
 import { EmptyState } from '@/components/empty-state';
 import { ChatListSkeleton } from '@/components/skeleton';
 import { HashIcon, PlusIcon } from '@/components/icons';
@@ -134,6 +135,39 @@ export default function ChannelsPage() {
             </button>
           ))}
         </div>
+
+        {!loading && !q && !cat && (() => {
+          const recommended = recommendChannels(channels);
+          if (recommended.length === 0) return null;
+          return (
+            <div>
+              <div className="mb-1.5 ml-1 text-xs font-semibold uppercase tracking-wide text-slate-500">{t('channels.recommended')}</div>
+              <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+                {recommended.map((c) => (
+                  <div key={c.id} className="flex w-40 shrink-0 flex-col items-center gap-2 rounded-xl border border-slate-900 bg-slate-950/60 p-3 text-center">
+                    <span className="grid h-12 w-12 place-items-center overflow-hidden rounded-full bg-slate-800 text-lg font-semibold text-slate-300">
+                      {c.avatar_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={c.avatar_url} alt="" className="h-full w-full object-cover" />
+                      ) : (
+                        (c.title || '#').trim().charAt(0).toUpperCase()
+                      )}
+                    </span>
+                    <span className="line-clamp-2 text-xs font-medium text-slate-100">{c.title || t('channels.untitled')}</span>
+                    <button
+                      type="button"
+                      onClick={() => onJoin(c)}
+                      disabled={busyId === c.id}
+                      className="w-full rounded-lg toky-grad toky-ring-brand px-2 py-1 text-xs font-semibold text-white disabled:opacity-50"
+                    >
+                      {busyId === c.id ? t('channels.joining') : t('channels.join')}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
 
         {loading ? (
           <ChatListSkeleton rows={6} />

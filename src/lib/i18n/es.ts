@@ -91,6 +91,7 @@ const es: Dictionary = {
     creating: 'Creando…',
     empty: 'Aún no hay canales. ¡Crea el primero!',
     untitled: 'Canal sin título',
+    recommended: 'Recomendados para ti',
     join: 'Seguir',
     joining: 'Siguiendo…',
     open: 'Abrir',

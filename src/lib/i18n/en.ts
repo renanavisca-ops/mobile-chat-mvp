@@ -89,6 +89,7 @@ const en = {
     creating: 'Creating…',
     empty: 'No channels yet. Create the first one!',
     untitled: 'Untitled channel',
+    recommended: 'Recommended for you',
     join: 'Follow',
     joining: 'Following…',
     open: 'Open',
