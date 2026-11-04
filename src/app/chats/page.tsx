@@ -17,6 +17,7 @@ import { listChats, markIncomingDelivered, setChatArchived, setChatFavorite, get
 import { isChatLocked } from '@/lib/chat-lock';
 import { getChatLists, type ChatList } from '@/lib/chat-lists';
 import { ChatListsModal } from '@/components/chat-lists-modal';
+import { messageKind, matchesSearchKind, type SearchKind, type MsgKind } from '@/lib/messages/kind';
 import { getCached, setCached } from '@/lib/cache';
 import { tap, impact } from '@/lib/haptics';
 import { useIsOnline } from '@/components/presence-provider';
@@ -148,6 +149,10 @@ export default function ChatsPage() {
   // messages whose text matches; tapping one opens that chat at that message.
   const [msgResults, setMsgResults] = useState<MessageRow[]>([]);
   const [msgSearching, setMsgSearching] = useState(false);
+  // Global-search filters: by media/content type and by date range.
+  const [searchKind, setSearchKind] = useState<SearchKind | null>(null);
+  const [searchDate, setSearchDate] = useState<'all' | '7d' | '30d'>('all');
+  const [showSearchFilters, setShowSearchFilters] = useState(false);
   // sender id -> display name, for labelling who sent each global-search hit.
   const [senderNames, setSenderNames] = useState<Record<string, string>>({});
   // When opening a chat at a specific message in the embedded (wide-screen)
@@ -203,20 +208,26 @@ export default function ChatsPage() {
   // matching messages across every chat (RLS keeps it to the user's own).
   useEffect(() => {
     const q = search.trim();
-    if (q.length < 2) {
+    const hasFilter = searchKind !== null || searchDate !== 'all';
+    if (q.length < 2 && !hasFilter) {
       setMsgResults([]);
       setMsgSearching(false);
       return;
     }
+    const since =
+      searchDate === '7d' ? new Date(Date.now() - 7 * 864e5).toISOString()
+      : searchDate === '30d' ? new Date(Date.now() - 30 * 864e5).toISOString()
+      : undefined;
     setMsgSearching(true);
     const id = window.setTimeout(() => {
-      searchAllMessages(q)
+      searchAllMessages(q.length >= 2 ? q : '', { since, typeOnly: searchKind !== null })
+        .then((rows) => (searchKind ? rows.filter((r) => matchesSearchKind(r, searchKind)) : rows))
         .then(setMsgResults)
         .catch(() => setMsgResults([]))
         .finally(() => setMsgSearching(false));
     }, 250);
     return () => window.clearTimeout(id);
-  }, [search]);
+  }, [search, searchKind, searchDate]);
 
   // Resolve the display name of each sender appearing in the message results,
   // so a hit can show WHO sent it (not just which chat).
@@ -549,6 +560,24 @@ export default function ChatsPage() {
     }
   }
 
+  // Label for a search-result message that has no plain text (media/other).
+  function kindLabel(kind: MsgKind): string {
+    switch (kind) {
+      case 'photo': return t('chatsList.photo');
+      case 'video': return t('chatsList.video');
+      case 'audio': return t('chatsList.audio');
+      case 'gif': return t('chatsList.gif');
+      case 'sticker': return t('chatsList.sticker');
+      case 'contact': return t('chatsList.contact');
+      case 'location': return t('chatsList.location');
+      case 'event': return t('chatsList.event');
+      case 'poll': return t('chatsList.poll');
+      case 'file': return t('chatsList.file');
+      case 'call': return t('chatsList.call');
+      default: return '…';
+    }
+  }
+
   return (
     <div className="flex h-[100dvh] flex-col bg-slate-950 text-slate-50">
       {/* Reserve space for the fixed bottom nav so the conversation composer
@@ -623,13 +652,68 @@ export default function ChatsPage() {
                 placeholder={t('chatsList.searchPlaceholder')}
                 className="min-w-0 flex-1 bg-transparent text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none"
               />
+              <button
+                type="button"
+                onClick={() => setShowSearchFilters((v) => !v)}
+                aria-label={t('search.filters')}
+                aria-pressed={showSearchFilters || searchKind !== null || searchDate !== 'all'}
+                className={`shrink-0 rounded-lg p-1 transition ${searchKind !== null || searchDate !== 'all' ? 'text-blue-400' : 'hover:text-slate-200'}`}
+              >
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z" />
+                </svg>
+              </button>
             </div>
+            {showSearchFilters && (
+              <div className="mt-2 space-y-1.5">
+                <div className="flex gap-1.5 overflow-x-auto pb-0.5">
+                  {([
+                    [null, 'search.typeAll'],
+                    ['photo', 'search.typePhotos'],
+                    ['video', 'search.typeVideos'],
+                    ['audio', 'search.typeAudio'],
+                    ['file', 'search.typeFiles'],
+                    ['link', 'search.typeLinks'],
+                    ['location', 'search.typeLocation'],
+                  ] as const).map(([key, labelKey]) => (
+                    <button
+                      key={labelKey}
+                      type="button"
+                      onClick={() => setSearchKind(key)}
+                      className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium transition ${
+                        searchKind === key ? 'toky-grad text-white' : 'bg-slate-800/70 text-slate-300 hover:bg-slate-800'
+                      }`}
+                    >
+                      {t(labelKey)}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex gap-1.5 overflow-x-auto pb-0.5">
+                  {([
+                    ['all', 'search.dateAll'],
+                    ['7d', 'search.date7d'],
+                    ['30d', 'search.date30d'],
+                  ] as const).map(([key, labelKey]) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setSearchDate(key)}
+                      className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium transition ${
+                        searchDate === key ? 'bg-blue-600 text-white' : 'bg-slate-800/70 text-slate-300 hover:bg-slate-800'
+                      }`}
+                    >
+                      {t(labelKey)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </header>
 
           <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4 pt-3">
             {!search && <StoriesBar />}
 
-            {!search && !showArchived && chats.length > 0 && (
+            {!search && !showArchived && searchKind === null && searchDate === 'all' && chats.length > 0 && (
               <div className="mb-1 flex gap-2 overflow-x-auto pb-1">
                 {([
                   ['all', 'chatsList.filterAll'],
@@ -694,6 +778,10 @@ export default function ChatsPage() {
             ) : (() => {
               const q = search.trim();
               const isSearching = q.length > 0;
+              // A search driven only by type/date filters (no text): show the
+              // message results and hide the normal chat list.
+              const filterOnly = !isSearching && (searchKind !== null || searchDate !== 'all');
+              const showResults = q.length >= 2 || searchKind !== null || searchDate !== 'all';
               const chatById = new Map(chats.map((c) => [c.id, c] as const));
               const searched = chats.filter((c) => (c.title || '').toLowerCase().includes(q.toLowerCase()));
               const archivedList = searched.filter((c) => c.archived);
@@ -738,12 +826,12 @@ export default function ChatsPage() {
                 .sort(byUnreadThenRecent);
               return (
               <>
-                {isSearching && visible.length > 0 && (
+                {!filterOnly && isSearching && visible.length > 0 && (
                   <div className="px-3 pb-1 pt-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                     {t('chatsList.sectionChats')}
                   </div>
                 )}
-                {visible.length === 0 && isSearching ? (
+                {filterOnly ? null : visible.length === 0 && isSearching ? (
                   <p className="px-3 py-1 text-[13px] text-slate-500">{t('chatsList.noChatNameMatches')}</p>
                 ) : visible.length === 0 && !isSearching && !showArchived && filter !== 'all' ? (
                   <p className="px-3 py-6 text-center text-[13px] text-slate-500">{t('chatsList.noFilterMatches')}</p>
@@ -836,7 +924,7 @@ export default function ChatsPage() {
                 })}
               </ul>
                 )}
-                {isSearching && q.length >= 2 && (
+                {showResults && (
                   <div className="mt-2">
                     <div className="px-3 pb-1 pt-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                       {t('chatsList.sectionMessages')}
@@ -875,7 +963,7 @@ export default function ChatsPage() {
                                   </div>
                                   <div className="mt-0.5 truncate text-[13px] text-slate-400">
                                     <span className="font-medium text-slate-300">{senderLabel}: </span>
-                                    {highlightSnippet(r.content, q)}
+                                    {r.content ? highlightSnippet(r.content, q) : kindLabel(messageKind(r))}
                                   </div>
                                 </div>
                               </button>

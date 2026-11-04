@@ -67,7 +67,7 @@ Guías de activación: `docs/INTEGRATIONS.md`, `docs/CAMPAIGNS.md`, `docs/PAYMEN
 | Reacciones / menciones | ✅ | — | — | — | — |
 | Destacados/fijados/guardados | ✅ | `src/app/saved` | — | — | — |
 | Búsqueda en chat + global por texto | ✅ | chats page, searchAllMessages | — | — | — |
-| **Búsqueda por fecha / tipo de archivo** | ❌ | — | Filtro por tipo/fecha en búsqueda global | — | — |
+| **Búsqueda por fecha / tipo de archivo** | ✅ | chats page, `src/lib/messages/kind.ts`, searchAllMessages | — (fecha server-side; tipo derivado client-side, acotado al límite de resultados) | tests +7 | — |
 | Selección múltiple / preview enlaces | ✅ | — | — | — | — |
 | Temporales / vista única / borradores | ✅ | — | — | — | — |
 | Traducción | ✅ | — | — | — | — |
@@ -254,7 +254,7 @@ Guías de activación: `docs/INTEGRATIONS.md`, `docs/CAMPAIGNS.md`, `docs/PAYMEN
 ## Plan de etapas (orden por dependencias; cada etapa = PR verificado)
 
 1. **Matriz** (este documento). ✅
-2. **§3** Búsqueda por tipo/fecha · **§15** extender trampa de foco · **§16** unificar rate limiter. _(limpiezas + búsqueda)_
+2. **§3** Búsqueda por tipo/fecha ✅ (#209) · **§15** extender trampa de foco · **§16** unificar rate limiter. _(limpiezas + búsqueda)_
 3. **§4** Descripciones accesibles de medios (alt/caption al enviar).
 4. **§5** Límite de miembros configurable · **§8** canales privados + recomendaciones · **§5** anuncios de comunidad.
 5. **§7** Historias: video/audio, audiencia fina, vistas/reacciones, silenciar autor.
