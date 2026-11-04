@@ -167,6 +167,7 @@ export function TrimmedVideo({
   className,
   onError,
   onCanPlay,
+  ariaLabel,
 }: {
   src: string;
   start?: number;
@@ -174,6 +175,7 @@ export function TrimmedVideo({
   className?: string;
   onError?: () => void;
   onCanPlay?: () => void;
+  ariaLabel?: string;
 }) {
   const ref = useRef<HTMLVideoElement | null>(null);
   const hasTrim = typeof start === 'number' && typeof end === 'number' && end > start;
@@ -192,6 +194,7 @@ export function TrimmedVideo({
       <video
         ref={ref}
         src={src}
+        aria-label={ariaLabel}
         controls
         // Load the video only when the user hits play, not on every chat open.
         // Inline videos can be large (up to 200MB), so preloading them — even just

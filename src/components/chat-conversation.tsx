@@ -90,6 +90,9 @@ type Payload = {
   is_deleted?: boolean;
   /** "Ver una vez": photo/video the recipient can open exactly once. */
   viewOnce?: boolean;
+  /** Accessibility description of the attached media (image/video), used as the
+   *  alt / aria-label so screen readers announce what the media shows. */
+  alt?: string;
   /** User ids mentioned in `text` (groups). */
   mentions?: string[];
   poll?: { question: string; options: string[] };
@@ -261,6 +264,8 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
   // Active @mention typing context: the '@' index and the query after it.
   const [mentionQuery, setMentionQuery] = useState<{ start: number; query: string } | null>(null);
   const [pendingImages, setPendingImages] = useState<File[]>([]);
+  // Optional accessibility description for the staged image(s)/video.
+  const [pendingAlt, setPendingAlt] = useState('');
   const [pendingVideo, setPendingVideo] = useState<File | null>(null);
   const [pendingVideoTrim, setPendingVideoTrim] = useState<{ start: number; end: number } | null>(null);
   const [trimmerOpen, setTrimmerOpen] = useState(false);
@@ -543,6 +548,7 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
     return { path };
   }
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  const [lightboxAlt, setLightboxAlt] = useState<string>('');
   // Auto-download gating: media kinds withheld on the current network show a
   // tap-to-download tile instead of fetching automatically.
   const [deferredMedia, setDeferredMedia] = useState<Set<string>>(new Set());
@@ -2387,6 +2393,7 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
     setPreviewImages([]);
     setPendingImages([]);
     setComposeViewOnce(false);
+    setPendingAlt('');
     if (imageInputRef.current) imageInputRef.current.value = '';
   }
 
@@ -2410,6 +2417,7 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
     setPendingVideo(null);
     setPendingVideoTrim(null);
     setComposeViewOnce(false);
+    setPendingAlt('');
     if (videoInputRef.current) videoInputRef.current.value = '';
     if (cameraVideoRef.current) cameraVideoRef.current.value = '';
   }
@@ -2700,6 +2708,7 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
 
         const payload: Payload = t2 ? { text: t2, videoPath: path } : { videoPath: path };
         if (enc) payload.enc = { [path]: enc };
+        if (pendingAlt.trim()) payload.alt = pendingAlt.trim();
         if (composeViewOnce) payload.viewOnce = true;
         if (pendingVideoTrim) {
           payload.videoTrimStart = Math.round(pendingVideoTrim.start * 10) / 10;
@@ -2744,6 +2753,7 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
         const encMap: Record<string, MediaEnc> = {};
         for (const r of results) if (r.enc) encMap[r.path] = r.enc;
         if (Object.keys(encMap).length) payload.enc = encMap;
+        if (pendingAlt.trim()) payload.alt = pendingAlt.trim();
         if (composeViewOnce) payload.viewOnce = true;
         if (replyingTo) payload.reply_to = replyingTo.id;
 
@@ -3456,7 +3466,7 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
         onClose={() => setMediaGalleryOpen(false)}
         messages={items}
         resolveUrl={(p) => signedUrls[p]}
-        onOpenImage={(url) => setLightboxUrl(url)}
+        onOpenImage={(url) => { setLightboxAlt(''); setLightboxUrl(url); }}
         onOpenDoc={(body) => setDocPreview(body)}
       />
 
@@ -4052,7 +4062,7 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
                                 <img
                                   key={path}
                                   src={url}
-                                  alt="chat image"
+                                  alt={m.body.alt || m.body.text || t('chat.imageAlt')}
                                   onLoad={() => {
                                     if (stickBottomRef.current && scrollRef.current) {
                                       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -4060,7 +4070,7 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
                                   }}
                                   onClick={() => {
                                     if (selectMode) toggleSelect(m.id);
-                                    else setLightboxUrl(url);
+                                    else { setLightboxAlt(m.body.alt || m.body.text || ''); setLightboxUrl(url); }
                                   }}
                                   className={
                                     single
@@ -4112,6 +4122,7 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
                                 src={signedUrls[videoPath]}
                                 start={m.body.videoTrimStart}
                                 end={m.body.videoTrimEnd}
+                                ariaLabel={m.body.alt || m.body.text || t('chat.videoAlt')}
                                 className="max-h-96 w-full rounded-lg border border-slate-900"
                                 onError={() => setVideoPlayError((prev) => ({ ...prev, [videoPath]: true }))}
                                 onCanPlay={() => setVideoPlayError((prev) => ({ ...prev, [videoPath]: false }))}
@@ -4282,6 +4293,15 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
                   </div>
                 ))}
               </div>
+              {/* Accessibility description (alt) for the staged image(s) */}
+              <input
+                value={pendingAlt}
+                onChange={(e) => setPendingAlt(e.target.value)}
+                maxLength={200}
+                placeholder={t('chat.altPlaceholder')}
+                aria-label={t('chat.altLabel')}
+                className="mt-2 w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-1.5 text-xs text-slate-100 placeholder:text-slate-500"
+              />
               {/* Per-send quality */}
               <div className="mt-2 flex items-center gap-1.5">
                 <span className="text-[11px] text-slate-500">{t('sendQuality.label')}</span>
@@ -4346,6 +4366,14 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
                   </button>
                 </div>
               </div>
+              <input
+                value={pendingAlt}
+                onChange={(e) => setPendingAlt(e.target.value)}
+                maxLength={200}
+                placeholder={t('chat.altPlaceholder')}
+                aria-label={t('chat.altLabel')}
+                className="mt-2 w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-1.5 text-xs text-slate-100 placeholder:text-slate-500"
+              />
             </div>
           ) : null}
 
@@ -4764,7 +4792,7 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
       )}
 
       {lightboxUrl && (
-        <ImageLightbox url={lightboxUrl} alt={t('chatsList.photo')} onClose={() => setLightboxUrl(null)} />
+        <ImageLightbox url={lightboxUrl} alt={lightboxAlt || t('chatsList.photo')} onClose={() => { setLightboxUrl(null); setLightboxAlt(''); }} />
       )}
 
       {viewOnceOpen && (
