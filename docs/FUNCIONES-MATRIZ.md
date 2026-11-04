@@ -95,7 +95,7 @@ Guías de activación: `docs/INTEGRATIONS.md`, `docs/CAMPAIGNS.md`, `docs/PAYMEN
 | Requisito | Estado | Archivos | Pendiente | Evidencia | Dependencia |
 |---|---|---|---|---|---|
 | Crear con nombre/imagen/descr. | ✅ | groups/new | — | — | — |
-| Añadir/retirar + **límites configurables** | 🧩 | group-info-modal | Límite de miembros configurable | — | — |
+| Añadir/retirar + **límites configurables** | 🧪 | group-info-modal, migration 202611050001 | Aplicar migración + verificar flujo vivo | tsc/eslint/build | Migración pendiente de aplicar |
 | Roles creador/admin/miembro + permisos | ✅ | group-roles migration | — | — | — |
 | Invitación enlace/QR + revocación | ✅ | — | — | — | — |
 | **Aprobación de ingreso** | ✅ | approval migration (#203) | — | migración verificada | — |

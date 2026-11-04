@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { searchUsers } from '@/lib/db/contacts';
-import { updateGroupInfo, addGroupMembers, removeGroupMember, leaveChat, getChatMuted, setChatMuteUntil, setDisappearingMessages, getGroupMeta, setGroupRole, setGroupPerms, getGroupInvite, rotateGroupInvite, revokeGroupInvite, inviteLinkFor, getGroupRequireApproval, setGroupRequireApproval, listGroupJoinRequests, approveGroupJoin, rejectGroupJoin, channelShareLink, type GroupMeta, type GroupPerm, type GroupJoinRequest } from '@/lib/db/chats';
+import { updateGroupInfo, addGroupMembers, removeGroupMember, leaveChat, getChatMuted, setChatMuteUntil, setDisappearingMessages, getGroupMeta, setGroupRole, setGroupPerms, getGroupInvite, rotateGroupInvite, revokeGroupInvite, inviteLinkFor, getGroupRequireApproval, setGroupRequireApproval, listGroupJoinRequests, approveGroupJoin, rejectGroupJoin, channelShareLink, getGroupMaxMembers, setGroupMaxMembers, type GroupMeta, type GroupPerm, type GroupJoinRequest } from '@/lib/db/chats';
 import { QrCode } from '@/components/qr-code';
 import { uploadGroupAvatar } from '@/lib/db/groupAvatar';
 import { useT } from '@/lib/i18n/context';
@@ -101,6 +101,9 @@ export function GroupInfoModal({
   const [approvalBusy, setApprovalBusy] = useState(false);
   const [joinRequests, setJoinRequests] = useState<GroupJoinRequest[]>([]);
   const [reqBusyId, setReqBusyId] = useState<string | null>(null);
+  const [maxMembers, setMaxMembers] = useState<number | null>(null);
+  const [limitInput, setLimitInput] = useState('');
+  const [limitBusy, setLimitBusy] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const [confirmLeave, setConfirmLeave] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
@@ -122,6 +125,7 @@ export function GroupInfoModal({
       getGroupInvite(chatId).then(setInviteCode).catch(() => {});
       getGroupRequireApproval(chatId).then(setRequireApproval).catch(() => {});
       listGroupJoinRequests(chatId).then(setJoinRequests).catch(() => setJoinRequests([]));
+      getGroupMaxMembers(chatId).then((v) => { setMaxMembers(v); setLimitInput(v != null ? String(v) : ''); }).catch(() => {});
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, title, description, chatId, disappearingSeconds]);
@@ -308,6 +312,20 @@ export function GroupInfoModal({
       setErr(e?.message ?? String(e));
     } finally {
       setApprovalBusy(false);
+    }
+  }
+
+  async function applyLimit(value: number | null) {
+    setLimitBusy(true);
+    setErr('');
+    try {
+      await setGroupMaxMembers(chatId, value);
+      setMaxMembers(value);
+      setLimitInput(value != null ? String(value) : '');
+    } catch (e: any) {
+      setErr(e?.message ?? String(e));
+    } finally {
+      setLimitBusy(false);
     }
   }
 
@@ -697,6 +715,47 @@ export function GroupInfoModal({
                 </ul>
               </div>
             )}
+          </div>
+        )}
+
+        {amAdmin && !isChannel && (
+          <div className="mt-4 space-y-2 rounded-xl border border-slate-800 bg-slate-900/40 p-3">
+            <div>
+              <div className="text-sm font-medium text-slate-200">{t('groupInfo.memberLimitTitle')}</div>
+              <div className="text-xs text-slate-500">{t('groupInfo.memberLimitDesc', { n: members.length })}</div>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                inputMode="numeric"
+                min={Math.max(2, members.length)}
+                value={limitInput}
+                onChange={(e) => setLimitInput(e.target.value)}
+                placeholder={t('groupInfo.memberLimitNone')}
+                className="w-28 rounded-lg border border-slate-800 bg-slate-900 px-3 py-1.5 text-sm text-slate-100"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  const n = parseInt(limitInput, 10);
+                  if (Number.isFinite(n)) applyLimit(n);
+                }}
+                disabled={limitBusy || !limitInput.trim()}
+                className="rounded-lg toky-grad toky-ring-brand px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+              >
+                {t('groupInfo.memberLimitSet')}
+              </button>
+              {maxMembers != null && (
+                <button
+                  type="button"
+                  onClick={() => applyLimit(null)}
+                  disabled={limitBusy}
+                  className="rounded-lg bg-slate-800 px-3 py-1.5 text-xs text-slate-300 hover:bg-slate-700 disabled:opacity-50"
+                >
+                  {t('groupInfo.memberLimitClear')}
+                </button>
+              )}
+            </div>
           </div>
         )}
 
