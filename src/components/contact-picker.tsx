@@ -50,7 +50,7 @@ export function ContactPicker({ open, onClose, onPick }: {
       className="fixed inset-0 z-[90] flex items-end justify-center bg-black/70 p-0 backdrop-blur-sm sm:items-center sm:p-4"
       onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="toky-glass toky-elev flex max-h-[80vh] w-full max-w-md flex-col rounded-t-3xl border border-slate-800 sm:rounded-3xl">
+      <div role="dialog" aria-modal="true" className="toky-glass toky-elev flex max-h-[80vh] w-full max-w-md flex-col rounded-t-3xl border border-slate-800 sm:rounded-3xl">
         <div className="flex items-center justify-between border-b border-slate-800 px-4 py-3">
           <h2 className="text-base font-semibold text-slate-100">{t('contactPicker.title')}</h2>
           <button onClick={onClose} aria-label={t('common.close')} className="text-slate-400 hover:text-slate-200">

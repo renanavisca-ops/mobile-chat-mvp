@@ -281,7 +281,7 @@ export function AvatarCreator({
         if (e.target === e.currentTarget && !busy) onClose();
       }}
     >
-      <div className="w-full max-w-sm rounded-3xl border border-slate-800 toky-glass toky-elev p-4">
+      <div role="dialog" aria-modal="true" className="w-full max-w-sm rounded-3xl border border-slate-800 toky-glass toky-elev p-4">
         <div className="flex items-center justify-between">
           <div className="text-base font-semibold text-slate-100">{t('avatarCreator.title')}</div>
           <button type="button" onClick={onClose} className="rounded bg-slate-800 px-3 py-1.5 text-xs hover:bg-slate-700">

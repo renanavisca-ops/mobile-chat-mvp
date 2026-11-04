@@ -92,7 +92,7 @@ export function CameraCapture({
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-4">
-      <div className="w-full max-w-md rounded-2xl border border-slate-900 bg-slate-950 p-3 shadow-xl">
+      <div role="dialog" aria-modal="true" className="w-full max-w-md rounded-2xl border border-slate-900 bg-slate-950 p-3 shadow-xl">
         <div className="mb-2 flex items-center justify-between">
           <div className="text-sm font-semibold text-slate-100">{t('camera.title')}</div>
           <button

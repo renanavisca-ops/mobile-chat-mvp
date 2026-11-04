@@ -415,7 +415,7 @@ export function StickerCreator({
 
   return (
     <div className="fixed inset-0 z-[90] flex items-end justify-center bg-black/70 p-0 backdrop-blur-sm sm:items-center sm:p-4">
-      <div className="toky-glass toky-elev flex max-h-[92vh] w-full max-w-md flex-col rounded-t-3xl border border-slate-800 sm:rounded-3xl">
+      <div role="dialog" aria-modal="true" className="toky-glass toky-elev flex max-h-[92vh] w-full max-w-md flex-col rounded-t-3xl border border-slate-800 sm:rounded-3xl">
         <div className="flex items-center justify-between border-b border-slate-800 px-4 py-3">
           <h2 className="font-display text-base font-bold text-slate-100">{t('stickers.create')}</h2>
           <button onClick={onClose} aria-label={t('common.cancel')} className="text-slate-400 hover:text-slate-200">

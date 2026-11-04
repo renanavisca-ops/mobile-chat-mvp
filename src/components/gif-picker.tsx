@@ -61,7 +61,7 @@ export function GifPicker({
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="flex h-[70vh] w-full max-w-md flex-col overflow-hidden rounded-3xl border border-slate-800 toky-glass toky-elev">
+      <div role="dialog" aria-modal="true" className="flex h-[70vh] w-full max-w-md flex-col overflow-hidden rounded-3xl border border-slate-800 toky-glass toky-elev">
         <div className="flex items-center gap-2 border-b border-slate-900 p-3">
           <input
             autoFocus

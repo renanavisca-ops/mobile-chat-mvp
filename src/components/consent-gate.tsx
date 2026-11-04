@@ -102,7 +102,7 @@ export function ConsentGate() {
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4">
-      <div className="w-full max-w-sm rounded-2xl border border-slate-800 bg-slate-950 p-6 text-slate-200 shadow-xl">
+      <div role="dialog" aria-modal="true" aria-label={t('consent.welcome')} className="w-full max-w-sm rounded-2xl border border-slate-800 bg-slate-950 p-6 text-slate-200 shadow-xl">
         <div className="text-lg font-semibold">{t('consent.welcome')}</div>
         <p className="mt-3 text-sm text-slate-400">
           {noticeParts[0]}

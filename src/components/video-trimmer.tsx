@@ -66,7 +66,7 @@ export function VideoTrimmer({
 
   return (
     <div className="fixed inset-0 z-[75] flex items-center justify-center bg-black/80 p-3">
-      <div className="flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-slate-900 bg-slate-950 shadow-xl">
+      <div role="dialog" aria-modal="true" className="flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-slate-900 bg-slate-950 shadow-xl">
         <div className="flex items-center justify-between border-b border-slate-900 p-3">
           <div className="text-sm font-semibold text-slate-100">{t('videoTrim.title')}</div>
           <button type="button" onClick={onClose} className="rounded bg-slate-800 px-3 py-1.5 text-xs hover:bg-slate-700">

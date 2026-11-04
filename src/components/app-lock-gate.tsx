@@ -78,7 +78,7 @@ export function AppLockGate() {
   if (!locked) return null;
 
   return (
-    <div className="fixed inset-0 z-[120] flex flex-col items-center justify-center gap-6 bg-slate-950 px-6 text-center">
+    <div role="dialog" aria-modal="true" className="fixed inset-0 z-[120] flex flex-col items-center justify-center gap-6 bg-slate-950 px-6 text-center">
       <div className="toky-grad grid h-16 w-16 place-items-center rounded-3xl text-white">
         <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <rect x="4" y="11" width="16" height="9" rx="2" />

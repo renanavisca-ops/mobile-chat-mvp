@@ -85,7 +85,7 @@ export function Linkify({ text, className }: { text: string; className?: string 
           className="fixed inset-0 z-[90] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
           onClick={(e) => { e.stopPropagation(); if (e.target === e.currentTarget) setConfirm(null); }}
         >
-          <div className="w-full max-w-sm rounded-3xl border border-amber-500/40 toky-glass toky-elev p-4" onClick={(e) => e.stopPropagation()}>
+          <div role="alertdialog" aria-modal="true" className="w-full max-w-sm rounded-3xl border border-amber-500/40 toky-glass toky-elev p-4" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-2 text-amber-300">
               <span className="text-lg">⚠</span>
               <h2 className="text-base font-semibold">{t('linkSafety.title')}</h2>

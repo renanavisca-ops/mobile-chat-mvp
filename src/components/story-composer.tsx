@@ -145,7 +145,7 @@ export function StoryComposer({
         if (e.target === e.currentTarget && !busy) close();
       }}
     >
-      <div className="w-full max-w-sm rounded-3xl border border-slate-800 toky-glass toky-elev p-4">
+      <div role="dialog" aria-modal="true" className="w-full max-w-sm rounded-3xl border border-slate-800 toky-glass toky-elev p-4">
         <div className="flex items-center justify-between">
           <div className="text-base font-semibold text-slate-100">
             {reviewing ? t('stories.reviewTitle') : t('stories.addTitle')}

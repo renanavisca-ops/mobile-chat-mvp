@@ -72,7 +72,7 @@ export function EventComposer({
       className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
       onMouseDown={(e) => { if (e.target === e.currentTarget && !busy) { reset(); onClose(); } }}
     >
-      <div className="w-full max-w-sm rounded-3xl border border-slate-800 toky-glass toky-elev p-4">
+      <div role="dialog" aria-modal="true" className="w-full max-w-sm rounded-3xl border border-slate-800 toky-glass toky-elev p-4">
         <div className="text-base font-semibold text-slate-100">{t('event.createTitle')}</div>
 
         <label className="mt-3 block text-xs text-slate-400">{t('event.titleLabel')}</label>
