@@ -3,6 +3,7 @@
 import { useEffect, type ReactNode } from 'react';
 import { useT } from '@/lib/i18n/context';
 import { useBackClose } from '@/lib/back';
+import { useFocusTrap } from '@/lib/a11y/focus-trap';
 import { ImageIcon, FilmIcon, CameraIcon, VideoIcon, GifIcon, BarChartIcon, PaperclipIcon } from '@/components/icons';
 
 export function AttachSheet(props: {
@@ -23,6 +24,7 @@ export function AttachSheet(props: {
 }) {
   const { open, onClose, onPickPhotos, onPickVideo, onCameraPhoto, onCameraVideo, onPickFile, onPoll, onGif, onSticker, onContact, onLocation, onEvent, onSchedule } = props;
   useBackClose(open, onClose);
+  const trapRef = useFocusTrap<HTMLDivElement>(open);
   const t = useT();
 
   useEffect(() => {
@@ -59,6 +61,7 @@ export function AttachSheet(props: {
       onClick={onClose}
     >
       <div
+        ref={trapRef}
         role="dialog"
         aria-modal="true"
         className="w-full max-w-md rounded-3xl border border-slate-800 toky-glass toky-elev"

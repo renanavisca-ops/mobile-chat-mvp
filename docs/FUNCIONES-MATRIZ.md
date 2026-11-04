@@ -217,7 +217,8 @@ Guías de activación: `docs/INTEGRATIONS.md`, `docs/CAMPAIGNS.md`, `docs/PAYMEN
 ## 15. Accesibilidad y experiencia de usuario
 | Requisito | Estado | Archivos | Pendiente | Evidencia | Dependencia |
 |---|---|---|---|---|---|
-| Lectores de pantalla / navegación accesible | 🧩 | a11y screenreaders | **Extender trampa de foco al resto de modales** | — | — |
+| Lectores de pantalla / navegación accesible | 🧩 | a11y screenreaders | Extender a los modales restantes (pickers, editores) | — | — |
+| └ Trampa de foco extendida | ✅ | attach/message-actions/schedule/seen-by/status-privacy/media-gallery + núcleo (#205) | resto de pickers/editores (menor) | build | — |
 | Trampa de foco (núcleo) | ✅ | `src/lib/a11y/focus-trap.ts` (#205) | — | tests +6 | — |
 | Texto escalable/contraste + indicadores conexión | ✅ | — | — | — | — |
 | Teclado/dictado del SO | 🧩 | — | Se apoya en SO | — | — |

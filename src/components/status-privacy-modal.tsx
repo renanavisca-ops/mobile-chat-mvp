@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useT } from '@/lib/i18n/context';
 import { listStatusAudience, setStatusHidden, type StatusAudiencePerson } from '@/lib/db/stories';
 import { avatarBg, initials } from '@/lib/ui/avatar';
+import { useFocusTrap } from '@/lib/a11y/focus-trap';
 
 /**
  * "Who can't see my status" manager. Lists everyone who could see my status
@@ -13,6 +14,7 @@ import { avatarBg, initials } from '@/lib/ui/avatar';
  */
 export function StatusPrivacyModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const t = useT();
+  const trapRef = useFocusTrap<HTMLDivElement>(open);
   const [people, setPeople] = useState<StatusAudiencePerson[]>([]);
   const [loading, setLoading] = useState(false);
   const [pending, setPending] = useState<Set<string>>(new Set());
@@ -55,7 +57,7 @@ export function StatusPrivacyModal({ open, onClose }: { open: boolean; onClose: 
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div role="dialog" aria-modal="true" className="flex max-h-[85vh] w-full max-w-sm flex-col overflow-hidden rounded-t-3xl border border-slate-800 toky-glass toky-elev sm:rounded-3xl">
+      <div ref={trapRef} role="dialog" aria-modal="true" className="flex max-h-[85vh] w-full max-w-sm flex-col overflow-hidden rounded-t-3xl border border-slate-800 toky-glass toky-elev sm:rounded-3xl">
         <div className="flex items-center justify-between border-b border-slate-800 p-4">
           <div>
             <div className="text-base font-semibold text-slate-100">{t('statusHide.title')}</div>

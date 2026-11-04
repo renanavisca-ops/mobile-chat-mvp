@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { useT } from '@/lib/i18n/context';
 import { firstUrl } from '@/components/link-preview';
 import { FileIcon, GlobeIcon, XIcon } from '@/components/icons';
+import { useFocusTrap } from '@/lib/a11y/focus-trap';
 
 /** Minimal shape of a decrypted message the gallery needs. */
 export type GalleryMessage = {
@@ -62,6 +63,7 @@ export function ChatMediaGallery({
   onOpenDoc: (body: GalleryMessage['body']) => void;
 }) {
   const t = useT();
+  const trapRef = useFocusTrap<HTMLDivElement>(open);
   const [tab, setTab] = useState<Tab>('media');
 
   const { media, docs, links } = useMemo(() => {
@@ -106,7 +108,7 @@ export function ChatMediaGallery({
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div role="dialog" aria-modal="true" className="flex max-h-[90vh] w-full max-w-md flex-col overflow-hidden rounded-3xl border border-slate-800 toky-glass toky-elev">
+      <div ref={trapRef} role="dialog" aria-modal="true" className="flex max-h-[90vh] w-full max-w-md flex-col overflow-hidden rounded-3xl border border-slate-800 toky-glass toky-elev">
         <div className="flex items-center justify-between px-4 py-3">
           <div className="text-base font-semibold text-slate-100">{t('gallery.title')}</div>
           <button

@@ -7,6 +7,7 @@ import { useLanguage } from '@/lib/i18n/context';
 import { XIcon } from '@/components/icons';
 import { avatarBg, initials } from '@/lib/ui/avatar';
 import { useBackClose } from '@/lib/back';
+import { useFocusTrap } from '@/lib/a11y/focus-trap';
 
 type Member = { id: string; username: string | null; display_name: string | null; avatar_url: string | null };
 type Reader = { userId: string; readAt: string; name: string; avatarUrl: string | null };
@@ -29,6 +30,7 @@ export function SeenBySheet({
 }) {
   const { t, lang } = useLanguage();
   useBackClose(true, onClose);
+  const trapRef = useFocusTrap<HTMLDivElement>(true);
   const [readers, setReaders] = useState<Reader[] | null>(null);
 
   useEffect(() => {
@@ -83,7 +85,7 @@ export function SeenBySheet({
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div role="dialog" aria-modal="true" aria-label={t('chat.seenBy')} className="toky-glass toky-elev flex max-h-[80vh] w-full max-w-sm flex-col rounded-t-3xl border border-slate-800 sm:rounded-3xl">
+      <div ref={trapRef} role="dialog" aria-modal="true" aria-label={t('chat.seenBy')} className="toky-glass toky-elev flex max-h-[80vh] w-full max-w-sm flex-col rounded-t-3xl border border-slate-800 sm:rounded-3xl">
         <div className="flex items-center justify-between border-b border-slate-800 px-4 py-3">
           <h2 className="text-base font-semibold text-slate-100">{t('chat.seenBy')}</h2>
           <button onClick={onClose} aria-label={t('common.close')} className="text-slate-400 hover:text-slate-200">
