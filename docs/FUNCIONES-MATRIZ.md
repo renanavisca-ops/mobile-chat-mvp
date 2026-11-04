@@ -130,7 +130,7 @@ Guías de activación: `docs/INTEGRATIONS.md`, `docs/CAMPAIGNS.md`, `docs/PAYMEN
 | Requisito | Estado | Archivos | Pendiente | Evidencia | Dependencia |
 |---|---|---|---|---|---|
 | Crear públicos | ✅ | chats.ts createChannel | — | — | — |
-| **Canales privados (invitación)** | ❌ | — | Canal privado + invitación | — | — |
+| **Canales privados (invitación)** | ✅ | chats.ts, `/c`, channels page, migration 202611050002 (aplicada) | — | migración aplicada + RLS verificado (no-miembros no ven la fila ni mensajes) | — |
 | Seguir/dejar/descubrir/buscar | ✅ | channels page | — | — | — |
 | Publicar texto/img/video/enlace/audio/encuesta | ✅ | — | — | — | — |
 | Reacciones + métricas agregadas | ✅ | mark_channel_seen | — | — | — |

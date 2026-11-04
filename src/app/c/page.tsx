@@ -4,7 +4,7 @@ import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { browserSupabase } from '@/lib/supabase/client';
-import { channelPreview, joinChannel, type ChannelPreview } from '@/lib/db/chats';
+import { channelPreview, joinChannel, channelInvitePreview, joinChannelByCode, type ChannelPreview } from '@/lib/db/chats';
 import { avatarBg, initials } from '@/lib/ui/avatar';
 import { useT } from '@/lib/i18n/context';
 
@@ -13,7 +13,9 @@ type Status = 'loading' | 'needauth' | 'notfound' | 'ready' | 'joining' | 'error
 function ChannelInner() {
   const t = useT();
   const router = useRouter();
-  const id = useSearchParams().get('id') || '';
+  const params = useSearchParams();
+  const id = params.get('id') || '';
+  const code = params.get('code') || '';
   const [status, setStatus] = useState<Status>('loading');
   const [preview, setPreview] = useState<ChannelPreview | null>(null);
   const [err, setErr] = useState('');
@@ -21,12 +23,13 @@ function ChannelInner() {
   useEffect(() => {
     let alive = true;
     (async () => {
-      if (!id) { if (alive) setStatus('notfound'); return; }
+      if (!id && !code) { if (alive) setStatus('notfound'); return; }
       const { data } = await browserSupabase().auth.getSession();
       if (!alive) return;
       if (!data.session?.user) { setStatus('needauth'); return; }
       try {
-        const p = await channelPreview(id);
+        // A `code` is a private-channel invite; `id` is a public channel.
+        const p = code ? await channelInvitePreview(code) : await channelPreview(id);
         if (!alive) return;
         if (!p) { setStatus('notfound'); return; }
         setPreview(p);
@@ -36,10 +39,10 @@ function ChannelInner() {
       }
     })();
     return () => { alive = false; };
-  }, [id]);
+  }, [id, code]);
 
   async function open() {
-    router.replace(`/chats/view?c=${id}`);
+    if (preview) router.replace(`/chats/view?c=${preview.id}`);
   }
 
   async function follow() {
@@ -47,7 +50,10 @@ function ChannelInner() {
     setStatus('joining');
     setErr('');
     try {
-      if (!preview.joined) await joinChannel(preview.id);
+      if (!preview.joined) {
+        if (code) await joinChannelByCode(code);
+        else await joinChannel(preview.id);
+      }
       router.replace(`/chats/view?c=${preview.id}`);
     } catch (e: any) {
       setErr(e?.message ?? String(e));
