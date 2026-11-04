@@ -137,7 +137,7 @@ Guías de activación: `docs/INTEGRATIONS.md`, `docs/CAMPAIGNS.md`, `docs/PAYMEN
 | Administración roles/permisos + notif por canal | ✅ | — | — | — | — |
 | **Enlaces para compartir/invitar** | ✅ | `src/app/c` (#207) | — | export 30/30 | — |
 | Listas de difusión con consentimiento | ✅ | broadcast-lists | — | — | — |
-| Directorio/categorías + **recomendaciones** | 🧩 | — | Recomendaciones | — | — |
+| Directorio/categorías + **recomendaciones** | ✅ | `src/lib/channels/recommend.ts`, channels page | — | tests +4 | — |
 
 ## 9. Privacidad y seguridad
 | Requisito | Estado | Archivos | Pendiente | Evidencia | Dependencia |
