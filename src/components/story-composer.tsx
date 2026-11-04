@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { createImageStory, createTextStory } from '@/lib/db/stories';
+import { createImageStory, createTextStory, createVideoStory } from '@/lib/db/stories';
 import { compressImage } from '@/lib/image-compress';
 import { useT } from '@/lib/i18n/context';
 import { ImageIcon, TypeIcon, PencilIcon, XIcon, PlusIcon } from '@/components/icons';
@@ -32,6 +32,7 @@ export function StoryComposer({
 }) {
   const t = useT();
   const fileRef = useRef<HTMLInputElement | null>(null);
+  const videoRef = useRef<HTMLInputElement | null>(null);
   const [mode, setMode] = useState<Mode>('choose');
   const [text, setText] = useState('');
   const [bg, setBg] = useState(BACKGROUNDS[0]);
@@ -87,6 +88,23 @@ export function StoryComposer({
 
   function removeAt(i: number) {
     setFiles((prev) => prev.filter((_, idx) => idx !== i));
+  }
+
+  async function onVideoChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setBusy(true);
+    setErr('');
+    try {
+      await createVideoStory(file);
+      onPosted();
+      close();
+    } catch (err: any) {
+      setErr(err?.message ?? String(err));
+    } finally {
+      setBusy(false);
+    }
   }
 
   function onEditSave(file: File) {
@@ -166,6 +184,13 @@ export function StoryComposer({
           accept="image/jpeg,image/png,image/webp"
           onChange={onFileChange}
         />
+        <input
+          ref={videoRef}
+          type="file"
+          hidden
+          accept="video/*"
+          onChange={onVideoChange}
+        />
 
         {reviewing ? (
           <div className="mt-4 space-y-3">
@@ -229,7 +254,7 @@ export function StoryComposer({
             </div>
           </div>
         ) : mode === 'choose' ? (
-          <div className="mt-4 grid grid-cols-2 gap-3">
+          <div className="mt-4 grid grid-cols-3 gap-3">
             <button
               type="button"
               onClick={() => fileRef.current?.click()}
@@ -238,6 +263,18 @@ export function StoryComposer({
             >
               <ImageIcon size={26} />
               {t('stories.photo')}
+            </button>
+            <button
+              type="button"
+              onClick={() => videoRef.current?.click()}
+              disabled={busy}
+              className="flex flex-col items-center gap-2 rounded-xl border border-slate-900 bg-slate-950/60 px-3 py-6 text-sm text-slate-100 hover:bg-slate-900 disabled:opacity-50"
+            >
+              <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="m22 8-6 4 6 4V8z" />
+                <rect x="2" y="6" width="14" height="12" rx="2" />
+              </svg>
+              {t('stories.video')}
             </button>
             <button
               type="button"

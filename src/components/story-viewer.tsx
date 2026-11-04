@@ -270,14 +270,30 @@ export function StoryViewer({
         >
           {story.media_path ? (
             mediaUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={mediaUrl}
-                alt=""
-                className="max-h-full max-w-full object-contain"
-                onLoad={() => setLoaded(true)}
-                onError={() => setLoaded(true)}
-              />
+              story.media_type === 'video' ? (
+                <video
+                  src={mediaUrl}
+                  className="max-h-full max-w-full object-contain"
+                  autoPlay
+                  playsInline
+                  controls={false}
+                  onLoadedData={() => setLoaded(true)}
+                  onError={() => setLoaded(true)}
+                />
+              ) : story.media_type === 'audio' ? (
+                <div className="grid h-full w-full place-items-center p-8 text-center text-white" style={{ background: story.background || '#1e293b' }}>
+                  <audio src={mediaUrl} autoPlay controls onLoadedData={() => setLoaded(true)} onError={() => setLoaded(true)} className="w-full max-w-xs" />
+                </div>
+              ) : (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={mediaUrl}
+                  alt=""
+                  className="max-h-full max-w-full object-contain"
+                  onLoad={() => setLoaded(true)}
+                  onError={() => setLoaded(true)}
+                />
+              )
             ) : (
               <div className="h-16 w-16 animate-pulse rounded-full bg-white/10" />
             )

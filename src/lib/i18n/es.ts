@@ -793,6 +793,7 @@ const es: Dictionary = {
     you: 'Tú',
     addTitle: 'Añadir a tu historia',
     photo: 'Foto',
+    video: 'Video',
     text: 'Texto',
     textPlaceholder: 'Escribe algo…',
     background: 'Fondo',

@@ -4,11 +4,18 @@ import { browserSupabase } from '@/lib/supabase/client';
 import type { Story, StoryGroup } from '@/lib/db/types';
 
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+const MAX_VIDEO_BYTES = 30 * 1024 * 1024;
 
 function extFor(type: string): string {
   if (type === 'image/png') return 'png';
   if (type === 'image/webp') return 'webp';
   return 'jpg';
+}
+
+function videoExtFor(type: string): string {
+  if (type.includes('webm')) return 'webm';
+  if (type.includes('quicktime') || type.includes('mov')) return 'mov';
+  return 'mp4';
 }
 
 /** Upload an image and publish it as a 24h story. */
@@ -32,7 +39,28 @@ export async function createImageStory(file: File): Promise<void> {
   });
   if (upErr) throw upErr;
 
-  const { error } = await supabase.from('stories').insert({ user_id: me.user.id, media_path: path });
+  const { error } = await (supabase as any).from('stories').insert({ user_id: me.user.id, media_path: path, media_type: 'image' });
+  if (error) throw error;
+}
+
+/** Upload a short video and publish it as a 24h story. */
+export async function createVideoStory(file: File): Promise<void> {
+  const supabase = browserSupabase();
+  const { data: me } = await supabase.auth.getUser();
+  if (!me.user) throw new Error('Not authenticated');
+
+  if (!file.type.startsWith('video/')) throw new Error('Only video files.');
+  if (file.size > MAX_VIDEO_BYTES) throw new Error('Maximum 30MB per video.');
+
+  const path = `${me.user.id}/${Date.now()}_${crypto.randomUUID()}.${videoExtFor(file.type)}`;
+  const { error: upErr } = await supabase.storage.from('stories').upload(path, file, {
+    upsert: false,
+    contentType: file.type,
+    cacheControl: '31536000',
+  });
+  if (upErr) throw upErr;
+
+  const { error } = await (supabase as any).from('stories').insert({ user_id: me.user.id, media_path: path, media_type: 'video' });
   if (error) throw error;
 }
 
@@ -72,9 +100,9 @@ export async function listStoryGroups(): Promise<StoryGroup[]> {
   // Visibility is enforced by RLS: my own status, plus authors who are my
   // contact OR who I share a chat with, minus anyone who hid their status from
   // me. So we can simply select — the database returns only what I may see.
-  const { data: stories, error } = await supabase
+  const { data: stories, error } = await (supabase as any)
     .from('stories')
-    .select('id, user_id, media_path, text_content, background, created_at, expires_at')
+    .select('id, user_id, media_path, media_type, text_content, background, created_at, expires_at')
     .order('created_at', { ascending: true });
   if (error) throw error;
 
