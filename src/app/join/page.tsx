@@ -4,11 +4,11 @@ import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { browserSupabase } from '@/lib/supabase/client';
-import { groupInvitePreview, joinGroupByCode, type InvitePreview } from '@/lib/db/chats';
+import { groupInvitePreview, requestGroupJoin, type InvitePreview } from '@/lib/db/chats';
 import { avatarBg, initials } from '@/lib/ui/avatar';
 import { useT } from '@/lib/i18n/context';
 
-type Status = 'loading' | 'needauth' | 'notfound' | 'ready' | 'joining' | 'error';
+type Status = 'loading' | 'needauth' | 'notfound' | 'ready' | 'joining' | 'error' | 'pending';
 
 function JoinInner() {
   const t = useT();
@@ -42,8 +42,12 @@ function JoinInner() {
     setStatus('joining');
     setErr('');
     try {
-      const chatId = await joinGroupByCode(code);
-      router.replace(`/chats/view?c=${chatId}`);
+      const outcome = await requestGroupJoin(code);
+      if (outcome === 'pending') {
+        setStatus('pending');
+        return;
+      }
+      router.replace(`/chats/view?c=${preview?.chatId ?? ''}`);
     } catch (e: any) {
       setErr(e?.message ?? String(e));
       setStatus('error');
@@ -70,6 +74,17 @@ function JoinInner() {
             <div className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-slate-800 text-2xl">🔗</div>
             <h1 className="mt-3 text-lg font-semibold">{t('join.invalidTitle')}</h1>
             <p className="mt-2 text-sm text-slate-400">{t('join.invalidBody')}</p>
+            <Link href="/chats" className="mt-4 inline-block rounded-xl bg-slate-800 px-5 py-2.5 text-sm text-slate-200 hover:bg-slate-700">
+              {t('join.goToChats')}
+            </Link>
+          </>
+        )}
+
+        {status === 'pending' && (
+          <>
+            <div className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-slate-800 text-2xl">⏳</div>
+            <h1 className="mt-3 text-lg font-semibold">{t('join.pendingTitle')}</h1>
+            <p className="mt-2 text-sm text-slate-400">{t('join.pendingBody')}</p>
             <Link href="/chats" className="mt-4 inline-block rounded-xl bg-slate-800 px-5 py-2.5 text-sm text-slate-200 hover:bg-slate-700">
               {t('join.goToChats')}
             </Link>
