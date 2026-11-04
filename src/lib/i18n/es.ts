@@ -799,6 +799,7 @@ const es: Dictionary = {
     reply: 'Enviar',
     replyPlaceholder: 'Responder en privado…',
     replySent: 'Respuesta enviada',
+    mute: 'Silenciar estas historias',
     textPlaceholder: 'Escribe algo…',
     background: 'Fondo',
     post: 'Publicar',

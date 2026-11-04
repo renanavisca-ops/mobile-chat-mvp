@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { createSignedStoryUrl, markStoryViewed, countStoryViews, deleteStory, myStoryReaction, reactToStory, listStoryReactions } from '@/lib/db/stories';
+import { createSignedStoryUrl, markStoryViewed, countStoryViews, deleteStory, myStoryReaction, reactToStory, listStoryReactions, setStoryAuthorMuted } from '@/lib/db/stories';
 import { createDirectChatWith, sendMessage } from '@/lib/db/chats';
 import { useT, useLanguage } from '@/lib/i18n/context';
 import { XIcon, TrashIcon, EyeIcon } from '@/components/icons';
@@ -229,6 +229,12 @@ export function StoryViewer({
     try { await reactToStory(story.id, nextVal); } catch { /* ignore */ }
   }
 
+  async function onMute() {
+    if (!group || group.isMe) return;
+    try { await setStoryAuthorMuted(group.user_id, true); } catch { /* ignore */ }
+    goNextGroup();
+  }
+
   async function onReply() {
     const text = replyText.trim();
     if (!text || !story || !group) return;
@@ -282,14 +288,31 @@ export function StoryViewer({
               {new Date(story.created_at).toLocaleTimeString(lang, { hour: '2-digit', minute: '2-digit' })}
             </div>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label={t('common.close')}
-            className="grid place-items-center rounded-full bg-black/40 p-1.5 text-white hover:bg-black/60"
-          >
-            <XIcon size={18} />
-          </button>
+          <div className="flex items-center gap-2">
+            {!group.isMe && (
+              <button
+                type="button"
+                onClick={onMute}
+                aria-label={t('stories.mute')}
+                title={t('stories.mute')}
+                className="grid place-items-center rounded-full bg-black/40 p-1.5 text-white hover:bg-black/60"
+              >
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M11 5 6 9H2v6h4l5 4V5z" />
+                  <line x1="23" y1="9" x2="17" y2="15" />
+                  <line x1="17" y1="9" x2="23" y2="15" />
+                </svg>
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label={t('common.close')}
+              className="grid place-items-center rounded-full bg-black/40 p-1.5 text-white hover:bg-black/60"
+            >
+              <XIcon size={18} />
+            </button>
+          </div>
         </div>
 
         {/* Content */}

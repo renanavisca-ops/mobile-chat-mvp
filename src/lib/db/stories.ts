@@ -111,10 +111,14 @@ export async function listStoryGroups(): Promise<StoryGroup[]> {
 
   const authorIds = Array.from(new Set(rows.map((s) => s.user_id)));
 
-  const [profilesRes, viewsRes] = await Promise.all([
+  const [profilesRes, viewsRes, mutedRes] = await Promise.all([
     supabase.from('profiles').select('id, username, display_name, avatar_url').in('id', authorIds),
     supabase.from('story_views').select('story_id').eq('viewer_id', myId),
+    (supabase as any).from('story_muted').select('muted_id').eq('owner_id', myId),
   ]);
+
+  // Hide stories from authors the viewer muted (never mute your own).
+  const mutedIds = new Set(((mutedRes.data as { muted_id: string }[] | null) ?? []).map((r) => r.muted_id));
 
   const profById = new Map<string, { username: string | null; display_name: string | null; avatar_url: string | null }>();
   for (const p of profilesRes.data ?? []) {
@@ -124,6 +128,7 @@ export async function listStoryGroups(): Promise<StoryGroup[]> {
 
   const byUser = new Map<string, Story[]>();
   for (const s of rows) {
+    if (s.user_id !== myId && mutedIds.has(s.user_id)) continue;
     const arr = byUser.get(s.user_id) ?? [];
     arr.push({ ...s, seen: viewedIds.has(s.id) });
     byUser.set(s.user_id, arr);
@@ -178,6 +183,26 @@ export async function deleteStory(storyId: string): Promise<void> {
   const supabase = browserSupabase();
   const { error } = await supabase.from('stories').delete().eq('id', storyId);
   if (error) throw error;
+}
+
+/** Mute (or unmute) a person's stories so they don't show in my rings. */
+export async function setStoryAuthorMuted(userId: string, muted: boolean): Promise<void> {
+  const supabase = browserSupabase();
+  const { data: me } = await supabase.auth.getUser();
+  if (!me.user) throw new Error('Not authenticated');
+  if (muted) {
+    const { error } = await (supabase as any)
+      .from('story_muted')
+      .upsert({ owner_id: me.user.id, muted_id: userId }, { onConflict: 'owner_id,muted_id' });
+    if (error) throw error;
+  } else {
+    const { error } = await (supabase as any)
+      .from('story_muted')
+      .delete()
+      .eq('owner_id', me.user.id)
+      .eq('muted_id', userId);
+    if (error) throw error;
+  }
 }
 
 /** The current viewer's reaction emoji to a story (or null). */
