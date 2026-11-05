@@ -36,7 +36,7 @@ Guías de activación: `docs/INTEGRATIONS.md`, `docs/CAMPAIGNS.md`, `docs/PAYMEN
 | Requisito | Estado | Archivos | Pendiente | Evidencia | Dependencia |
 |---|---|---|---|---|---|
 | Registro/login por correo | ✅ | `src/app/login`, `auth/*` | — | Flujo en uso | — |
-| Registro/login por teléfono + SMS | 🔒→🧪 (objetivo) | _por construir_ | Adaptador SMS + UI, compatible con cuentas de correo | — | Proveedor SMS |
+| Verificación de teléfono (atributo, compatible con correo) | 🧪 | phone/* + /api/phone/*, phone-settings, migration 202611050009 (aplicada) | Adaptador SMS REAL (tiene costo) | tests +5; desactivado por defecto; simulador local | Proveedor SMS |
 | Perfil (nombre/foto/descr./disponibilidad) | ✅ | `src/app/settings` | — | — | — |
 | Edición de perfil + privacidad | ✅ | `settings`, `privacy` | — | — | — |
 | Cambio de número/correo conservando info | ❌ | — | Flujo de cambio de identidad | — | Ligado a teléfono |

@@ -27,6 +27,7 @@ import dynamic from 'next/dynamic';
 // never download this code. Each component self-gates and renders null when the
 // user isn't a store admin, so no loading placeholder is needed.
 const BusinessProfileSettings = dynamic(() => import('@/components/business-profile-settings').then((m) => m.BusinessProfileSettings), { ssr: false });
+const PhoneSettings = dynamic(() => import('@/components/phone-settings').then((m) => m.PhoneSettings), { ssr: false });
 const CatalogSettings = dynamic(() => import('@/components/catalog-settings').then((m) => m.CatalogSettings), { ssr: false });
 const OrdersSettings = dynamic(() => import('@/components/orders-settings').then((m) => m.OrdersSettings), { ssr: false });
 const QuickRepliesSettings = dynamic(() => import('@/components/quick-replies-settings').then((m) => m.QuickRepliesSettings), { ssr: false });
@@ -1084,6 +1085,10 @@ export default function SettingsPage() {
               </div>
               <span className="shrink-0 text-slate-500">›</span>
             </button>
+          </section>
+
+          <section className="space-y-3">
+            <PhoneSettings />
           </section>
 
           {/* Commercial profile + catalog — render only for store admins. */}
