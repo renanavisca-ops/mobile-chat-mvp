@@ -194,13 +194,13 @@ Guías de activación: `docs/INTEGRATIONS.md`, `docs/CAMPAIGNS.md`, `docs/PAYMEN
 | **Campañas** (consentimiento/límites/baja) | 🏗️ | campaigns/* | Worker de envío + canal simulado (desactivado) | — | Proveedor canal |
 | Estadísticas de entrega/lectura/atención | ✅ | store_support_stats | — | — | — |
 | **Verificación de identidad empresarial** | 🔒 | — | Lógica propia + simulador + adaptador desactivado | — | Programa externo |
-| **Pagos** | 🏗️ | payments/* | Simulador completo + historial (desactivado) | — | Proveedor |
+| **Pagos** | 🧪/🏗️ | payments/* + simulator.ts + /api/payments/sim | Adaptador de proveedor REAL (sigue pendiente) | tests simulador +5; desactivado por defecto | Proveedor |
 
 ## 13. Pagos y servicios adicionales
 | Requisito | Estado | Archivos | Pendiente | Evidencia | Dependencia |
 |---|---|---|---|---|---|
-| Transferencias/pagos/solicitudes (estructura) | 🏗️ | payments/config, api/payments/webhook | Simulador de proveedor + flujo cliente completo | — | Proveedor |
-| **Historial/comprobantes** | ❌ | — | Historial + comprobante (con simulador) | — | Proveedor |
+| Transferencias/pagos/solicitudes (estructura) | 🧪 | payments/config, checkout, sim, simulator.ts | Adaptador real + UI de cobro | tests + build; desactivado por defecto | Proveedor |
+| **Historial/comprobantes** | 🧪 | payments.listMyPayments (fila = comprobante) | Comprobante con formato / UI | — | Proveedor |
 | Verificación identidad/antifraude | 🔒 | — | — | — | Proveedor |
 | Integración proveedores por país | 🔒 | — | — | — | Decisión país |
 | **Compartir enlaces de pago/estados** | ❌ | — | Enlace de pago + estado (simulado) | — | Proveedor |
@@ -261,7 +261,7 @@ Guías de activación: `docs/INTEGRATIONS.md`, `docs/CAMPAIGNS.md`, `docs/PAYMEN
 4. **§5** Límite de miembros ✅ (#211) · **§8** canales privados ✅ (#213) + recomendaciones ✅ (#212) · **§5** anuncios de comunidad ✅ (#214). _(Etapa 4 completa)_
 5. **§7** Historias: video/audio, audiencia fina, vistas/reacciones, silenciar autor.
 6. **§12** Pedidos/carrito desde catálogo (flujo completo).
-7. **§12/§13** Pagos: simulador de proveedor + historial/comprobantes + compartir enlace (desactivado por defecto).
+7. **§12/§13** Pagos: simulador de proveedor + historial/comprobantes ✅ (#220, desactivado por defecto) · campañas worker + CRM adaptador: pendiente.
 8. **§12** Campañas: worker de envío + canal simulado (desactivado).
 9. **§12** CRM/API: adaptador local simulador (desactivado).
 10. **§1** Registro por teléfono con **simulador SMS** (compatible con correo) · alertas de acceso.

@@ -60,6 +60,27 @@ export async function startCheckout(
   return { configured: true, ...(await res.json()) };
 }
 
+/** Drive a simulated payment to its outcome (dev/test only; no-op in prod
+ *  since the simulator route refuses unless PAYMENTS_PROVIDER=simulator).
+ *  Stands in for the provider's async webhook. */
+export async function simulateConfirm(
+  paymentId: string,
+  outcome?: 'succeed' | 'fail',
+): Promise<{ status: PaymentStatus; changed: boolean }> {
+  const supabase = browserSupabase();
+  const { data } = await supabase.auth.getSession();
+  const res = await apiFetch('/api/payments/sim', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${data.session?.access_token}`,
+    },
+    body: JSON.stringify({ paymentId, outcome }),
+  });
+  if (!res.ok) throw new Error('Simulation failed');
+  return res.json();
+}
+
 /** List payments the current user sent or received. */
 export async function listMyPayments(): Promise<Payment[]> {
   const supabase = browserSupabase();
