@@ -24,7 +24,7 @@ function En() {
         </section>
         <section>
           <h2 className={H2}>2. The Service</h2>
-          <p>Toky Chat lets you send messages and media, make voice and video calls, and create one-to-one and group chats. We may add, change, or remove features at any time. New direct chats require end-to-end encryption and will not send until both people have set it up; attachments in encrypted chats are end-to-end encrypted too. Group chats and channels are not end-to-end encrypted, and messages sent before encryption remain unencrypted. See the Privacy Policy for details.</p>
+          <p>Toky Chat lets you send messages, media, and stories, make voice and video calls, and create one-to-one chats, groups, communities, and channels. It also includes optional business features (store profile, catalog, orders, and campaigns). We may add, change, or remove features at any time. End-to-end encryption is available and can be turned on per one-to-one chat; when enabled, messages and attachments are end-to-end encrypted. Encryption is off by default, and group chats, channels, and business or support conversations are not end-to-end encrypted. See the Privacy Policy for details.</p>
         </section>
         <section>
           <h2 className={H2}>3. Your account</h2>
@@ -80,7 +80,7 @@ function Es() {
         </section>
         <section>
           <h2 className={H2}>2. El Servicio</h2>
-          <p>Toky Chat te permite enviar mensajes y multimedia, hacer llamadas de voz y video, y crear chats individuales y de grupo. Podemos agregar, cambiar o quitar funciones en cualquier momento. Los chats directos están cifrados de extremo a extremo de forma predeterminada; los chats de grupo y canales pueden no estarlo. Consulta la Política de privacidad.</p>
+          <p>Toky Chat te permite enviar mensajes, multimedia e historias, hacer llamadas de voz y video, y crear chats individuales, grupos, comunidades y canales. También incluye funciones opcionales de negocio (perfil de tienda, catálogo, pedidos y campañas). Podemos agregar, cambiar o quitar funciones en cualquier momento. El cifrado de extremo a extremo está disponible y puedes activarlo por cada chat individual; al activarlo, los mensajes y los archivos adjuntos quedan cifrados de extremo a extremo. El cifrado está desactivado de forma predeterminada, y los chats de grupo, canales y las conversaciones de negocio o soporte no están cifrados de extremo a extremo. Consulta la Política de privacidad.</p>
         </section>
         <section>
           <h2 className={H2}>3. Tu cuenta</h2>
