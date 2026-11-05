@@ -244,31 +244,84 @@ Guías de activación: `docs/INTEGRATIONS.md`, `docs/CAMPAIGNS.md`, `docs/PAYMEN
 ## 17. Criterios transversales de aceptación
 | Requisito | Estado | Archivos | Pendiente | Evidencia | Dependencia |
 |---|---|---|---|---|---|
-| Definir plataformas/permisos/límites/offline por función | 🧩 | roadmap/docs | Tabla transversal por función | — | — |
+| Definir plataformas/permisos/límites/offline por función | ✅ | tabla transversal (abajo) | — | — | — |
 | Entrega/lectura/eliminación distinguen local vs remoto | ✅ | — | — | — | — |
 | Funciones cifradas declaran alcance real | ✅ | esta matriz + docs | — | — | — |
 | Dependientes de terceros activables por configuración | ✅ | env gates | — | — | — |
 | Acciones críticas con confirmación/recuperación/trazabilidad | 🧩 | audit, confirmaciones | — | — | — |
 | Documentar límites sin inventar cifras | ✅ | docs | — | — | — |
 
+### Tabla transversal por área (plataformas · permisos · offline · límites)
+
+| Área | Plataformas | Permisos | Offline | Límites conocidos |
+|------|-------------|----------|---------|-------------------|
+| Mensajería 1:1 / grupo | web · Android · iOS | — | ✅ cola de envío offline + caché local; reconcilia al reconectar | búsqueda por tipo acotada al lote de resultados |
+| Multimedia | web · Android · iOS | cámara/galería/archivos (se piden al usar) | envío en cola; descarga diferida configurable | imagen 5MB; video historia 30MB |
+| Llamadas | web · Android · iOS 📱 | micrófono/cámara; Bluetooth/segundo plano 📱 | requiere conexión | — |
+| Historias | web · Android · iOS | cámara/galería | ver requiere conexión | video 30MB; expiran 24h |
+| Pedidos/carrito | web · Android · iOS | — | requiere conexión (crear pedido) | — |
+| Pagos | web (servidor) | — | n/a | **desactivado**; solo simulador en dev |
+| Campañas / CRM | web (servidor) | — | n/a | **desactivado**; solo simulador; límite diario por campaña |
+| Teléfono (verificación) | web · Android · iOS | — | requiere conexión | **desactivado**; simulador; código TTL 10 min, 5 intentos |
+| E2EE (opt-in por chat) | web · Android · iOS | — | claves locales por dispositivo | soporte/tienda nunca E2EE; multidispositivo pendiente de validar |
+| Biometría / bloqueo | Android · iOS 📱 | biometría del SO | local | PIN ✅; biometría nativa pendiente de build |
+
+> 📱 = requiere build nativo (Codemagic) para verificarse en dispositivo.
+
+### Pendientes nativos (📱) — preparados / identificados, no verificables aquí
+
+No se declaran verificados (sin dispositivo ni build en este entorno):
+- **Biometría** para el bloqueo de app: hoy hay PIN + autobloqueo. Falta: plugin
+  biométrico de Capacitor, gate en `app-lock-gate` (fallback a PIN), permisos
+  iOS/Android y **prueba en dispositivo**.
+- **Sincronización de agenda** (detección de contactos registrados): falta plugin
+  de contactos + flujo de consentimiento + **prueba en dispositivo**.
+- Ya en código, efecto en el próximo build: audio Bluetooth, compartir pantalla,
+  continuidad de llamada, protección de capturas (Android).
+
 ---
 
 ## Plan de etapas (orden por dependencias; cada etapa = PR verificado)
 
 1. **Matriz** (este documento). ✅
-2. **§3** Búsqueda por tipo/fecha ✅ (#209) · **§15** extender trampa de foco · **§16** unificar rate limiter. _(limpiezas + búsqueda)_
+2. **§3** Búsqueda por tipo/fecha ✅ (#209) · **§15** extender trampa de foco ✅ (#218) · **§16** unificar rate limiter ✅ (#226). _(limpiezas + búsqueda)_
 3. **§4** Descripciones accesibles de medios (alt/caption al enviar). ✅ (#210)
 4. **§5** Límite de miembros ✅ (#211) · **§8** canales privados ✅ (#213) + recomendaciones ✅ (#212) · **§5** anuncios de comunidad ✅ (#214). _(Etapa 4 completa)_
-5. **§7** Historias: video/audio, audiencia fina, vistas/reacciones, silenciar autor.
-6. **§12** Pedidos/carrito desde catálogo (flujo completo).
+5. **§7** Historias: video ✅ (#215), reacciones + responder en privado ✅ (#216), silenciar autor ✅ (#217). _(Etapa 5 completa)_
+6. **§12** Pedidos/carrito desde catálogo (flujo completo). ✅ (#219)
 7. **§12/§13** Pagos: simulador de proveedor + historial/comprobantes ✅ (#220, desactivado por defecto) · campañas worker + CRM adaptador: pendiente.
 8. **§12** Campañas: worker de envío + canal simulado (desactivado). ✅ (#221)
 9. **§12** CRM/API: adaptador local simulador (desactivado). ✅ (#222) _(Etapa 7 completa)_
 10. **§1** Registro por teléfono con **simulador SMS** (compatible con correo) ✅ (#223) · alertas de acceso ✅ (#224). _(Etapa 8 completa)_
 11. **§16** admin (cubierto por paneles existentes; unificar rate limiter ✅ #226) · **§14** export completo de datos ✅ (#225). _(Etapa 9 completa)_
-12. **§9** E2EE de mensajes en entorno aislado (desactivado en prod) — mayor riesgo; decisión explícita.
-13. **Nativo (📱)**: biometría, sincronización de agenda — preparar código + marcar pendiente de build.
-14. **§17** Tabla transversal por función + cierre de matriz.
+12. **§9** E2EE de mensajes: **opt-in por chat** ✅ (#228, interruptor visible; soporte/tienda nunca E2EE; multidispositivo/revocación a validar con dispositivos reales). _(Etapa 10 completa)_
+13. **Nativo (📱)**: biometría, sincronización de agenda — **identificados/documentados**, pendientes de build en dispositivo (ver "Pendientes nativos" en §17).
+14. **§17** Tabla transversal por función + cierre de matriz. ✅ (#229)
 
 > **Punto de continuidad:** al retomar, leer esta matriz, verificar el estado real
 > en el código y continuar por la primera etapa no cerrada sin repetir trabajo.
+
+---
+
+## Estado al cierre de esta tanda
+
+Construible sin contratar servicios ni generar gasto: **entregado y verificado**
+(`tsc` / `eslint` / `vitest` 117 / export móvil 30/30; migraciones aplicadas).
+Lo que queda **requiere una decisión, un proveedor con costo, o dispositivos/
+infra reales**, y está **preparado y documentado** (desactivado por defecto con
+simulador local donde aplica):
+
+- **Proveedores (costo):** SMS real (teléfono), canal real de campañas, entrega
+  real CRM/webhook, procesador de pagos, verificación de identidad empresarial,
+  DSN de Sentry de producción. Todos con **simulador/adaptador local + gate
+  apagado**; docs dicen qué credencial/código real falta (no "solo una clave").
+- **Dispositivos/build (📱):** biometría, sincronización de agenda, y validación
+  en dispositivo de Bluetooth/compartir pantalla/continuidad/capturas.
+- **Validación multi-dispositivo:** E2EE (opt-in ya activo), revocación y
+  restauración de respaldo entre dispositivos.
+- **Infra/decisión:** pruebas de carga y de compatibilidad, DR/HA formal,
+  ubicación en tiempo real (API de mapas), 3er idioma completo, transcripción de
+  audio (motor), backups cifrados/multidispositivo, cliente de escritorio.
+
+Nada de lo anterior consume ni cambia el comportamiento actual mientras no se
+configure. El registro por correo y las cuentas existentes se conservan.
