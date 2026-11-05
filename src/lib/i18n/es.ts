@@ -422,6 +422,13 @@ const es: Dictionary = {
     delete: 'Eliminar',
     noChats: 'No hay chats para agregar.',
   },
+  accessAlert: {
+    title: 'Nuevo inicio de sesión',
+    body: 'Se inició sesión en tu cuenta en {{device}} el {{when}}. Si fuiste tú, puedes descartar este aviso.',
+    unknownDevice: 'otro dispositivo',
+    wasMe: 'Fui yo',
+    review: 'Revisar dispositivos',
+  },
   phone: {
     title: 'Número de teléfono',
     desc: 'Agrega opcionalmente un teléfono verificado a tu cuenta. Tu inicio de sesión por correo no cambia.',
