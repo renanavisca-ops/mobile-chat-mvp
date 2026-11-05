@@ -420,6 +420,13 @@ const en = {
     delete: 'Delete',
     noChats: 'No chats to add.',
   },
+  accessAlert: {
+    title: 'New sign-in detected',
+    body: 'Your account was signed in on {{device}} on {{when}}. If this was you, you can dismiss this.',
+    unknownDevice: 'another device',
+    wasMe: 'This was me',
+    review: 'Review devices',
+  },
   phone: {
     title: 'Phone number',
     desc: 'Optionally add a verified phone to your account. Your email sign-in stays the same.',

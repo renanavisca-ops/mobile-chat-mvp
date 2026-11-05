@@ -17,6 +17,7 @@ import { listChats, markIncomingDelivered, setChatArchived, setChatFavorite, get
 import { isChatLocked } from '@/lib/chat-lock';
 import { getChatLists, type ChatList } from '@/lib/chat-lists';
 import { ChatListsModal } from '@/components/chat-lists-modal';
+import { AccessAlert } from '@/components/access-alert';
 import { messageKind, matchesSearchKind, type SearchKind, type MsgKind } from '@/lib/messages/kind';
 import { getCached, setCached } from '@/lib/cache';
 import { tap, impact } from '@/lib/haptics';
@@ -711,6 +712,7 @@ export default function ChatsPage() {
           </header>
 
           <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4 pt-3">
+            {!search && <AccessAlert />}
             {!search && <StoriesBar />}
 
             {!search && !showArchived && searchKind === null && searchDate === 'all' && chats.length > 0 && (

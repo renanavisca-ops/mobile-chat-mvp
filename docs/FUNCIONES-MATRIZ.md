@@ -41,7 +41,7 @@ Guías de activación: `docs/INTEGRATIONS.md`, `docs/CAMPAIGNS.md`, `docs/PAYMEN
 | Edición de perfil + privacidad | ✅ | `settings`, `privacy` | — | — | — |
 | Cambio de número/correo conservando info | ❌ | — | Flujo de cambio de identidad | — | Ligado a teléfono |
 | Gestión de dispositivos + cierre remoto | ✅ | `src/lib/db/devices.ts` | — | — | — |
-| Alertas de acceso (login nuevo) | ❌ | — | Registrar sesión + aviso | — | — |
+| Alertas de acceso (login nuevo) | ✅ | devices.ts, access-alert.tsx, migration 202611050010 (aplicada) | — | migración aplicada + build | — |
 | Eliminación de cuenta | ✅ | `src/app/delete-account` | — | — | — |
 | 2FA (PIN) + recuperación | ✅ | app-lock, recovery codes | — | — | — |
 | Biometría / bloqueo local | 🧩/📱 | `src/lib/chat-lock`, app-lock-gate | Biometría nativa | — | Build nativo |
@@ -264,7 +264,7 @@ Guías de activación: `docs/INTEGRATIONS.md`, `docs/CAMPAIGNS.md`, `docs/PAYMEN
 7. **§12/§13** Pagos: simulador de proveedor + historial/comprobantes ✅ (#220, desactivado por defecto) · campañas worker + CRM adaptador: pendiente.
 8. **§12** Campañas: worker de envío + canal simulado (desactivado). ✅ (#221)
 9. **§12** CRM/API: adaptador local simulador (desactivado). ✅ (#222) _(Etapa 7 completa)_
-10. **§1** Registro por teléfono con **simulador SMS** (compatible con correo) · alertas de acceso.
+10. **§1** Registro por teléfono con **simulador SMS** (compatible con correo) ✅ (#223) · alertas de acceso ✅ (#224). _(Etapa 8 completa)_
 11. **§16** Consola de administración · **§14** export completo de datos.
 12. **§9** E2EE de mensajes en entorno aislado (desactivado en prod) — mayor riesgo; decisión explícita.
 13. **Nativo (📱)**: biometría, sincronización de agenda — preparar código + marcar pendiente de build.
