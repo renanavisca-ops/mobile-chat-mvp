@@ -125,7 +125,7 @@ Guías de activación: `docs/INTEGRATIONS.md`, `docs/CAMPAIGNS.md`, `docs/PAYMEN
 | Reacciones + registro de vistas | ✅ | story-viewer, migration 202611050005 (aplicada) | — | migración aplicada + build | — |
 | **Silenciar historias de ciertas personas** | ✅ | stories.ts, story-viewer, migration 202611050006 (aplicada) | — | migración aplicada + build | — |
 | Eliminar propias | ✅ | — | — | — | — |
-| Edición (texto/dibujo/emojis/fondos) | 🧩 | — | Edición avanzada | — | — |
+| Edición (texto/dibujo/emojis/fondos) | ✅ | story-composer (ImageEditor: editingIndex/onEditSave/PencilIcon) | — | build | — |
 
 ## 8. Canales y difusión
 | Requisito | Estado | Archivos | Pendiente | Evidencia | Dependencia |
@@ -238,7 +238,7 @@ Guías de activación: `docs/INTEGRATIONS.md`, `docs/CAMPAIGNS.md`, `docs/PAYMEN
 | **Panel admin / roles internos / auditoría** | ✅ (cubierto por paneles) | audit-log, stats, staff, catalog, orders, automations, campaigns, labels, templates en Ajustes (solo admins) | Pantalla única unificada (polish opcional, no es brecha funcional) | — | — |
 | Alta disponibilidad/backups/DR | 🔒 | Supabase/Vercel gestionados | Plan DR formal | — | — |
 | Privacidad/términos/consentimiento | 🧩 | terms, privacy, guidelines | Cumplimiento por jurisdicción | — | Legal |
-| **Pruebas carga/seguridad/accesibilidad/compat** | 🧩 | tests/* (87) | Scripts de carga reproducibles (sin ejecutar contra prod); compat dispositivos | tests 87 | Infra/dispositivos |
+| **Pruebas carga/seguridad/accesibilidad/compat** | 🧪 | tests/* (87), scripts/load/k6-smoke.js + README (preparado, NO ejecutado) | Ejecutar carga contra staging propio; compat dispositivos (device farm) | tests 87 + harness k6 reproducible | Infra/dispositivos |
 | Versionado API / despliegue gradual | 🧩 | — | — | — | — |
 
 ## 17. Criterios transversales de aceptación
@@ -287,7 +287,7 @@ No se declaran verificados (sin dispositivo ni build en este entorno):
 2. **§3** Búsqueda por tipo/fecha ✅ (#209) · **§15** extender trampa de foco ✅ (#218) · **§16** unificar rate limiter ✅ (#226). _(limpiezas + búsqueda)_
 3. **§4** Descripciones accesibles de medios (alt/caption al enviar). ✅ (#210)
 4. **§5** Límite de miembros ✅ (#211) · **§8** canales privados ✅ (#213) + recomendaciones ✅ (#212) · **§5** anuncios de comunidad ✅ (#214). _(Etapa 4 completa)_
-5. **§7** Historias: video ✅ (#215), reacciones + responder en privado ✅ (#216), silenciar autor ✅ (#217). _(Etapa 5 completa)_
+5. **§7** Historias: video ✅ (#215), reacciones + responder en privado ✅ (#216), silenciar autor ✅ (#217), edición avanzada ✅ (ImageEditor en story-composer). _(Etapa 5 completa)_
 6. **§12** Pedidos/carrito desde catálogo (flujo completo). ✅ (#219)
 7. **§12/§13** Pagos: simulador de proveedor + historial/comprobantes ✅ (#220, desactivado por defecto) · campañas worker + CRM adaptador: pendiente.
 8. **§12** Campañas: worker de envío + canal simulado (desactivado). ✅ (#221)
@@ -297,6 +297,7 @@ No se declaran verificados (sin dispositivo ni build en este entorno):
 12. **§9** E2EE de mensajes: **opt-in por chat** ✅ (#228, interruptor visible; soporte/tienda nunca E2EE; multidispositivo/revocación a validar con dispositivos reales). _(Etapa 10 completa)_
 13. **Nativo (📱)**: biometría, sincronización de agenda — **identificados/documentados**, pendientes de build en dispositivo (ver "Pendientes nativos" en §17).
 14. **§17** Tabla transversal por función + cierre de matriz. ✅ (#229)
+15. **§16** Harness de carga reproducible (k6) **preparado, NO ejecutado** (staging propio, nunca prod) ✅ — `scripts/load/`.
 
 > **Punto de continuidad:** al retomar, leer esta matriz, verificar el estado real
 > en el código y continuar por la primera etapa no cerrada sin repetir trabajo.
