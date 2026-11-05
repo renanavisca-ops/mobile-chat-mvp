@@ -7,6 +7,7 @@ import { useBackClose } from '@/lib/back';
 import { useFocusTrap } from '@/lib/a11y/focus-trap';
 import { browserSupabase } from '@/lib/supabase/client';
 import { peerFingerprint } from '@/lib/crypto/keystore';
+import { EncryptionToggle } from '@/components/encryption-toggle';
 import { blockUser, unblockUser, isBlockedByMe } from '@/lib/db/safety';
 import { shareText } from '@/lib/native-files';
 import { listBroadcastLists, saveBroadcastList, createBroadcastList, type BroadcastList } from '@/lib/broadcast-lists';
@@ -53,6 +54,7 @@ export function UserInfoModal({
   open,
   onClose,
   userId,
+  chatId,
   onMessage,
   onAudioCall,
   onVideoCall,
@@ -74,6 +76,8 @@ export function UserInfoModal({
   open: boolean;
   onClose: () => void;
   userId: string | null;
+  /** The current 1:1 chat id, when opened from a conversation (enables E2EE toggle). */
+  chatId?: string | null;
   onMessage?: () => void;
   onAudioCall?: () => void;
   onVideoCall?: () => void;
@@ -486,6 +490,9 @@ export function UserInfoModal({
                 {t('userInfo.memberSince', { when: formatSince(profile.created_at, lang) })}
               </div>
             )}
+
+            {/* Opt-in end-to-end encryption for this 1:1 chat */}
+            {chatId && <EncryptionToggle chatId={chatId} />}
 
             {/* Safety number (E2EE) */}
             {fingerprint && (

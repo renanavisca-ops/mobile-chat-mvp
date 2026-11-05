@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { searchUsers } from '@/lib/db/contacts';
 import { updateGroupInfo, addGroupMembers, removeGroupMember, leaveChat, getChatMuted, setChatMuteUntil, setDisappearingMessages, getGroupMeta, setGroupRole, setGroupPerms, getGroupInvite, rotateGroupInvite, revokeGroupInvite, inviteLinkFor, getGroupRequireApproval, setGroupRequireApproval, listGroupJoinRequests, approveGroupJoin, rejectGroupJoin, channelShareLink, getGroupMaxMembers, setGroupMaxMembers, getChannelInviteCode, channelInviteLink, type GroupMeta, type GroupPerm, type GroupJoinRequest } from '@/lib/db/chats';
 import { QrCode } from '@/components/qr-code';
+import { EncryptionToggle } from '@/components/encryption-toggle';
 import { uploadGroupAvatar } from '@/lib/db/groupAvatar';
 import { useT } from '@/lib/i18n/context';
 import { useBackClose } from '@/lib/back';
@@ -547,6 +548,8 @@ export function GroupInfoModal({
             </div>
           </div>
         )}
+
+        {!isChannel && <EncryptionToggle chatId={chatId} />}
 
         <div className="mt-4">
           <div className="ml-1 text-xs text-slate-400">{t('groupInfo.members')} ({members.length})</div>

@@ -420,6 +420,17 @@ const en = {
     delete: 'Delete',
     noChats: 'No chats to add.',
   },
+  encryption: {
+    title: 'End-to-end encryption',
+    on: 'On',
+    onDesc: 'Messages in this chat are end-to-end encrypted.',
+    offDesc: 'Turn on so only participants can read messages in this chat.',
+    enable: 'Turn on',
+    enabling: 'Turning on…',
+    missing: 'The other participant needs to open the app once to set up encryption. Try again later.',
+    setupFirst: 'Set up encryption on this device first (unlock your key).',
+    error: 'Could not enable encryption.',
+  },
   dataExport: {
     title: 'Download my data',
     desc: 'Export your account data (profile, contacts, chats, your messages, stories, devices) as a JSON file.',

@@ -3442,6 +3442,7 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
             open
             onClose={() => setUserInfoId(null)}
             userId={uid}
+            chatId={isPeer ? chatId : undefined}
             onAudioCall={isPeer ? () => startCall({ chatId, peerIds: [uid], label: headerName, video: false, isGroup: false }) : undefined}
             onVideoCall={isPeer ? () => startCall({ chatId, peerIds: [uid], label: headerName, video: true, isGroup: false }) : undefined}
             onReport={isPeer ? () => { setReportMessageId(null); setReportOpen(true); } : undefined}
