@@ -115,6 +115,74 @@ export async function POST(req: Request, { params }: { params: { token: string }
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
+    // Pedido desde el catálogo (§12). El cliente envía {action:'order', items:
+    // [{productId, qty}], note?}. Se validan los productos contra el catálogo de
+    // la tienda (precio/título se congelan), se crea el pedido y se publica un
+    // resumen en el chat para el agente. Nunca confía en precios del cliente.
+    if (payload?.action === 'order') {
+      const orderStoreId = (session as any)?.chats?.store_id;
+      if (!orderStoreId) return NextResponse.json({ error: 'No store' }, { status: 400 });
+      const rawItems: { productId?: string; qty?: number }[] = Array.isArray(payload.items) ? payload.items : [];
+      const wanted = new Map<string, number>();
+      for (const it of rawItems) {
+        if (!it?.productId) continue;
+        const q = Math.max(1, Math.min(99, Math.floor(Number(it.qty) || 1)));
+        wanted.set(it.productId, (wanted.get(it.productId) ?? 0) + q);
+      }
+      if (wanted.size === 0) return NextResponse.json({ error: 'Empty order' }, { status: 400 });
+
+      const { data: prods } = await (supabaseAdmin as any)
+        .from('store_products')
+        .select('id, name, price, active')
+        .eq('store_id', orderStoreId)
+        .in('id', Array.from(wanted.keys()));
+      const valid = ((prods as any[]) || []).filter((p) => p.active !== false);
+      if (valid.length === 0) return NextResponse.json({ error: 'No valid products' }, { status: 400 });
+
+      const note = typeof payload.note === 'string' ? payload.note.trim().slice(0, 500) : null;
+      const { data: order, error: orderErr } = await (supabaseAdmin as any)
+        .from('orders')
+        .insert({ store_id: orderStoreId, chat_id: session.chat_id, customer_id: session.customer_id, status: 'pending', note })
+        .select('id')
+        .single();
+      if (orderErr) throw orderErr;
+
+      const itemsToInsert = valid.map((p) => ({
+        order_id: order.id,
+        product_id: p.id,
+        title: p.name,
+        price: p.price ?? null,
+        qty: wanted.get(p.id) ?? 1,
+      }));
+      await (supabaseAdmin as any).from('order_items').insert(itemsToInsert);
+
+      // Resumen legible publicado en el chat como mensaje del cliente.
+      const lines = itemsToInsert.map((it) => `• ${it.qty}× ${it.title}${it.price ? ` (${it.price})` : ''}`);
+      const summary = `🛒 Pedido:\n${lines.join('\n')}${note ? `\n\n📝 ${note}` : ''}`;
+      const { data: orderMsg } = await (supabaseAdmin as any)
+        .from('messages')
+        .insert({
+          chat_id: session.chat_id,
+          content: summary,
+          ciphertext: JSON.stringify({ v: 1, text: summary, order_id: order.id }),
+          message_type: 'whisper',
+          sender_type: 'customer',
+          sender_id: session.customer_id,
+          nonce: crypto.randomUUID(),
+          read: false,
+        })
+        .select()
+        .single();
+
+      try {
+        await recordIntegrationEvent(supabaseAdmin, orderStoreId, 'support.order_placed', {
+          chatId: session.chat_id, orderId: order.id, itemCount: itemsToInsert.length,
+        });
+      } catch { /* best-effort */ }
+
+      return NextResponse.json({ ok: true, orderId: order.id, message: orderMsg });
+    }
+
     // 2a. ¿Es el primer mensaje del cliente? (para la bienvenida automática)
     const { count: priorCustomer } = await supabaseAdmin
       .from('messages')

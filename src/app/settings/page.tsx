@@ -28,6 +28,7 @@ import dynamic from 'next/dynamic';
 // user isn't a store admin, so no loading placeholder is needed.
 const BusinessProfileSettings = dynamic(() => import('@/components/business-profile-settings').then((m) => m.BusinessProfileSettings), { ssr: false });
 const CatalogSettings = dynamic(() => import('@/components/catalog-settings').then((m) => m.CatalogSettings), { ssr: false });
+const OrdersSettings = dynamic(() => import('@/components/orders-settings').then((m) => m.OrdersSettings), { ssr: false });
 const QuickRepliesSettings = dynamic(() => import('@/components/quick-replies-settings').then((m) => m.QuickRepliesSettings), { ssr: false });
 const LabelsSettings = dynamic(() => import('@/components/labels-settings').then((m) => m.LabelsSettings), { ssr: false });
 const StaffSettings = dynamic(() => import('@/components/staff-settings').then((m) => m.StaffSettings), { ssr: false });
@@ -1091,6 +1092,9 @@ export default function SettingsPage() {
           </section>
           <section className="space-y-3">
             <CatalogSettings />
+          </section>
+          <section className="space-y-3">
+            <OrdersSettings />
           </section>
           <section className="space-y-3">
             <QuickRepliesSettings />
