@@ -65,6 +65,28 @@ entrega saliente a un **webhook** o **CRM**:
 Mientras esas piezas no existan, el sistema funciona con el adaptador local y no
 realiza ninguna llamada externa.
 
+## Dispatcher local (ya implementado, dev/test)
+
+El outbox (`integration_events`) siempre se llena, pero la **entrega** a un
+destino externo está **desactivada por defecto**. Hay un dispatcher local que se
+activa solo con:
+
+```
+INTEGRATIONS_ENABLED=1
+INTEGRATIONS_TARGET=local
+```
+
+Con eso, `POST /api/integrations/dispatch` (solo admin de la tienda) toma los
+eventos `delivered=false` de su tienda, los "entrega" con el **adaptador local**
+(`deliverLocal` — los reconoce **sin ninguna llamada de red**) y los marca
+`delivered=true`. Lógica pura y probada en `src/lib/integrations/adapter.ts`
+(`pickAdapter`, `deliverLocal`) con `tests/integrations-adapter.test.ts`.
+
+`INTEGRATIONS_TARGET` con cualquier otro valor (una URL, `crm`, …) devuelve
+`adapter_not_implemented` (501): **no se finge una entrega real**. El adaptador
+real (webhook firmado / CRM con reintentos y backoff) sigue pendiente —
+`deliverLocal` no demuestra que la entrega externa funcione.
+
 ## API pública (no incluida)
 
 No se construyó una API pública para terceros (lectura/escritura con tokens). Si
