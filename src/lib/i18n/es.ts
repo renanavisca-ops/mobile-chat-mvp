@@ -422,6 +422,17 @@ const es: Dictionary = {
     delete: 'Eliminar',
     noChats: 'No hay chats para agregar.',
   },
+  encryption: {
+    title: 'Cifrado de extremo a extremo',
+    on: 'Activado',
+    onDesc: 'Los mensajes de este chat están cifrados de extremo a extremo.',
+    offDesc: 'Actívalo para que solo los participantes puedan leer los mensajes de este chat.',
+    enable: 'Activar',
+    enabling: 'Activando…',
+    missing: 'El otro participante debe abrir la app una vez para configurar el cifrado. Inténtalo más tarde.',
+    setupFirst: 'Primero configura el cifrado en este dispositivo (desbloquea tu clave).',
+    error: 'No se pudo activar el cifrado.',
+  },
   dataExport: {
     title: 'Descargar mis datos',
     desc: 'Exporta los datos de tu cuenta (perfil, contactos, chats, tus mensajes, historias, dispositivos) como archivo JSON.',

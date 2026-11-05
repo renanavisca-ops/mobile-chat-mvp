@@ -945,6 +945,12 @@ export async function enableChatEncryption(chatId: string): Promise<{ ok: boolea
   return ksLockChat(chatId, memberIds);
 }
 
+/** Whether a chat is marked end-to-end encrypted. */
+export async function getChatEncrypted(chatId: string): Promise<boolean> {
+  const { data } = await (browserSupabase() as any).from('chats').select('encrypted').eq('id', chatId).maybeSingle();
+  return !!(data as any)?.encrypted;
+}
+
 /** Remove another member from a group. Only the group's creator may do this. */
 export async function removeGroupMember(chatId: string, memberId: string) {
   const supabase = browserSupabase();

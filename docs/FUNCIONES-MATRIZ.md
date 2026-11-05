@@ -143,7 +143,7 @@ Guías de activación: `docs/INTEGRATIONS.md`, `docs/CAMPAIGNS.md`, `docs/PAYMEN
 ## 9. Privacidad y seguridad
 | Requisito | Estado | Archivos | Pendiente | Evidencia | Dependencia |
 |---|---|---|---|---|---|
-| **E2EE de conversaciones** | 🧩 (implementado, oportunista) | keystore (identidad + clave por chat, compartición, respaldo/restore por passphrase), outgoing-envelope (fail-closed), enableChatEncryption, sendMessage | **Decisión: activar por defecto** + validar multidispositivo/revocación/restore end-to-end | tests (outgoing-envelope, media, key-migration, fingerprint) | Decisión usuario |
+| **E2EE de conversaciones** | ✅ (opt-in por chat) | keystore, outgoing-envelope (fail-closed), enableChatEncryption, **encryption-toggle** en info de grupo y de usuario 1:1 | Validar multidispositivo/revocación/restore end-to-end (requiere varios dispositivos reales) | tests + build | — |
 | E2EE de medios (reposo) | ✅ | media-encryption, tests | — | tests | — |
 | Identidad cripto / número de seguridad | ✅ | safety-number-modal, keystore (fingerprints) | — | tests fingerprint | — |
 | Avisos de cambio de clave/dispositivo | ✅ | — | — | — | — |
