@@ -127,6 +127,12 @@ workflows:
           echo "AAB: $AAB"
           echo "versionName: 1.3.0  versionCode: $VERSION_CODE  applicationId: app.toky.chat"
           shasum -a 256 "$AAB" || sha256sum "$AAB"
+          # R8 is on, so a deobfuscation mapping is produced and auto-embedded in
+          # the .aab (Play's "no deobfuscation file" warning goes away). Surface
+          # it as an artifact too, for symbolicating crash reports locally.
+          MAP=$(find android/app/build/outputs/mapping -name "mapping.txt" | head -1)
+          echo "mapping: ${MAP:-NOT FOUND}"
     artifacts:
       - android/app/build/outputs/**/*.aab
       - android/app/build/outputs/**/*.apk
+      - android/app/build/outputs/mapping/release/mapping.txt
