@@ -191,7 +191,7 @@ Guías de activación: `docs/INTEGRATIONS.md`, `docs/CAMPAIGNS.md`, `docs/PAYMEN
 | Multiagente (asignación + roles) | ✅ | authz/chat-access | — | tests | — |
 | Automatizaciones por palabra clave | ✅ | automations/match | — | tests | — |
 | **Integraciones CRM / API** | 🏗️ | integrations/events+dispatch | Adaptador local simulador + flujo completo (desactivado) | — | Proveedor |
-| **Campañas** (consentimiento/límites/baja) | 🏗️ | campaigns/* | Worker de envío + canal simulado (desactivado) | — | Proveedor canal |
+| **Campañas** (consentimiento/límites/baja) | 🧪 | campaigns/* + sender.ts + /api/campaigns/send + campaign_deliveries (migración aplicada) | Adaptador de canal REAL (SMS/WhatsApp/email) + disparo recurrente | tests +4; desactivado por defecto; migración aplicada | Proveedor canal |
 | Estadísticas de entrega/lectura/atención | ✅ | store_support_stats | — | — | — |
 | **Verificación de identidad empresarial** | 🔒 | — | Lógica propia + simulador + adaptador desactivado | — | Programa externo |
 | **Pagos** | 🧪/🏗️ | payments/* + simulator.ts + /api/payments/sim | Adaptador de proveedor REAL (sigue pendiente) | tests simulador +5; desactivado por defecto | Proveedor |
@@ -262,7 +262,7 @@ Guías de activación: `docs/INTEGRATIONS.md`, `docs/CAMPAIGNS.md`, `docs/PAYMEN
 5. **§7** Historias: video/audio, audiencia fina, vistas/reacciones, silenciar autor.
 6. **§12** Pedidos/carrito desde catálogo (flujo completo).
 7. **§12/§13** Pagos: simulador de proveedor + historial/comprobantes ✅ (#220, desactivado por defecto) · campañas worker + CRM adaptador: pendiente.
-8. **§12** Campañas: worker de envío + canal simulado (desactivado).
+8. **§12** Campañas: worker de envío + canal simulado (desactivado). ✅ (#221)
 9. **§12** CRM/API: adaptador local simulador (desactivado).
 10. **§1** Registro por teléfono con **simulador SMS** (compatible con correo) · alertas de acceso.
 11. **§16** Consola de administración · **§14** export completo de datos.

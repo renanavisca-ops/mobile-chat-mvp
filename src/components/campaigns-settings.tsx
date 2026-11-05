@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useT } from '@/lib/i18n/context';
 import { browserSupabase } from '@/lib/supabase/client';
 import {
-  listCampaigns, upsertCampaign, deleteCampaign, getAudienceCount,
+  listCampaigns, upsertCampaign, deleteCampaign, getAudienceCount, sendCampaignRun,
   type Campaign,
 } from '@/lib/db/campaigns';
 
@@ -87,6 +87,24 @@ export function CampaignsSettings() {
     finally { setBusy(false); }
   }
 
+  async function onSend(id: string) {
+    setBusy(true);
+    setStatus('');
+    try {
+      const r = await sendCampaignRun(id);
+      if (!r.ok) {
+        setStatus(`ℹ️ ${t('campaigns.sendDisabled')}`);
+      } else {
+        setStatus(`✅ ${t('campaigns.sendResult', { sent: r.sent, failed: r.failed, total: r.audienceTotal })}`);
+        await reload();
+      }
+    } catch {
+      setStatus(`❌ ${t('campaigns.sendError')}`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const inputCls = 'w-full rounded-lg border border-slate-800 bg-slate-950/60 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-600 focus:border-indigo-500 focus:outline-none';
 
   return (
@@ -117,6 +135,8 @@ export function CampaignsSettings() {
                 </div>
                 <div className="line-clamp-1 text-xs text-slate-500">{c.body}</div>
               </div>
+              <button type="button" onClick={() => onSend(c.id)} disabled={busy}
+                className="shrink-0 rounded-lg bg-indigo-500/15 px-2.5 py-1.5 text-xs text-indigo-200 hover:bg-indigo-500/25 disabled:opacity-50">{t('campaigns.sendNow')}</button>
               <button type="button" onClick={() => { setStatus(''); setDraft({ id: c.id, name: c.name, body: c.body, dailyLimit: c.dailyLimit }); }}
                 className="shrink-0 rounded-lg bg-slate-800 px-2.5 py-1.5 text-xs text-slate-200 hover:bg-slate-700">{t('common.edit')}</button>
               <button type="button" onClick={() => onDelete(c.id)} disabled={busy}
