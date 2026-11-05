@@ -82,3 +82,41 @@ export async function getAudienceCount(storeId: string): Promise<number> {
     return 0;
   }
 }
+
+export type CampaignSendResult =
+  | { ok: true; simulated: boolean; sent: number; failed: number; processedTotal: number; audienceTotal: number; status: string }
+  | { ok: false; code: string };
+
+/** Trigger one send run for a campaign. Returns the summary, or {ok:false,code}
+ *  when sending is disabled (501) — mass sending is off by default and only the
+ *  local simulator channel is implemented today (see docs/CAMPAIGNS.md). */
+export async function sendCampaignRun(campaignId: string): Promise<CampaignSendResult> {
+  const supabase = browserSupabase();
+  const { apiFetch } = await import('@/lib/api/client');
+  const { data } = await supabase.auth.getSession();
+  const res = await apiFetch('/api/campaigns/send', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${data.session?.access_token}` },
+    body: JSON.stringify({ campaignId }),
+  });
+  if (res.status === 501) {
+    const j = await res.json().catch(() => ({}));
+    return { ok: false, code: (j as any).code || 'not_configured' };
+  }
+  if (!res.ok) throw new Error('Send failed');
+  return res.json();
+}
+
+export type CampaignDelivery = { id: string; status: string; channel: string | null; createdAt: string };
+
+/** Deliveries recorded for a campaign (store staff only, via RLS). */
+export async function listCampaignDeliveries(campaignId: string): Promise<CampaignDelivery[]> {
+  const supabase = browserSupabase();
+  const { data } = await (supabase as any)
+    .from('campaign_deliveries')
+    .select('id, status, channel, created_at')
+    .eq('campaign_id', campaignId)
+    .order('created_at', { ascending: false })
+    .limit(200);
+  return ((data as any[]) || []).map((r) => ({ id: r.id, status: r.status, channel: r.channel ?? null, createdAt: r.created_at }));
+}
