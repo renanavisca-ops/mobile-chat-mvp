@@ -278,6 +278,12 @@ No se declaran verificados (sin dispositivo ni build en este entorno):
   de contactos + flujo de consentimiento + **prueba en dispositivo**.
 - Ya en código, efecto en el próximo build: audio Bluetooth, compartir pantalla,
   continuidad de llamada, protección de capturas (Android).
+- **Config Codemagic + permisos nativos: preparados, build NO ejecutado.**
+  `codemagic.yaml` (workflows iOS/Android, firma/grupos de variables documentados),
+  permisos declarados Android (cámara/mic/ubicación/notif/media) e iOS
+  (`Info.plist`: cámara/mic/fotos/**ubicación when-in-use**/background audio+push).
+  Falta solo lo del operador: cuentas de tienda, firma, y correr el build en la UI
+  de Codemagic. Ver `MOBILE.md`.
 
 ---
 
