@@ -186,7 +186,7 @@ Guías de activación: `docs/INTEGRATIONS.md`, `docs/CAMPAIGNS.md`, `docs/PAYMEN
 | **Enlaces/QR para iniciar chat con tienda** | 🧩 | support links | QR dedicado a soporte de tienda | — | — |
 | Bienvenida/ausencia/respuestas rápidas + etiquetas | ✅ | templates | — | — | — |
 | Gestión de consultas/estados | ✅ | chat status | — | — | — |
-| **Pedidos / carrito desde catálogo** | 🧪 | public-chat route (order action), public-chat-view (carrito), orders-settings, orders.ts, migration 202611050007 | Aplicar migración + verificar flujo vivo | tsc/eslint/build | **Migración PENDIENTE de aplicar** (tool de escritura colgado) |
+| **Pedidos / carrito desde catálogo** | 🧪 | public-chat route (order action), public-chat-view (carrito), orders-settings, orders.ts, migration 202611050007 (aplicada) | Verificar flujo vivo con una tienda con catálogo (no hay tiendas/productos sembrados en el proyecto) | migración aplicada + build; esquema verificado (2 tablas, 3 políticas, RLS) | — |
 | Mensajes interactivos (botones/listas) | ✅ | — | — | — | — |
 | Multiagente (asignación + roles) | ✅ | authz/chat-access | — | tests | — |
 | Automatizaciones por palabra clave | ✅ | automations/match | — | tests | — |
