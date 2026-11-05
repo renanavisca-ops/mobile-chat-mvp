@@ -8,6 +8,8 @@ import { browserSupabase } from '@/lib/supabase/client';
 import { clearLocalIdentity } from '@/lib/auth/local-identity';
 import { clearCache } from '@/lib/cache';
 import { clearMediaCache } from '@/lib/storage/media-cache';
+import { buildDataExport } from '@/lib/db/export-data';
+import { saveOrDownload } from '@/lib/native-files';
 import { validatePassword } from '@/lib/password';
 import { isMfaEnabled, enrollTotp, verifyEnroll, disableTotp, generateRecoveryCodes } from '@/lib/auth/mfa';
 import { WALLPAPERS, CUSTOM_WALLPAPER_ID, getWallpaperId, setWallpaperId as saveWallpaperId, uploadCustomWallpaper, getCustomWallpaperUrl } from '@/lib/wallpaper';
@@ -83,6 +85,20 @@ export default function SettingsPage() {
   const [savingPrivacy, setSavingPrivacy] = useState(false);
   const [statusPrivacyOpen, setStatusPrivacyOpen] = useState(false);
   const [storageOpen, setStorageOpen] = useState(false);
+  const [exportingData, setExportingData] = useState(false);
+
+  async function onExportData() {
+    setExportingData(true);
+    try {
+      const data = await buildDataExport();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      await saveOrDownload(blob, `toky-data-${new Date().toISOString().slice(0, 10)}.json`);
+    } catch {
+      /* best-effort; the button re-enables */
+    } finally {
+      setExportingData(false);
+    }
+  }
 
   // Password change state
   const [newPassword, setNewPassword] = useState('');
@@ -1139,6 +1155,18 @@ export default function SettingsPage() {
                 <div className="mt-1 text-xs text-slate-400">{t('storage.manageDesc')}</div>
               </div>
               <span className="shrink-0 text-slate-500">›</span>
+            </button>
+            <button
+              type="button"
+              onClick={onExportData}
+              disabled={exportingData}
+              className="flex w-full items-center justify-between gap-3 rounded-xl border border-slate-900 bg-slate-950/50 p-4 text-left shadow-sm hover:bg-slate-900/60 disabled:opacity-50"
+            >
+              <div>
+                <div className="text-sm font-medium text-slate-200">{t('dataExport.title')}</div>
+                <div className="mt-1 text-xs text-slate-400">{exportingData ? t('dataExport.working') : t('dataExport.desc')}</div>
+              </div>
+              <span className="shrink-0 text-slate-500">⬇</span>
             </button>
           </section>
 

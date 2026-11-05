@@ -420,6 +420,11 @@ const en = {
     delete: 'Delete',
     noChats: 'No chats to add.',
   },
+  dataExport: {
+    title: 'Download my data',
+    desc: 'Export your account data (profile, contacts, chats, your messages, stories, devices) as a JSON file.',
+    working: 'Preparing your export…',
+  },
   accessAlert: {
     title: 'New sign-in detected',
     body: 'Your account was signed in on {{device}} on {{when}}. If this was you, you can dismiss this.',

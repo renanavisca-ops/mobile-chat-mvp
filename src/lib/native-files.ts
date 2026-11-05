@@ -138,6 +138,25 @@ export async function saveNativeFile(blob: Blob, filename: string): Promise<stri
  * cache file, then hand its URI to the Media plugin, which inserts it into the
  * gallery with the right permissions per OS/version.
  */
+/**
+ * Save a generated file either to the device (native) or via a browser
+ * download (web). Used for data/export downloads that aren't encrypted media.
+ */
+export async function saveOrDownload(blob: Blob, filename: string): Promise<void> {
+  if (canNativeFiles()) {
+    await saveNativeFile(blob, filename);
+    return;
+  }
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 export async function saveMediaToGallery(blob: Blob, filename: string): Promise<void> {
   const uri = await writeToCache(blob, filename);
   const isVideo = (blob.type || '').toLowerCase().startsWith('video/');

@@ -422,6 +422,11 @@ const es: Dictionary = {
     delete: 'Eliminar',
     noChats: 'No hay chats para agregar.',
   },
+  dataExport: {
+    title: 'Descargar mis datos',
+    desc: 'Exporta los datos de tu cuenta (perfil, contactos, chats, tus mensajes, historias, dispositivos) como archivo JSON.',
+    working: 'Preparando tu exportación…',
+  },
   accessAlert: {
     title: 'Nuevo inicio de sesión',
     body: 'Se inició sesión en tu cuenta en {{device}} el {{when}}. Si fuiste tú, puedes descartar este aviso.',
