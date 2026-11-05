@@ -210,7 +210,7 @@ Guías de activación: `docs/INTEGRATIONS.md`, `docs/CAMPAIGNS.md`, `docs/PAYMEN
 |---|---|---|---|---|---|
 | Respaldo manual/programado + restauración | 🔒 | base key_backups | Backup/restore (ligado a E2EE/claves) | — | Backups cifrados |
 | Incluir/excluir videos + liberar espacio | 🧩/✅ | storage-manager | — | — | — |
-| **Exportación de datos personales (completa)** | 🧩 | export de conversación | Export completo de la cuenta | — | — |
+| **Exportación de datos personales (completa)** | ✅ | export-data.ts, settings (Descargar mis datos), saveOrDownload | — | build | — |
 | Eliminación de datos | ✅ | delete-account | — | — | — |
 | Transferencia segura de historial / retención | 🔒/🧩 | — | Políticas de retención | — | — |
 
