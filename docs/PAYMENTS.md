@@ -47,8 +47,44 @@ real. Esto es deliberado: el interruptor no "inventa" un procesador.
 4. **Cumplimiento**: verificación de identidad, comprobantes, historial,
    antifraude, y requisitos legales por país.
 
-## Simulaciones
+## Simulador local (dev/test)
 
-No hay simulación activa. Si en desarrollo se necesitara una, debe quedar
-**claramente identificada** y **limitada al entorno de desarrollo** (nunca en
-producción, nunca con dinero real), y no mostrarse como una función operativa.
+Para poder recorrer el flujo completo **sin un proveedor real y sin dinero**,
+hay un simulador que se activa **solo** con:
+
+```
+PAYMENTS_ENABLED=1
+PAYMENTS_PROVIDER=simulator
+```
+
+Con eso:
+- `POST /api/payments/checkout` (provider `simulator`) crea una fila `payments`
+  en estado `pending`, marcada `provider='simulator'`, y devuelve `paymentId` +
+  `confirmPath`. **No hace ninguna llamada externa.**
+- `POST /api/payments/sim` `{ paymentId, outcome?: 'succeed'|'fail' }` imita el
+  **webhook asíncrono** del proveedor y pasa el pago a `succeeded`/`failed`. Sin
+  `outcome` el resultado es determinista (`simulateOutcome`: montos cuyos
+  centavos son `13` fallan, el resto tiene éxito), lo que permite probar el
+  **camino de fallo**. Un pago `failed` puede reintentarse (`failed → succeeded`);
+  un pago `succeeded` ya no se puede mutar (`canTransition`).
+- El cliente `simulateConfirm(paymentId, outcome?)` (`src/lib/payments/index.ts`)
+  llama a esa ruta. Lógica pura en `src/lib/payments/simulator.ts` con pruebas
+  (`tests/payments-simulator.test.ts`).
+
+**Importante:** el simulador está **desactivado por defecto** (en producción
+`PAYMENTS_ENABLED` no está puesto → las rutas devuelven 501), toda fila simulada
+queda marcada `provider='simulator'`, y **un simulador NO demuestra que la
+integración real funcione**.
+
+## Qué falta para el proveedor REAL (sigue pendiente)
+
+El simulador no es el adaptador real. Para operar con dinero de verdad falta,
+además de la decisión/compliance de arriba:
+- el **SDK y la clave secreta** del proveedor elegido (variable de servidor,
+  nunca `NEXT_PUBLIC`);
+- crear el PaymentIntent/sesión real en `checkout` (rama por `PAYMENTS_PROVIDER`)
+  e insertar la fila `pending`;
+- **verificar la firma** del webhook real del proveedor en una ruta propia
+  (distinta de `/api/payments/sim`) antes de actualizar el estado;
+- la UI de cobro/pago y los comprobantes para el usuario final.
+No basta con "poner una clave": ese código del adaptador real aún no existe.
