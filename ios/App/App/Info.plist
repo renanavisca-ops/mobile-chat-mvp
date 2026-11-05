@@ -59,6 +59,13 @@
 	<string>Toky needs access to your photos so you can share images in chats.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Toky saves photos and media you download from chats to your library.</string>
+	<!-- Location: only when the user taps "share location" in a chat. @capacitor/
+	     geolocation (src/lib/geolocation.ts) prompts for this; iOS crashes/rejects
+	     the build if the string is missing, and Android already declares the
+	     matching ACCESS_FINE/COARSE_LOCATION permissions. When-in-use only — Toky
+	     never tracks location in the background. -->
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Toky uses your location only when you choose to share it in a chat.</string>
 	<!-- Keep audio alive during backgrounded calls; receive push notifications -->
 	<key>UIBackgroundModes</key>
 	<array>

@@ -16,9 +16,15 @@
 #   - Variable group `toky_ios`  : APP_STORE_APPLE_ID (numeric App ID).
 #   - Variable group `toky_android` (only if publishing): GCLOUD_SERVICE_ACCOUNT.
 #
-# The app UI is now BUNDLED into the native app (Phase 1), so every build runs a
-# static Next.js export (`scripts/build-mobile.mjs`) before `cap sync` copies the
-# bundled UI + plugins into the native projects.
+# RUNTIME MODEL: the native shell loads the LIVE app from the hosted origin
+# (capacitor.config.ts `server.url` -> https://mobile-chat-mvp.vercel.app), so
+# web changes still ship instantly via Vercel and the WebView keeps a stable
+# origin (the Supabase session + E2EE identity key are stored per-origin — do not
+# switch back to the https://localhost bundled model, see capacitor.config.ts).
+# Each build still runs the static export (`scripts/build-mobile.mjs`) so that
+# `cap sync` populates mobile/www as the webDir / OFFLINE FALLBACK and links the
+# native plugins into ios/ and android/. The NEXT_PUBLIC_* vars below are still
+# required: the export inlines them into that fallback bundle.
 
 workflows:
   ios:

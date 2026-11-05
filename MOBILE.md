@@ -101,9 +101,10 @@ browser-based — no Mac needed).
   gradient "T", generated from a single source.
 - ✅ PWA `manifest.webmanifest` + Apple touch icon (also makes the web app
   installable from the browser).
-- ✅ Native permission declarations for **camera/microphone** (WebRTC calls)
-  and **push notifications**, plus iOS background modes (`audio`,
-  `remote-notification`).
+- ✅ Native permission declarations for **camera/microphone** (WebRTC calls),
+  **location** (share-location in chat: Android `ACCESS_FINE/COARSE_LOCATION`,
+  iOS `NSLocationWhenInUseUsageDescription` — when-in-use only) and **push
+  notifications**, plus iOS background modes (`audio`, `remote-notification`).
 - ✅ Thin loader with an offline screen and connectivity retry.
 - ✅ **Native push wired end to end** — `@capacitor-firebase/messaging` on the
   client stores an FCM token in the `device_tokens` table; the server
@@ -158,6 +159,23 @@ push in the app's Settings registers the device and starts delivery.
 5. **UGC safety** — a chat app with user content + calls needs report/block
    flows and a moderation contact to satisfy store review and age rating.
 6. **Store listings** — screenshots, descriptions, age ratings, categories.
+
+### Native features still pending a plugin + device build (not wired)
+
+These need a Capacitor plugin that is **not installed yet** plus on-device
+verification, so they are intentionally left out of the current build rather
+than half-wired:
+
+- **Biometric unlock** (Face ID / fingerprint) — needs a biometric plugin and a
+  decision on what it gates (app lock vs. E2EE key unlock). iOS would also need
+  `NSFaceIDUsageDescription` in `Info.plist` once added.
+- **Contacts / calendar (agenda) sync** — needs a contacts plugin plus
+  `NSContactsUsageDescription` (iOS) / `READ_CONTACTS` (Android). Off by default
+  and must be opt-in for privacy.
+
+Until a plugin is added and tested on a real device, do **not** mark
+biometrics/agenda, Bluetooth, screen-share, call-continuity or battery behavior
+as verified — they can only be confirmed on a physical device build.
 
 ## Review-rejection watch-outs
 
