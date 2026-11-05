@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
-import { rateLimit } from '@/lib/rate-limit';
+import { durableRateLimit } from '@/lib/ratelimit-db';
 import { hashCode } from '@/lib/auth/recovery-hash';
 
 /**
@@ -23,9 +23,10 @@ export async function POST(req: Request) {
   const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
   if (error || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  // Tight limit: brute-forcing high-entropy codes is infeasible, but cap anyway.
-  const rl = rateLimit(`mfa-recover:${user.id}`, 5, 60_000);
-  if (!rl.ok) return NextResponse.json({ error: 'Too many attempts. Wait a minute.' }, { status: 429 });
+  // Tight limit (durable / cross-instance): brute-forcing high-entropy codes is
+  // infeasible, but cap anyway. Fail-open on limiter error.
+  const allowed = await durableRateLimit(supabaseAdmin, `mfa-recover:${user.id}`, 5, 60);
+  if (!allowed) return NextResponse.json({ error: 'Too many attempts. Wait a minute.' }, { status: 429 });
 
   const body = await req.json().catch(() => ({}));
   const code = typeof body?.code === 'string' ? body.code : '';

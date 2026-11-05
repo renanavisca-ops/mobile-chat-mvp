@@ -233,9 +233,9 @@ Guías de activación: `docs/INTEGRATIONS.md`, `docs/CAMPAIGNS.md`, `docs/PAYMEN
 | Señalización llamadas + STUN/TURN | ✅ | — | — | — | — |
 | Gestión de claves/protocolos auditados | 🧩 | ENCRYPTION_EXPORT_REVIEW | E2EE mensajes | — | Decisión E2EE |
 | Moderación/denuncias | ✅ | — | — | — | — |
-| **Rate limiting / anti-spam** | 🧩 | ratelimit-db (#202) | Unificar limitador memoria↔durable | tests | — |
+| **Rate limiting / anti-spam** | ✅ | ratelimit-db; durable en soporte/chat-start/avatar/ai/mfa-recovery | — (limitador en memoria eliminado; todo durable) | tests + build | — |
 | **Observabilidad** (métricas/trazas/alertas) | 🧩 | observability.ts | DSN producción + alertas | — | Config/Proveedor |
-| **Panel admin / roles internos / auditoría** | 🧩 | audit.ts, activity log | Consola de administración | — | — |
+| **Panel admin / roles internos / auditoría** | ✅ (cubierto por paneles) | audit-log, stats, staff, catalog, orders, automations, campaigns, labels, templates en Ajustes (solo admins) | Pantalla única unificada (polish opcional, no es brecha funcional) | — | — |
 | Alta disponibilidad/backups/DR | 🔒 | Supabase/Vercel gestionados | Plan DR formal | — | — |
 | Privacidad/términos/consentimiento | 🧩 | terms, privacy, guidelines | Cumplimiento por jurisdicción | — | Legal |
 | **Pruebas carga/seguridad/accesibilidad/compat** | 🧩 | tests/* (87) | Scripts de carga reproducibles (sin ejecutar contra prod); compat dispositivos | tests 87 | Infra/dispositivos |
@@ -265,7 +265,7 @@ Guías de activación: `docs/INTEGRATIONS.md`, `docs/CAMPAIGNS.md`, `docs/PAYMEN
 8. **§12** Campañas: worker de envío + canal simulado (desactivado). ✅ (#221)
 9. **§12** CRM/API: adaptador local simulador (desactivado). ✅ (#222) _(Etapa 7 completa)_
 10. **§1** Registro por teléfono con **simulador SMS** (compatible con correo) ✅ (#223) · alertas de acceso ✅ (#224). _(Etapa 8 completa)_
-11. **§16** Consola de administración · **§14** export completo de datos.
+11. **§16** admin (cubierto por paneles existentes; unificar rate limiter ✅ #226) · **§14** export completo de datos ✅ (#225). _(Etapa 9 completa)_
 12. **§9** E2EE de mensajes en entorno aislado (desactivado en prod) — mayor riesgo; decisión explícita.
 13. **Nativo (📱)**: biometría, sincronización de agenda — preparar código + marcar pendiente de build.
 14. **§17** Tabla transversal por función + cierre de matriz.

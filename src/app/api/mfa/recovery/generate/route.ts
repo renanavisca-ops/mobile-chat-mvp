@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { randomBytes } from 'crypto';
 import { supabaseAdmin } from '@/lib/supabase/admin';
-import { rateLimit } from '@/lib/rate-limit';
+import { durableRateLimit } from '@/lib/ratelimit-db';
 import { hashCode } from '@/lib/auth/recovery-hash';
 
 /**
@@ -33,8 +33,8 @@ export async function POST(req: Request) {
   const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
   if (error || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const rl = rateLimit(`mfa-gen:${user.id}`, 10, 60_000);
-  if (!rl.ok) return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
+  const allowed = await durableRateLimit(supabaseAdmin, `mfa-gen:${user.id}`, 10, 60);
+  if (!allowed) return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
 
   const codes = Array.from({ length: CODE_COUNT }, makeCode);
 

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { reportServerError } from '@/lib/observability';
 import { supabaseAdmin } from '@/lib/supabase/admin';
-import { rateLimit, rateLimitHeaders } from '@/lib/rate-limit';
+import { durableRateLimit } from '@/lib/ratelimit-db';
 
 // Per-user throttle for the AI proxy so one client can't run up Anthropic cost.
 const AI_RATE_LIMIT = Number(process.env.AI_RATE_LIMIT_PER_MIN || 30);
@@ -83,12 +83,14 @@ export async function POST(req: Request) {
   } = await supabaseAdmin.auth.getUser(token);
   if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  // Throttle per authenticated user (see src/lib/rate-limit.ts).
-  const rl = rateLimit(`ai:${user.id}`, AI_RATE_LIMIT, 60_000);
-  if (!rl.ok) {
+  // Throttle per authenticated user using the DURABLE limiter (cross-instance,
+  // fixed window) so the cap holds across serverless invocations — unified with
+  // the rest of the API. Fail-open on limiter error.
+  const allowed = await durableRateLimit(supabaseAdmin, `ai:${user.id}`, AI_RATE_LIMIT, 60);
+  if (!allowed) {
     return NextResponse.json(
-      { error: 'Too many requests', code: 'rate_limited', retryAfter: rl.retryAfter },
-      { status: 429, headers: rateLimitHeaders(rl) },
+      { error: 'Too many requests', code: 'rate_limited', retryAfter: 60 },
+      { status: 429, headers: { 'Retry-After': '60' } },
     );
   }
 
