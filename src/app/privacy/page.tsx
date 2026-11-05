@@ -22,10 +22,12 @@ function En() {
           <h2 className={H2}>1. Information we collect</h2>
           <h3 className={H3}>a. Information you provide</h3>
           <ul className={UL}>
-            <li><b>Account information:</b> your email address and authentication credentials (passwords are handled by our authentication provider, not stored by us in plaintext).</li>
+            <li><b>Account information:</b> your email address and authentication credentials (passwords are handled by our authentication provider, not stored by us in plaintext). Email remains your primary way to sign in.</li>
+            <li><b>Phone number (optional):</b> if you choose to add and verify a phone number, we store it to help secure your account and let others find you. It is an optional addition to your email account — it never replaces email sign-in and does not create a second account.</li>
             <li><b>Profile information:</b> username, display name, and profile photo.</li>
-            <li><b>Content you share:</b> the messages, images, videos, and voice notes you send or receive.</li>
-            <li><b>Relationships:</b> your contacts and the chats and groups you belong to.</li>
+            <li><b>Content you share:</b> the messages, images, videos, voice notes, and stories you send or receive, and any location you choose to share in a chat.</li>
+            <li><b>Business &amp; commerce (optional):</b> if you use business features, your store profile and catalog, and the orders you place or receive. If you operate a business account, the customer lists and campaign content you create.</li>
+            <li><b>Relationships:</b> your contacts and the chats, groups, communities, and channels you belong to.</li>
             <li><b>Communications with us:</b> support requests, reports, or feedback.</li>
           </ul>
           <h3 className={H3}>b. Information collected automatically</h3>
@@ -51,6 +53,7 @@ function En() {
           <ul className={UL}>
             <li><b>With other users:</b> your profile and the content you send are visible to the participants of your chats.</li>
             <li><b>With service providers (processors):</b> Supabase (database, authentication, storage, realtime), Vercel (hosting), Google Firebase Cloud Messaging (push notifications), and Cloudflare (STUN/TURN for calls). They process data on our behalf under security obligations.</li>
+            <li><b>Feature-dependent providers:</b> if and when you use a feature that requires one, we share only the minimum necessary data with the corresponding provider — for example an SMS provider (only if you verify a phone number) or a payment processor (only if you make a purchase through a business). These features are off by default and no such data is shared until you use them.</li>
             <li><b>For legal reasons &amp; safety:</b> to comply with law or protect the rights and safety of our users and the public.</li>
           </ul>
         </section>
@@ -65,7 +68,7 @@ function En() {
         <section>
           <h2 className={H2}>5. Security &amp; encryption</h2>
           <p>We protect your information with encryption in transit (HTTPS) and database-level access controls that restrict messages and media to the participants of a chat.</p>
-          <p className="mt-2"><b>End-to-end encryption.</b> New one-to-one (direct) chats require end-to-end encryption: keys are generated on your device, we store only public keys and ciphertext, and messages will not send until both people have set up encryption — we do not fall back to storing readable messages for those chats. In an encrypted chat, <b>attachments</b> (images, videos, audio, files) are also end-to-end encrypted on your device before upload, so we store only ciphertext. <b>Group chats and channels are not end-to-end encrypted.</b> Older direct chats, and any messages or media sent before encryption was set up, remain <b>not</b> end-to-end encrypted (protected by encryption in transit and database access controls), and enabling encryption does not retroactively encrypt them. Your private key is stored on your device; if you lose the device and have not saved a passphrase backup of your key, your encrypted history may be unrecoverable. Our encryption is built from standard cryptographic components and has not been independently audited.</p>
+          <p className="mt-2"><b>End-to-end encryption (opt-in per chat).</b> End-to-end encryption is available and can be turned on for an individual one-to-one chat using the switch in the chat&apos;s info screen. When you enable it, keys are generated on your devices, we store only public keys and ciphertext, and both <b>messages</b> and <b>attachments</b> (images, videos, audio, files) are encrypted on your device before upload — we cannot read them. Encryption is <b>off by default</b>; chats that are not encrypted are protected by encryption in transit (HTTPS) and database access controls that limit content to the chat&apos;s participants. <b>Group chats, channels, and business or support conversations are not end-to-end encrypted.</b> Enabling encryption does not retroactively encrypt messages or media sent earlier. Your private key is stored on your device; if you lose the device and have not saved a passphrase backup of your key, your encrypted history may be unrecoverable. Our encryption is built from standard cryptographic components and has not been independently audited.</p>
         </section>
         <section>
           <h2 className={H2}>6. Your rights &amp; choices</h2>
@@ -97,10 +100,12 @@ function Es() {
           <h2 className={H2}>1. Información que recopilamos</h2>
           <h3 className={H3}>a. Información que nos proporcionas</h3>
           <ul className={UL}>
-            <li><b>Datos de la cuenta:</b> tu correo electrónico y credenciales de acceso (las contraseñas las gestiona nuestro proveedor de autenticación, no las guardamos en texto plano).</li>
+            <li><b>Datos de la cuenta:</b> tu correo electrónico y credenciales de acceso (las contraseñas las gestiona nuestro proveedor de autenticación, no las guardamos en texto plano). El correo sigue siendo tu forma principal de iniciar sesión.</li>
+            <li><b>Número de teléfono (opcional):</b> si decides agregar y verificar un número de teléfono, lo guardamos para ayudar a proteger tu cuenta y que otras personas te encuentren. Es un añadido opcional a tu cuenta de correo: no reemplaza el inicio de sesión por correo ni crea una segunda cuenta.</li>
             <li><b>Datos del perfil:</b> nombre de usuario, nombre visible y foto de perfil.</li>
-            <li><b>Contenido que compartes:</b> los mensajes, imágenes, videos y notas de voz que envías o recibes.</li>
-            <li><b>Relaciones:</b> tus contactos y los chats y grupos a los que perteneces.</li>
+            <li><b>Contenido que compartes:</b> los mensajes, imágenes, videos, notas de voz e historias que envías o recibes, y cualquier ubicación que elijas compartir en un chat.</li>
+            <li><b>Negocios y comercio (opcional):</b> si usas funciones de negocio, tu perfil de tienda y catálogo, y los pedidos que realizas o recibes. Si operas una cuenta de negocio, las listas de clientes y el contenido de campañas que creas.</li>
+            <li><b>Relaciones:</b> tus contactos y los chats, grupos, comunidades y canales a los que perteneces.</li>
             <li><b>Comunicaciones con nosotros:</b> solicitudes de soporte, denuncias o comentarios.</li>
           </ul>
           <h3 className={H3}>b. Información recopilada automáticamente</h3>
@@ -126,6 +131,7 @@ function Es() {
           <ul className={UL}>
             <li><b>Con otros usuarios:</b> tu perfil y el contenido que envías son visibles para los participantes de tus chats.</li>
             <li><b>Con proveedores de servicios (encargados):</b> Supabase (base de datos, autenticación, almacenamiento, tiempo real), Vercel (alojamiento), Google Firebase Cloud Messaging (notificaciones push) y Cloudflare (servidores STUN/TURN para llamadas). Procesan datos por cuenta nuestra bajo obligaciones de seguridad.</li>
+            <li><b>Proveedores según la función:</b> si usas una función que lo requiere, compartimos solo los datos mínimos necesarios con el proveedor correspondiente — por ejemplo un proveedor de SMS (solo si verificas un número de teléfono) o un procesador de pagos (solo si realizas una compra a través de un negocio). Estas funciones están desactivadas de forma predeterminada y no se comparte ningún dato hasta que las uses.</li>
             <li><b>Por motivos legales y de seguridad:</b> para cumplir la ley o proteger los derechos y la seguridad de nuestros usuarios y del público.</li>
           </ul>
         </section>
@@ -140,7 +146,7 @@ function Es() {
         <section>
           <h2 className={H2}>5. Seguridad y cifrado</h2>
           <p>Protegemos tu información con cifrado en tránsito (HTTPS) y controles de acceso a nivel de base de datos que limitan los mensajes y multimedia a los participantes de un chat.</p>
-          <p className="mt-2"><b>Cifrado de extremo a extremo.</b> En los chats directos (uno a uno), el texto y los detalles de tus mensajes están cifrados de extremo a extremo de forma predeterminada: las claves se generan en tu dispositivo y solo guardamos claves públicas y texto cifrado, por lo que no podemos leer ese contenido. Los <b>archivos adjuntos</b> (imágenes, videos, archivos) se almacenan en nuestros servidores con controles de acceso, pero <b>aún no</b> están cifrados de extremo a extremo. Los chats de grupo y canales no están cifrados de extremo a extremo. Si pierdes tu dispositivo y no guardaste una copia de tu clave con frase de contraseña, tu historial cifrado podría ser irrecuperable.</p>
+          <p className="mt-2"><b>Cifrado de extremo a extremo (opcional, por chat).</b> El cifrado de extremo a extremo está disponible y puedes activarlo para un chat individual (uno a uno) con el interruptor en la pantalla de información del chat. Cuando lo activas, las claves se generan en tus dispositivos, solo guardamos claves públicas y texto cifrado, y tanto los <b>mensajes</b> como los <b>archivos adjuntos</b> (imágenes, videos, audio, archivos) se cifran en tu dispositivo antes de subirse — no podemos leerlos. El cifrado está <b>desactivado de forma predeterminada</b>; los chats sin cifrar se protegen con cifrado en tránsito (HTTPS) y controles de acceso de base de datos que limitan el contenido a los participantes del chat. Los <b>chats de grupo, canales y las conversaciones de negocio o soporte no están cifrados de extremo a extremo.</b> Activar el cifrado no cifra retroactivamente los mensajes o multimedia enviados antes. Tu clave privada se guarda en tu dispositivo; si pierdes el dispositivo y no guardaste una copia de tu clave con frase de contraseña, tu historial cifrado podría ser irrecuperable. Nuestro cifrado usa componentes criptográficos estándar y no ha sido auditado de forma independiente.</p>
         </section>
         <section>
           <h2 className={H2}>6. Tus derechos y opciones</h2>

@@ -14,10 +14,10 @@ export const LEGAL = {
   /** Minimum age to use the Service — kept consistent everywhere. */
   minAge: 13,
   /** Document versions (date-based). Bump on material change. */
-  termsVersion: '2026-07-24',
-  privacyVersion: '2026-07-24',
+  termsVersion: '2026-11-05',
+  privacyVersion: '2026-11-05',
   /** Human-readable effective date shown on the documents. */
-  effectiveDate: 'July 24, 2026',
+  effectiveDate: 'November 5, 2026',
   /** Days after which residual copies in backups are purged. */
   retentionDays: 90,
   /** Third-party processors actually used by the app. */
