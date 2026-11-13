@@ -797,6 +797,12 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
   // the user scrolls up; re-pins as media loads so the latest message isn't left
   // cut off at the bottom of the screen after images finish loading.
   const stickBottomRef = useRef(true);
+  // The "N new messages" divider row, so opening a chat can land on the first
+  // unread message instead of always jumping to the newest.
+  const unreadDividerRef = useRef<HTMLLIElement | null>(null);
+  // Set once the user deliberately scrolls (wheel/touch) so the initial
+  // auto-scroll settling stops fighting them.
+  const userTookOverRef = useRef(false);
 
   // Long-press support
   const longPressTimer = useRef<number | null>(null);
@@ -1484,27 +1490,39 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
     initialScrollDoneRef.current = false;
   }, [chatId]);
 
-  // Scroll behavior: on first open jump straight to the newest message; after
-  // that only auto-scroll when you're already near the bottom.
+  // Scroll behavior: on first open land on the first UNREAD message (so you pick
+  // up where you left off), or at the newest message when everything is read.
+  // After that, only auto-scroll when you're already near the bottom.
   const chatReady = !authLoading && !msgLoading;
   useEffect(() => {
     const el = scrollRef.current;
     if (!el || !chatReady || items.length === 0) return;
     if (!initialScrollDoneRef.current) {
       initialScrollDoneRef.current = true;
-      stickBottomRef.current = true;
-      // Land at the bottom RELIABLY. A single jump often falls short because the
+      const hasUnread = firstUnreadIdx >= 0 && unreadCount > 0;
+      // When there are unread messages we land on the divider, so we're NOT at
+      // the bottom; otherwise we stick to the newest message.
+      stickBottomRef.current = !hasUnread;
+      // Land on the target RELIABLY. A single jump often falls short because the
       // final height isn't settled yet at first paint — images still decoding,
       // the keyboard/safe-area resizing, or catch-up rows arriving a tick later.
-      // Re-pin over the first ~600ms (guarded by stickBottom, so it stops the
-      // moment the user scrolls up).
-      const pin = () => {
+      // Re-apply over the first ~600ms; it stops the moment the user scrolls
+      // (userTookOverRef), so it never fights them.
+      const settle = () => {
         const e = scrollRef.current;
-        if (e && stickBottomRef.current) e.scrollTop = e.scrollHeight;
+        if (!e || userTookOverRef.current) return;
+        const divider = unreadDividerRef.current;
+        if (hasUnread && divider) {
+          // Put the "N new messages" divider just below the top of the viewport.
+          const delta = divider.getBoundingClientRect().top - e.getBoundingClientRect().top;
+          e.scrollTop = Math.max(0, e.scrollTop + delta - 12);
+        } else {
+          e.scrollTop = e.scrollHeight;
+        }
       };
-      pin();
-      const raf = requestAnimationFrame(pin);
-      const timers = [60, 150, 350, 600].map((ms) => window.setTimeout(pin, ms));
+      settle();
+      const raf = requestAnimationFrame(settle);
+      const timers = [60, 150, 350, 600].map((ms) => window.setTimeout(settle, ms));
       return () => {
         cancelAnimationFrame(raf);
         timers.forEach((t) => window.clearTimeout(t));
@@ -3674,7 +3692,7 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
             </div>
           )}
 
-          <div ref={scrollRef} onScroll={handleScroll} style={wallpaperStyle} className="-mx-3 min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain border-y border-slate-900 bg-slate-950/40 px-3 py-3">
+          <div ref={scrollRef} onScroll={handleScroll} onWheel={() => { userTookOverRef.current = true; }} onTouchMove={() => { userTookOverRef.current = true; }} style={wallpaperStyle} className="-mx-3 min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain border-y border-slate-900 bg-slate-950/40 px-3 py-3">
             {loadingMore && <div className="text-center text-xs text-slate-500 my-2">{t('chat.loadingOlder')}</div>}
             {items.length === 0 ? (
               <p className="text-sm text-slate-400">{t('chat.noMessagesYet')}</p>
@@ -3709,7 +3727,7 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
                   return (
                     <Fragment key={m.id}>
                     {idx === firstUnreadIdx && unreadCount > 0 && (
-                      <li className="my-2 flex items-center gap-3 px-1 text-[11px] font-semibold uppercase tracking-wide text-blue-300">
+                      <li ref={unreadDividerRef} className="my-2 flex items-center gap-3 px-1 text-[11px] font-semibold uppercase tracking-wide text-blue-300">
                         <span className="h-px flex-1 bg-blue-400/30" />
                         {unreadCount} {t('chat.newMessages')}
                         <span className="h-px flex-1 bg-blue-400/30" />
