@@ -803,6 +803,15 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
   // Set once the user deliberately scrolls (wheel/touch) so the initial
   // auto-scroll settling stops fighting them.
   const userTookOverRef = useRef(false);
+  // Enter behavior by device: on a desktop/physical keyboard Enter sends and
+  // Shift+Enter inserts a newline; on touch/mobile Enter inserts a newline and
+  // you send with the send button (matches WhatsApp/Telegram/Signal on phones).
+  // Ctrl/Cmd+Enter always sends. Defaults to "send" until measured.
+  const enterSendsRef = useRef(true);
+  useEffect(() => {
+    try { enterSendsRef.current = !window.matchMedia('(pointer: coarse)').matches; }
+    catch { /* keep the desktop default */ }
+  }, []);
 
   // Long-press support
   const longPressTimer = useRef<number | null>(null);
@@ -4716,14 +4725,24 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
                       return;
                     }
                   }
-                  // Enter sends; Shift+Enter inserts a newline.
-                  // Ignore keyboard auto-repeat (e.repeat) and in-flight sends so
-                  // that holding Enter can't fire onSend dozens of times and send
-                  // the same image/message repeatedly.
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    if (e.repeat || busy || sendingRef.current) return;
-                    onSend();
+                  if (e.key === 'Enter') {
+                    // Don't send when Enter only confirms an IME / autocorrect
+                    // composition (common on mobile keyboards): keyCode 229 or
+                    // isComposing. Let it fall through to the textarea default.
+                    if ((e.nativeEvent as KeyboardEvent).isComposing || (e as unknown as { keyCode?: number }).keyCode === 229) {
+                      return;
+                    }
+                    // Desktop: Enter sends, Shift+Enter = newline. Touch/mobile:
+                    // Enter = newline (send via the button). Ctrl/Cmd+Enter always
+                    // sends. Anything else lets Enter insert a newline normally.
+                    const sends = (e.ctrlKey || e.metaKey) || (enterSendsRef.current && !e.shiftKey);
+                    if (sends) {
+                      e.preventDefault();
+                      // Ignore auto-repeat (held key) and in-flight sends so a
+                      // held Enter can't fire onSend dozens of times.
+                      if (e.repeat || busy || sendingRef.current) return;
+                      onSend();
+                    }
                   }
                 }}
                 disabled={blocked}
