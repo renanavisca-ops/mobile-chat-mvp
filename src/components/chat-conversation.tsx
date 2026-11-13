@@ -17,6 +17,7 @@ import { GroupInfoModal } from '@/components/group-info-modal';
 import { UserInfoModal } from '@/components/user-info-modal';
 const ChatMediaGallery = dynamic(() => import('@/components/chat-media-gallery').then((m) => m.ChatMediaGallery), { ssr: false });
 import { getWallpaperId, wallpaperCss, getCustomWallpaperUrl, CUSTOM_WALLPAPER_ID } from '@/lib/wallpaper';
+import { getEnterSends, ENTER_SENDS_EVENT } from '@/lib/enter-to-send';
 import { blockUser, unblockUser, isBlockedByMe } from '@/lib/db/safety';
 import { EmojiPicker } from '@/components/emoji-picker';
 import { useRequireAuth } from '@/lib/auth/use-require-auth';
@@ -803,14 +804,17 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
   // Set once the user deliberately scrolls (wheel/touch) so the initial
   // auto-scroll settling stops fighting them.
   const userTookOverRef = useRef(false);
-  // Enter behavior by device: on a desktop/physical keyboard Enter sends and
-  // Shift+Enter inserts a newline; on touch/mobile Enter inserts a newline and
-  // you send with the send button (matches WhatsApp/Telegram/Signal on phones).
-  // Ctrl/Cmd+Enter always sends. Defaults to "send" until measured.
+  // Enter behavior: desktop/physical keyboard sends on Enter (Shift+Enter =
+  // newline); touch/mobile inserts a newline and you send with the button
+  // (matches WhatsApp/Telegram/Signal). Ctrl/Cmd+Enter always sends. The device
+  // default can be overridden in Settings ("Enviar con Enter"); we re-read it
+  // live when that preference changes.
   const enterSendsRef = useRef(true);
   useEffect(() => {
-    try { enterSendsRef.current = !window.matchMedia('(pointer: coarse)').matches; }
-    catch { /* keep the desktop default */ }
+    const read = () => { enterSendsRef.current = getEnterSends(); };
+    read();
+    window.addEventListener(ENTER_SENDS_EVENT, read);
+    return () => window.removeEventListener(ENTER_SENDS_EVENT, read);
   }, []);
 
   // Long-press support

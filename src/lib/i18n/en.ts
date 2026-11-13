@@ -1246,6 +1246,8 @@ const en = {
     pushResubscribe: 'Re-subscribe this device',
     notifSoundLabel: 'Notification sound',
     notifSoundHint: 'Tap an option to hear it and choose it.',
+    enterToSendLabel: 'Send with Enter',
+    enterToSendDesc: 'On: Enter sends and Shift+Enter adds a newline. Off: Enter adds a newline and you send with the button.',
     encTitle: 'End-to-end encryption',
     encDesc: 'Set up a private key on this device so you can turn on the lock in any chat. Once locked, only you and the other members can read the messages — not even the server.',
     encSetUp: 'Set up encryption',
