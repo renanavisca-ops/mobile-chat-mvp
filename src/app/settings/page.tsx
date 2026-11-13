@@ -14,6 +14,7 @@ import { validatePassword } from '@/lib/password';
 import { isMfaEnabled, enrollTotp, verifyEnroll, disableTotp, generateRecoveryCodes } from '@/lib/auth/mfa';
 import { WALLPAPERS, CUSTOM_WALLPAPER_ID, getWallpaperId, setWallpaperId as saveWallpaperId, uploadCustomWallpaper, getCustomWallpaperUrl } from '@/lib/wallpaper';
 import { NOTIF_SOUNDS, getNotifSound, setNotifSound as saveNotifSound, playNotifSound, type NotifSoundId } from '@/lib/notification-sound';
+import { getEnterSends, setEnterSends } from '@/lib/enter-to-send';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import { subscribeToPush, unsubscribeFromPush, isPushSubscribed, pushSupported } from '@/lib/push';
 import { isNativeApp } from '@/lib/native-push';
@@ -125,6 +126,7 @@ export default function SettingsPage() {
   const [pushErr, setPushErr] = useState('');
   const [pushOn, setPushOn] = useState(false);
   const [notifSound, setNotifSoundState] = useState<NotifSoundId>('chime');
+  const [enterSends, setEnterSendsState] = useState(true);
 
   useEffect(() => {
     isPushSubscribed().then(setPushOn).catch(() => {});
@@ -391,7 +393,14 @@ export default function SettingsPage() {
       getCustomWallpaperUrl().then(setCustomWallpaperUrl).catch(() => {});
     }
     setNotifSoundState(getNotifSound());
+    setEnterSendsState(getEnterSends());
   }, []);
+
+  function toggleEnterSends() {
+    const next = !enterSends;
+    setEnterSendsState(next);
+    setEnterSends(next);
+  }
 
   function chooseWallpaper(id: string) {
     saveWallpaperId(id);
@@ -985,6 +994,31 @@ export default function SettingsPage() {
                 <input ref={wallpaperInputRef} type="file" hidden accept="image/*" onChange={onWallpaperFileChange} />
               </div>
               <div className="mt-2 text-xs text-slate-500">{t('settings.wallpaperSavedNote')}</div>
+            </div>
+          </section>
+
+          <section className="space-y-3">
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500 ml-1">{t('settings.sectionChats')}</h2>
+            <div className="rounded-xl border border-slate-900 bg-slate-950/50 p-4 shadow-sm flex items-center justify-between gap-3">
+              <div>
+                <div className="text-sm font-medium text-slate-200">{t('settings.enterToSendLabel')}</div>
+                <div className="text-xs text-slate-400 mt-1">{t('settings.enterToSendDesc')}</div>
+              </div>
+              <button
+                onClick={toggleEnterSends}
+                role="switch"
+                aria-checked={enterSends}
+                aria-label={t('settings.enterToSendLabel')}
+                className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
+                  enterSends ? 'bg-emerald-600' : 'bg-slate-700'
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    enterSends ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
             </div>
           </section>
 

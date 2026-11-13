@@ -1248,6 +1248,8 @@ const es: Dictionary = {
     pushResubscribe: 'Volver a suscribir este dispositivo',
     notifSoundLabel: 'Sonido de notificación',
     notifSoundHint: 'Toca una opción para escucharla y elegirla.',
+    enterToSendLabel: 'Enviar con Enter',
+    enterToSendDesc: 'Activado: Enter envía y Mayús+Enter baja de línea. Desactivado: Enter baja de línea y envías con el botón.',
     encTitle: 'Cifrado de extremo a extremo',
     encDesc: 'Configura una clave privada en este dispositivo para poder activar el candado en cualquier chat. Una vez cifrado, solo tú y los demás miembros pueden leer los mensajes — ni siquiera el servidor.',
     encSetUp: 'Configurar cifrado',
