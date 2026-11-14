@@ -804,6 +804,9 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
   // Set once the user deliberately scrolls (wheel/touch) so the initial
   // auto-scroll settling stops fighting them.
   const userTookOverRef = useRef(false);
+  // Pending landing timers, so the open-landing can be re-armed as cached→network
+  // messages stream in without leaking timeouts.
+  const landTimersRef = useRef<number[]>([]);
   // Enter behavior: desktop/physical keyboard sends on Enter (Shift+Enter =
   // newline); touch/mobile inserts a newline and you send with the button
   // (matches WhatsApp/Telegram/Signal). Ctrl/Cmd+Enter always sends. The device
@@ -1503,49 +1506,59 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
     initialScrollDoneRef.current = false;
   }, [chatId]);
 
-  // Scroll behavior: on first open land on the first UNREAD message (so you pick
-  // up where you left off), or at the newest message when everything is read.
-  // After that, only auto-scroll when you're already near the bottom.
+  // Scroll behavior on open: land on the first UNREAD message (so you pick up
+  // where you left off), or at the newest message when everything is read.
+  //
+  // The conversation paints instantly from a per-chat cache that ends at the
+  // last message seen LAST time, then pulls everything newer from the network a
+  // moment later. So the landing must NOT finalize on the stale cached set —
+  // otherwise it lands at yesterday's tail and never follows the fresh messages
+  // down. We keep re-applying the landing (re-reading the live DOM each time, so
+  // the unread divider is honored once those rows arrive) across the cache→
+  // network load and async image heights, extending the window every time the
+  // message set grows, and stop the moment the user scrolls (userTookOverRef).
   const chatReady = !authLoading && !msgLoading;
   useEffect(() => {
     const el = scrollRef.current;
     if (!el || !chatReady || items.length === 0) return;
+
+    const applyLanding = () => {
+      const e = scrollRef.current;
+      if (!e || userTookOverRef.current) { initialScrollDoneRef.current = true; return; }
+      const divider = unreadDividerRef.current;
+      if (divider) {
+        // Put the "N new messages" divider just below the top of the viewport.
+        const delta = divider.getBoundingClientRect().top - e.getBoundingClientRect().top;
+        e.scrollTop = Math.max(0, e.scrollTop + delta - 12);
+        stickBottomRef.current = false;
+      } else {
+        e.scrollTop = e.scrollHeight;
+        stickBottomRef.current = true;
+      }
+    };
+
+    landTimersRef.current.forEach((t) => window.clearTimeout(t));
+    landTimersRef.current = [];
+
     if (!initialScrollDoneRef.current) {
-      initialScrollDoneRef.current = true;
-      const hasUnread = firstUnreadIdx >= 0 && unreadCount > 0;
-      // When there are unread messages we land on the divider, so we're NOT at
-      // the bottom; otherwise we stick to the newest message.
-      stickBottomRef.current = !hasUnread;
-      // Land on the target RELIABLY. A single jump often falls short because the
-      // final height isn't settled yet at first paint — images still decoding,
-      // the keyboard/safe-area resizing, or catch-up rows arriving a tick later.
-      // Re-apply over the first ~600ms; it stops the moment the user scrolls
-      // (userTookOverRef), so it never fights them.
-      const settle = () => {
-        const e = scrollRef.current;
-        if (!e || userTookOverRef.current) return;
-        const divider = unreadDividerRef.current;
-        if (hasUnread && divider) {
-          // Put the "N new messages" divider just below the top of the viewport.
-          const delta = divider.getBoundingClientRect().top - e.getBoundingClientRect().top;
-          e.scrollTop = Math.max(0, e.scrollTop + delta - 12);
-        } else {
-          e.scrollTop = e.scrollHeight;
-        }
-      };
-      settle();
-      const raf = requestAnimationFrame(settle);
-      const timers = [60, 150, 350, 600].map((ms) => window.setTimeout(settle, ms));
+      applyLanding();
+      const raf = requestAnimationFrame(applyLanding);
+      // Re-apply across the fresh-message load + decoding; the last message set
+      // change re-arms these, so the window naturally covers "catch-up" rows.
+      landTimersRef.current = [60, 150, 350, 600, 1000].map((ms) => window.setTimeout(applyLanding, ms));
+      // Lock the landing once things go quiet, so later incoming messages don't
+      // yank the view back to the divider while you're reading.
+      landTimersRef.current.push(window.setTimeout(() => { initialScrollDoneRef.current = true; }, 1100));
       return () => {
         cancelAnimationFrame(raf);
-        timers.forEach((t) => window.clearTimeout(t));
+        landTimersRef.current.forEach((t) => window.clearTimeout(t));
+        landTimersRef.current = [];
       };
     }
-    // Re-pin to the newest message whenever content grows (new message OR media
-    // finishing loading), as long as the user hasn't scrolled up.
-    if (stickBottomRef.current) {
-      el.scrollTop = el.scrollHeight;
-    }
+
+    // After landing: re-pin to the newest message when content grows (new message
+    // or media finishing loading), only while already near the bottom.
+    if (stickBottomRef.current) el.scrollTop = el.scrollHeight;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items.length, chatReady, signedUrls]);
 
