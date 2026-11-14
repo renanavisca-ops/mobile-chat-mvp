@@ -23,6 +23,11 @@ export function useChatRealtime(chatId: string) {
   const [loading, setLoading] = useState(() => !(getCached<MessageRow[]>(`msgs2:${chatId}`)?.length));
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
+  // True until the network catch-up for this open completes. The cache paints
+  // instantly (so `loading` is false), but it ends at the last message seen last
+  // time — the messages that arrived while away only land once this flips false.
+  // The UI uses it to avoid finalizing the open-scroll on the stale cached tail.
+  const [catchingUp, setCatchingUp] = useState(true);
 
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const [erasingUsers, setErasingUsers] = useState<string[]>([]);
@@ -82,7 +87,8 @@ export function useChatRealtime(chatId: string) {
           setMessages((prev) => mergeMessages(prev, rows));
           markMessagesAsRead(chatId).catch(console.error);
         })
-        .catch(() => {});
+        .catch(() => {})
+        .finally(() => { if (alive) setCatchingUp(false); });
     } else {
       setLoading(true);
       listMessages(chatId, PAGE_SIZE, 0)
@@ -93,7 +99,8 @@ export function useChatRealtime(chatId: string) {
           setLoading(false);
           markMessagesAsRead(chatId).catch(console.error);
         })
-        .catch(() => setLoading(false));
+        .catch(() => setLoading(false))
+        .finally(() => { if (alive) setCatchingUp(false); });
     }
 
     return () => {
@@ -366,6 +373,7 @@ export function useChatRealtime(chatId: string) {
   return {
     messages,
     loading,
+    catchingUp,
     appendLocal,
     clearMessages,
     loadMore,

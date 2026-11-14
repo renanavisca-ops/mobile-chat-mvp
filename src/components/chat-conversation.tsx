@@ -1,7 +1,7 @@
 'use client';
 
 import { apiFetch } from '@/lib/api/client';
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { ChevronLeftIcon, SearchIcon, InfoIcon, MoreVerticalIcon, XIcon } from '@/components/icons';
@@ -196,7 +196,7 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
 
   const supabase = browserSupabase();
   const { startCall, busy: callBusy } = useCall();
-  const { messages, loading: msgLoading, appendLocal, clearMessages, loadMore, hasMore, loadingMore, typingUsers, erasingUsers, recordingUsers, setMeActivity, reactions, pollVotes, hiddenIds } = useChatRealtime(chatId);
+  const { messages, loading: msgLoading, catchingUp, appendLocal, clearMessages, loadMore, hasMore, loadingMore, typingUsers, erasingUsers, recordingUsers, setMeActivity, reactions, pollVotes, hiddenIds } = useChatRealtime(chatId);
 
   // chat details
   const [chat, setChat] = useState<ChatSummary | null>(null);
@@ -1511,44 +1511,44 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
   //
   // The conversation paints instantly from a per-chat cache that ends at the
   // last message seen LAST time, then pulls everything newer from the network a
-  // moment later. So the landing must NOT finalize on the stale cached set —
-  // otherwise it lands at yesterday's tail and never follows the fresh messages
-  // down. We keep re-applying the landing (re-reading the live DOM each time, so
-  // the unread divider is honored once those rows arrive) across the cache→
-  // network load and async image heights, extending the window every time the
-  // message set grows, and stop the moment the user scrolls (userTookOverRef).
+  // moment later (`catchingUp`). The landing must NOT finalize on the stale
+  // cached tail — otherwise it lands at yesterday and never follows the fresh
+  // messages down. So we keep anchoring to the target (re-reading the live DOM,
+  // so the unread divider is honored once those rows arrive) and only LOCK the
+  // landing once the network catch-up is in AND heights have settled, or the
+  // moment the user scrolls (userTookOverRef).
+  const reanchorOnOpen = useCallback(() => {
+    const e = scrollRef.current;
+    if (!e || userTookOverRef.current || initialScrollDoneRef.current) return;
+    const divider = unreadDividerRef.current;
+    if (divider) {
+      // Put the "N new messages" divider just below the top of the viewport.
+      const delta = divider.getBoundingClientRect().top - e.getBoundingClientRect().top;
+      e.scrollTop = Math.max(0, e.scrollTop + delta - 12);
+      stickBottomRef.current = false;
+    } else {
+      e.scrollTop = e.scrollHeight;
+      stickBottomRef.current = true;
+    }
+  }, []);
+
   const chatReady = !authLoading && !msgLoading;
   useEffect(() => {
     const el = scrollRef.current;
     if (!el || !chatReady || items.length === 0) return;
 
-    const applyLanding = () => {
-      const e = scrollRef.current;
-      if (!e || userTookOverRef.current) { initialScrollDoneRef.current = true; return; }
-      const divider = unreadDividerRef.current;
-      if (divider) {
-        // Put the "N new messages" divider just below the top of the viewport.
-        const delta = divider.getBoundingClientRect().top - e.getBoundingClientRect().top;
-        e.scrollTop = Math.max(0, e.scrollTop + delta - 12);
-        stickBottomRef.current = false;
-      } else {
-        e.scrollTop = e.scrollHeight;
-        stickBottomRef.current = true;
-      }
-    };
-
     landTimersRef.current.forEach((t) => window.clearTimeout(t));
     landTimersRef.current = [];
 
     if (!initialScrollDoneRef.current) {
-      applyLanding();
-      const raf = requestAnimationFrame(applyLanding);
-      // Re-apply across the fresh-message load + decoding; the last message set
-      // change re-arms these, so the window naturally covers "catch-up" rows.
-      landTimersRef.current = [60, 150, 350, 600, 1000].map((ms) => window.setTimeout(applyLanding, ms));
-      // Lock the landing once things go quiet, so later incoming messages don't
-      // yank the view back to the divider while you're reading.
-      landTimersRef.current.push(window.setTimeout(() => { initialScrollDoneRef.current = true; }, 1100));
+      reanchorOnOpen();
+      const raf = requestAnimationFrame(reanchorOnOpen);
+      landTimersRef.current = [60, 150, 300, 500, 800].map((ms) => window.setTimeout(reanchorOnOpen, ms));
+      // Finalize ONLY once the network catch-up is in (today's messages present);
+      // until then keep anchoring so we never lock onto the stale cached tail.
+      if (!catchingUp) {
+        landTimersRef.current.push(window.setTimeout(() => { initialScrollDoneRef.current = true; }, 700));
+      }
       return () => {
         cancelAnimationFrame(raf);
         landTimersRef.current.forEach((t) => window.clearTimeout(t));
@@ -1560,7 +1560,7 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
     // or media finishing loading), only while already near the bottom.
     if (stickBottomRef.current) el.scrollTop = el.scrollHeight;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items.length, chatReady, signedUrls]);
+  }, [items.length, chatReady, signedUrls, catchingUp, reanchorOnOpen]);
 
   // Play a festive celebration the first time you SEE a festive message — i.e.
   // when you read it (open the chat), or live if you're already in the chat —
@@ -4109,6 +4109,10 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
                                   src={url}
                                   alt={m.body.alt || m.body.text || t('chat.imageAlt')}
                                   onLoad={() => {
+                                    // While still landing on open, keep the view
+                                    // anchored to the unread divider / bottom as
+                                    // image heights resolve above it.
+                                    if (!initialScrollDoneRef.current) { reanchorOnOpen(); return; }
                                     if (stickBottomRef.current && scrollRef.current) {
                                       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
                                     }
