@@ -229,8 +229,11 @@ export function useChatRealtime(chatId: string) {
                   notify('Nuevo mensaje', { body: txt });
                 } catch {}
               }
-              // Si el mensaje no es mío, marcar como leído
-              if (newMsg.sender_id && newMsg.sender_id !== userId) {
+              // Si el mensaje no es mío, marcarlo leído SOLO si el chat está en
+              // primer plano (como WhatsApp/Telegram). Si llega con la app/chat
+              // en segundo plano, se queda no leído y aparece bajo el divisor al
+              // volver a abrir.
+              if (newMsg.sender_id && newMsg.sender_id !== userId && !document.hidden) {
                 markMessagesAsRead(chatId).catch(console.error);
               }
             })();

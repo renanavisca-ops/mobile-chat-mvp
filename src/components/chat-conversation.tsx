@@ -1473,22 +1473,48 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
     }
   }
 
-  // Persist the newest message time as "read" while the chat is open.
+  // Advance the on-device "last read" marker to the newest message — but ONLY
+  // while the chat is actually in the FOREGROUND (like WhatsApp/Telegram). If we
+  // advanced it for messages that arrived while the app/chat was backgrounded
+  // (the component stays mounted), they'd be silently marked read and never get
+  // an unread divider on the next open. We also advance it when the chat returns
+  // to the foreground, since by then you're looking at it.
   useEffect(() => {
     if (typeof window === 'undefined' || messages.length === 0) return;
-    const newest = messages[messages.length - 1].created_at;
-    try { window.localStorage.setItem(`toky:lastread:${chatId}`, newest); } catch { /* ignore */ }
+    const advance = () => {
+      if (document.visibilityState !== 'visible') return;
+      const newest = messages[messages.length - 1].created_at;
+      try { window.localStorage.setItem(`toky:lastread:${chatId}`, newest); } catch { /* ignore */ }
+    };
+    advance();
+    document.addEventListener('visibilitychange', advance);
+    return () => document.removeEventListener('visibilitychange', advance);
   }, [messages, chatId]);
 
-  // First incoming message newer than the frozen last-read marker → divider row.
-  const firstUnreadIdx = initialLastRead
-    ? items.findIndex(
-        (mm) =>
-          mm.sender_type !== 'system' &&
-          !isMine(mm) &&
-          new Date(mm.created_at).getTime() > new Date(initialLastRead).getTime(),
-      )
-    : -1;
+  // Unread divider — like Telegram/WhatsApp: it marks where YOU left off and
+  // stays put for the whole visit. We capture the FIRST unread incoming message
+  // ONCE, as soon as the network catch-up is in (so today's messages are
+  // present), then FREEZE it by id: marking messages read, refetches, or new
+  // incoming messages never move or erase the line. A message counts as unread
+  // if the server still has it unread (read === false, same source as the
+  // chat-list badge, so they agree) or it arrived after the last-read marker.
+  const [firstUnreadId, setFirstUnreadId] = useState<string | null>(null);
+  const unreadCapturedRef = useRef(false);
+  useEffect(() => {
+    if (unreadCapturedRef.current || catchingUp || items.length === 0) return;
+    unreadCapturedRef.current = true;
+    const marker = initialLastRead ? new Date(initialLastRead).getTime() : 0;
+    const first = items.find(
+      (m) =>
+        m.sender_type !== 'system' &&
+        !isMine(m) &&
+        (m.read === false || (marker > 0 && new Date(m.created_at).getTime() > marker)),
+    );
+    setFirstUnreadId(first ? first.id : null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [catchingUp, items]);
+
+  const firstUnreadIdx = firstUnreadId ? items.findIndex((m) => m.id === firstUnreadId) : -1;
   const unreadCount =
     firstUnreadIdx >= 0
       ? items.slice(firstUnreadIdx).filter((mm) => mm.sender_type !== 'system' && !isMine(mm)).length
@@ -1560,7 +1586,7 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
     // or media finishing loading), only while already near the bottom.
     if (stickBottomRef.current) el.scrollTop = el.scrollHeight;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items.length, chatReady, signedUrls, catchingUp, reanchorOnOpen]);
+  }, [items.length, chatReady, signedUrls, catchingUp, firstUnreadId, reanchorOnOpen]);
 
   // Play a festive celebration the first time you SEE a festive message — i.e.
   // when you read it (open the chat), or live if you're already in the chat —
