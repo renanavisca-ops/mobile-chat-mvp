@@ -865,6 +865,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
               callerName: myNameRef.current,
               video: opts.video,
               chatId: opts.chatId,
+              callId,
             }),
           });
         } catch {
@@ -902,7 +903,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
       void apiFetch('/api/push/call', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${sess.session?.access_token}` },
-        body: JSON.stringify({ calleeIds: ids, callerName: myNameRef.current, video: callVideoRef.current, chatId: callChatIdRef.current ?? '' }),
+        body: JSON.stringify({ calleeIds: ids, callerName: myNameRef.current, video: callVideoRef.current, chatId: callChatIdRef.current ?? '', callId: callIdRef.current }),
       });
     } catch { /* best-effort */ }
     // eslint-disable-next-line react-hooks/exhaustive-deps

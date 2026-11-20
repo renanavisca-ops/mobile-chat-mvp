@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { reportServerError } from '@/lib/observability';
 import webpush from 'web-push';
 import { supabaseAdmin } from '@/lib/supabase/admin';
-import { sendToTokens } from '@/lib/fcm';
+import { sendCallDataToTokens } from '@/lib/fcm';
 
 /**
  * Sends a Web Push "incoming call" notification to the callees so their device
@@ -32,6 +32,7 @@ export async function POST(req: Request) {
     const callerName = String(body.callerName ?? 'Someone').slice(0, 80);
     const video = !!body.video;
     const chatId = body.chatId ? String(body.chatId) : null;
+    const callId = body.callId ? String(body.callId) : '';
     if (calleeIds.length === 0) return NextResponse.json({ ok: true, skipped: 'no_callees' });
 
     // Never notify a callee who has blocked the caller (or whom the caller
@@ -95,7 +96,11 @@ export async function POST(req: Request) {
     let nativeSent = 0;
     if (hasNative) {
       const tokens = deviceTokens!.map((d) => d.token);
-      const { staleTokens, sent } = await sendToTokens(tokens, { title, body: text, url }, CALL_TTL_SECONDS);
+      const { staleTokens, sent } = await sendCallDataToTokens(
+        tokens,
+        { callId, callerName, video, chatId: chatId || '', url },
+        CALL_TTL_SECONDS
+      );
       nativeSent = sent;
       if (staleTokens.length > 0) {
         await supabaseAdmin.from('device_tokens').delete().in('token', staleTokens);

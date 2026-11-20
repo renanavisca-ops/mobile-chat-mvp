@@ -132,3 +132,81 @@ export async function sendToTokens(
 
   return { staleTokens, sent };
 }
+
+/**
+ * Delivers an INCOMING-CALL push as a DATA-only message on Android, so the
+ * native MessagingService fires even when the app is killed and builds a
+ * full-screen, ringing call notification itself (WhatsApp-style). iOS has no
+ * native call UI here, so it still gets a normal alert via APNs.
+ */
+export async function sendCallDataToTokens(
+  tokens: string[],
+  data: { callId: string; callerName: string; video: boolean; chatId: string; url: string },
+  ttlSeconds: number
+): Promise<{ staleTokens: string[]; sent: number }> {
+  const sa = getServiceAccount();
+  if (!sa || tokens.length === 0) return { staleTokens: [], sent: 0 };
+
+  const accessToken = await getAccessToken(sa);
+  const endpoint = `https://fcm.googleapis.com/v1/projects/${sa.project_id}/messages:send`;
+  const apnsExpiration = Math.floor(Date.now() / 1000) + ttlSeconds;
+
+  const staleTokens: string[] = [];
+  let sent = 0;
+
+  await Promise.all(
+    tokens.map(async (token) => {
+      const message = {
+        message: {
+          token,
+          // DATA-ONLY: no top-level / android `notification`, so Android does not
+          // auto-show a tray notification and instead wakes our native handler.
+          data: {
+            type: 'incoming_call',
+            callId: data.callId,
+            callerName: data.callerName,
+            video: data.video ? '1' : '0',
+            chatId: data.chatId || '',
+            url: data.url,
+          },
+          android: {
+            priority: 'HIGH',
+            ttl: `${ttlSeconds}s`,
+          },
+          apns: {
+            headers: { 'apns-expiration': String(apnsExpiration), 'apns-priority': '10' },
+            payload: {
+              aps: {
+                alert: {
+                  title: data.callerName,
+                  body: data.video ? '📹 Videollamada entrante' : '📞 Llamada entrante',
+                },
+                sound: 'default',
+                badge: 1,
+              },
+            },
+          },
+        },
+      };
+      try {
+        const res = await fetch(endpoint, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify(message),
+        });
+        if (res.ok) {
+          sent++;
+          return;
+        }
+        const text = await res.text().catch(() => '');
+        if (res.status === 404 || (res.status === 400 && /not.?registered|invalid.*token/i.test(text))) {
+          staleTokens.push(token);
+        }
+      } catch {
+        // transient network error — leave the token in place
+      }
+    })
+  );
+
+  return { staleTokens, sent };
+}

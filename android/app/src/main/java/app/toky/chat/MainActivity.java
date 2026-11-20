@@ -8,6 +8,22 @@ import android.util.Rational;
 import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
+    /** True while the app is in the foreground, so an incoming-call push rings
+     *  in-app (web UI) instead of also posting the native full-screen notification. */
+    public static volatile boolean isForeground = false;
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        isForeground = true;
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        isForeground = false;
+    }
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
         // Must be registered before super.onCreate() so the bridge picks it up.
