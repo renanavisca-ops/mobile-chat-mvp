@@ -42,14 +42,14 @@ public class CallForegroundService extends Service {
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .build();
 
-        // Microphone only. Video does not continue in the background (the WebView
-        // pauses it when backgrounded / the screen is off; there is no
-        // Picture-in-Picture), so the service never uses the camera in the
-        // background and must NOT declare a camera type — declaring one we don't
-        // use would fail Google Play's foreground-service review.
+        // A video call keeps streaming the camera while the app is in the
+        // Picture-in-Picture floating window, which Android 14+ requires the
+        // service to declare as a camera type (in addition to microphone).
+        boolean video = intent != null && intent.getBooleanExtra("video", false);
         int type = 0;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             type = ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE;
+            if (video) type |= ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA;
         }
         ServiceCompat.startForeground(this, NOTIF_ID, notification, type);
 

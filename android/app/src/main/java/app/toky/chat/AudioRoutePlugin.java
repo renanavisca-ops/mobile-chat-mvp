@@ -32,6 +32,11 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 @CapacitorPlugin(name = "AudioRoute")
 public class AudioRoutePlugin extends Plugin {
 
+    /** True while a VIDEO call is in progress, so MainActivity can shrink into a
+     *  floating Picture-in-Picture window (keeping the video visible) when the
+     *  user leaves the app. Cleared when the call ends. */
+    public static volatile boolean activeVideoCall = false;
+
     private AudioManager audioManager() {
         Context ctx = getContext();
         if (ctx == null) return null;
@@ -47,6 +52,7 @@ public class AudioRoutePlugin extends Plugin {
         }
         am.setMode(AudioManager.MODE_IN_COMMUNICATION);
         boolean video = Boolean.TRUE.equals(call.getBoolean("video", false));
+        activeVideoCall = video;
         try {
             Intent i = new Intent(getContext(), CallForegroundService.class);
             i.putExtra("video", video);
@@ -164,6 +170,7 @@ public class AudioRoutePlugin extends Plugin {
 
     @PluginMethod
     public void stopCallAudio(PluginCall call) {
+        activeVideoCall = false;
         AudioManager am = audioManager();
         if (am != null) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
