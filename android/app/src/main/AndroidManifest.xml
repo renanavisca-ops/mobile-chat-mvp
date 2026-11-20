@@ -15,6 +15,8 @@
             android:label="@string/title_activity_main"
             android:theme="@style/AppTheme.NoActionBarLaunch"
             android:launchMode="singleTask"
+            android:supportsPictureInPicture="true"
+            android:resizeableActivity="true"
             android:exported="true">
 
             <intent-filter>
@@ -44,13 +46,12 @@
                 android:resource="@xml/file_paths"></meta-data>
         </provider>
 
-        <!-- Keeps a call alive (mic + CPU) while the screen is off. Microphone
-             only: the WebView pauses video when backgrounded/screen-off (no
-             Picture-in-Picture), so the camera is NOT streamed in the background
-             and the service never needs a camera type. -->
+        <!-- Keeps a call alive (mic + CPU) while the screen is off / the app is in
+             Picture-in-Picture. A video call keeps streaming the camera in the PiP
+             floating window, so the service declares the camera type too. -->
         <service
             android:name=".CallForegroundService"
-            android:foregroundServiceType="microphone"
+            android:foregroundServiceType="microphone|camera"
             android:exported="false" />
 
         <!-- Captures the screen (MediaProjection) while sharing during a call -->
@@ -76,11 +77,12 @@
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
 
-    <!-- Keep calls alive with the screen off (foreground service + wake lock).
-         Microphone-typed only: video does not continue in the background (the
-         WebView pauses it; no Picture-in-Picture), so no FOREGROUND_SERVICE_CAMERA. -->
+    <!-- Keep calls alive with the screen off / in Picture-in-Picture (foreground
+         service + wake lock). A video call keeps the camera streaming in the PiP
+         floating window, hence FOREGROUND_SERVICE_CAMERA. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
     <!-- Screen sharing during a call (MediaProjection foreground service) -->
