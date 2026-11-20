@@ -12,14 +12,16 @@ public class MainActivity extends BridgeActivity {
      *  in-app (web UI) instead of also posting the native full-screen notification. */
     public static volatile boolean isForeground = false;
 
+    // Capacitor's BridgeActivity declares onResume()/onPause() as public, so the
+    // overrides must be public too (a protected override is "weaker access").
     @Override
-    protected void onResume() {
+    public void onResume() {
         super.onResume();
         isForeground = true;
     }
 
     @Override
-    protected void onPause() {
+    public void onPause() {
         super.onPause();
         isForeground = false;
     }
