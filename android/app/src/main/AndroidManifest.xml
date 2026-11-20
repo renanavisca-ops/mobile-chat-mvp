@@ -44,10 +44,13 @@
                 android:resource="@xml/file_paths"></meta-data>
         </provider>
 
-        <!-- Keeps a call alive (mic + CPU) while the screen is off -->
+        <!-- Keeps a call alive (mic + CPU) while the screen is off. Microphone
+             only: the WebView pauses video when backgrounded/screen-off (no
+             Picture-in-Picture), so the camera is NOT streamed in the background
+             and the service never needs a camera type. -->
         <service
             android:name=".CallForegroundService"
-            android:foregroundServiceType="microphone|camera"
+            android:foregroundServiceType="microphone"
             android:exported="false" />
 
         <!-- Captures the screen (MediaProjection) while sharing during a call -->
@@ -73,10 +76,11 @@
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
 
-    <!-- Keep calls alive with the screen off (foreground service + wake lock) -->
+    <!-- Keep calls alive with the screen off (foreground service + wake lock).
+         Microphone-typed only: video does not continue in the background (the
+         WebView pauses it; no Picture-in-Picture), so no FOREGROUND_SERVICE_CAMERA. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
     <!-- Screen sharing during a call (MediaProjection foreground service) -->
