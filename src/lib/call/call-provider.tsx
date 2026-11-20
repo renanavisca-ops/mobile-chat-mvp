@@ -1314,6 +1314,60 @@ export function CallProvider({ children }: { children: ReactNode }) {
     incomingCallIdRef.current = incoming?.callId ?? null;
   }, [incoming]);
 
+  // Recover a call that started while the app was CLOSED/offline. The "invite"
+  // is a realtime broadcast (ephemeral), so a closed app misses it and the push
+  // notification alone can't present the call. On open / return to foreground,
+  // look up a still-ringing call addressed to me (the persistent `calls` row)
+  // and show the incoming-call screen, so tapping the call notification actually
+  // lets you answer. Caller stays in the call:<id> presence channel while
+  // ringing, so accepting connects via the mesh just like a live invite.
+  useEffect(() => {
+    if (!myId) return;
+    let alive = true;
+    const check = async () => {
+      if (!alive || phaseRef.current !== 'idle' || !myIdRef.current) return;
+      const sinceIso = new Date(Date.now() - 45_000).toISOString();
+      const { data: rows } = await (supabase as any)
+        .from('calls')
+        .select('id, chat_id, caller_id, peer_id, is_video, is_group, started_at')
+        .eq('peer_id', myIdRef.current)
+        .eq('answered', false)
+        .is('ended_at', null)
+        .gt('started_at', sinceIso)
+        .order('started_at', { ascending: false })
+        .limit(1);
+      const row = rows?.[0];
+      if (!alive || !row || phaseRef.current !== 'idle') return;
+      if (row.caller_id === myIdRef.current) return;
+      if (incomingCallIdRef.current === row.id || callIdRef.current === row.id) return;
+      if (await isBlockedWith(row.caller_id).catch(() => false)) return;
+      const { data: prof } = await (supabase as any)
+        .from('profiles').select('username, display_name').eq('id', row.caller_id).maybeSingle();
+      if (!alive || phaseRef.current !== 'idle') return;
+      const fromName = (prof as any)?.display_name || (prof as any)?.username || 'Someone';
+      setIncoming({
+        callId: row.id,
+        chatId: row.chat_id ?? '',
+        from: row.caller_id,
+        fromName,
+        video: !!row.is_video,
+        isGroup: !!row.is_group,
+        label: fromName,
+      });
+      setPhaseBoth('ringing');
+    };
+    check();
+    const onVisible = () => { if (document.visibilityState === 'visible') check(); };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', check);
+    return () => {
+      alive = false;
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', check);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [myId]);
+
   // Unlock the ring AudioContext on the first user gesture so an incoming ring
   // (or ringback) is actually audible on mobile, where a fresh AudioContext
   // created at call time stays 'suspended' and plays nothing.
