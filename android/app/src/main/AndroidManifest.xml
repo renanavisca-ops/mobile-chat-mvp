@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <application
         android:allowBackup="true"
@@ -59,6 +60,33 @@
             android:name=".ScreenCaptureService"
             android:foregroundServiceType="mediaProjection"
             android:exported="false" />
+
+        <!-- Incoming-call push handling. The Firebase messaging plugin registers
+             its own MessagingService in its manifest; we REPLACE it with ours so a
+             data-only "incoming_call" push rings natively (full-screen call UI,
+             WhatsApp-style) even when the app is killed. Ours extends the plugin's
+             service and delegates every other message back to it, so normal push
+             (notifications + JS delivery) is unaffected. -->
+        <service
+            android:name="io.capawesome.capacitorjs.plugins.firebase.messaging.MessagingService"
+            tools:node="remove" />
+        <service
+            android:name=".TokyMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+
+        <!-- Transparent trampoline launched by the full-screen call notification.
+             Wakes/unlocks the screen, then opens MainActivity (the web call UI). -->
+        <activity
+            android:name=".IncomingCallActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:launchMode="singleInstance"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
     </application>
 
     <!-- Permissions -->
@@ -67,6 +95,12 @@
 
     <!-- Push notifications (Android 13+ prompts at runtime) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!-- Full-screen incoming-call notification that rings over the lock screen
+         even when the app is killed (like a real phone call). Calling apps
+         qualify for this permission; declare the app's use as "Calling" / VoIP
+         in the Play Console if prompted. -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
 
     <!-- Share location (one-time, @capacitor/geolocation) -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
