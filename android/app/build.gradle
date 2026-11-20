@@ -60,6 +60,12 @@ dependencies {
     implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
     implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
     implementation project(':capacitor-android')
+    // Firebase Messaging on the APP module's classpath so TokyMessagingService
+    // (which extends the plugin's MessagingService -> FirebaseMessagingService)
+    // compiles: the plugin declares this as an `implementation` dep, which is
+    // NOT exposed transitively, so without this line javac can't resolve the
+    // Service -> Context chain. Version pinned to the plugin's default (23.4.1).
+    implementation "com.google.firebase:firebase-messaging:23.4.1"
     testImplementation "junit:junit:$junitVersion"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
