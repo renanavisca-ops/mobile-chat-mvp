@@ -82,15 +82,18 @@
     <!-- Screen sharing during a call (MediaProjection foreground service) -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
 
-    <!-- Save photos/videos to the gallery (@capacitor-community/media). Writing to
-         MediaStore needs WRITE_EXTERNAL_STORAGE only up to Android 9; the READ_MEDIA_*
-         permissions are the Android 13+ replacements for READ_EXTERNAL_STORAGE. -->
+    <!-- Save received photos/videos to the gallery (@capacitor-community/media).
+         The app only SAVES (writes) to the gallery and never BROWSES/reads it —
+         media is picked through the system file picker (<input type="file">),
+         which needs no permission. So on Android 13+ no READ_MEDIA_IMAGES/VIDEO
+         is requested (that avoids Google Play's "Photo and video permissions"
+         declaration). Writing to MediaStore needs WRITE_EXTERNAL_STORAGE only up
+         to Android 9; READ_EXTERNAL_STORAGE (<=Android 12) is kept for the legacy
+         WebView file chooser. -->
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="29" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="32" />
-    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
-    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
 
     <!-- Hardware implied by the permissions above is used opportunistically but
          NOT required to install the app. Without these explicit required="false"
