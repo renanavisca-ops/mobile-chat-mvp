@@ -133,15 +133,20 @@ public class AudioRoutePlugin extends Plugin {
 
         boolean effective = on;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            if (on) {
-                AudioDeviceInfo speaker = null;
-                for (AudioDeviceInfo d : am.getAvailableCommunicationDevices()) {
-                    if (d.getType() == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER) {
-                        speaker = d;
-                        break;
-                    }
+            // Pick the loudspeaker when ON, otherwise FORCE the earpiece. Just
+            // clearing the device lets the system route audio wherever it likes,
+            // which left callees with no sound until they manually chose the
+            // earpiece — so we select it explicitly, like a normal phone call.
+            int wantType = on ? AudioDeviceInfo.TYPE_BUILTIN_SPEAKER : AudioDeviceInfo.TYPE_BUILTIN_EARPIECE;
+            AudioDeviceInfo target = null;
+            for (AudioDeviceInfo d : am.getAvailableCommunicationDevices()) {
+                if (d.getType() == wantType) {
+                    target = d;
+                    break;
                 }
-                effective = speaker != null && am.setCommunicationDevice(speaker);
+            }
+            if (target != null) {
+                effective = am.setCommunicationDevice(target) && on;
             } else {
                 am.clearCommunicationDevice();
                 effective = false;

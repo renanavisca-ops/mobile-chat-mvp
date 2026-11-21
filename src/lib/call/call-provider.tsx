@@ -536,9 +536,10 @@ export function CallProvider({ children }: { children: ReactNode }) {
     if (localVideoRef.current && localStreamRef.current) {
       localVideoRef.current.srcObject = localStreamRef.current;
     }
-    // `compact` toggles whether the local self-view is mounted (hidden in PiP),
-    // so re-attach the stream when it remounts on returning to full screen.
-  }, [phase, cameraOff, participants, compact]);
+    // `compact`/`minimized` toggle whether the local self-view is mounted, so
+    // re-attach the stream when it remounts (e.g. after returning to full screen
+    // or stopping screen share, which previously left the camera preview blank).
+  }, [phase, cameraOff, participants, compact, minimized]);
 
   async function getIceServers(): Promise<RTCIceServer[]> {
     try {
@@ -1575,49 +1576,6 @@ export function CallProvider({ children }: { children: ReactNode }) {
         </div>
       )}
 
-      {/* Minimized call bar — shown while I share my screen, so the real Toky
-          app is usable behind it (and visible/controllable to the helper). */}
-      {phase === 'incall' && minimized && (
-        <div className="fixed inset-x-0 bottom-0 z-[96] flex justify-center px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-          <div className="toky-glass flex items-center gap-2 rounded-2xl border border-white/10 px-3 py-2 shadow-2xl">
-            <span className="flex items-center gap-1.5 pl-1 pr-1 text-xs font-medium text-emerald-300">
-              <ScreenShareIcon size={16} /> {t('call.sharingScreen')}
-            </span>
-            <button
-              type="button"
-              onClick={toggleMute}
-              aria-label={muted ? t('call.unmute') : t('call.mute')}
-              className={`grid h-10 w-10 place-items-center rounded-full ${
-                muted ? 'bg-white text-slate-900' : 'bg-slate-800 text-white hover:bg-slate-700'
-              }`}
-            >
-              {muted ? <MicOffIcon size={18} /> : <MicIcon size={18} />}
-            </button>
-            <button
-              type="button"
-              onClick={() => setMinimized(false)}
-              className="rounded-full bg-slate-800 px-3 py-2 text-xs font-medium text-white hover:bg-slate-700"
-            >
-              {t('call.expand')}
-            </button>
-            <button
-              type="button"
-              onClick={() => void stopScreenShare()}
-              className="rounded-full bg-slate-800 px-3 py-2 text-xs font-medium text-white hover:bg-slate-700"
-            >
-              {t('call.stopScreenShare')}
-            </button>
-            <button
-              type="button"
-              onClick={endCall}
-              aria-label={t('call.hangUp')}
-              className="grid h-10 w-10 place-items-center rounded-full bg-rose-600 text-white hover:bg-rose-500"
-            >
-              <PhoneOffIcon size={18} />
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* The helper's live pointer, drawn over my whole viewport while I share. */}
       {phase === 'incall' && screenSharing && remotePtr && (
@@ -1780,15 +1738,29 @@ export function CallProvider({ children }: { children: ReactNode }) {
         </div>
       )}
 
-      {/* Active call */}
-      {phase === 'incall' && !minimized && (
+      {/* Active call. Rendered whenever a call is up (not gated on !minimized) so
+          the remote media element stays MOUNTED when you minimize — otherwise
+          the remote audio/video is torn down. Minimized = a small floating
+          window (like WhatsApp) with the app usable behind it. */}
+      {phase === 'incall' && (
         <div
-          className="fixed inset-0 z-[95] bg-slate-950"
-          style={{
-            backgroundImage:
-              'radial-gradient(40rem 40rem at 50% 12%, rgba(99,102,241,0.22), transparent 60%), radial-gradient(34rem 34rem at 80% 100%, rgba(56,189,248,0.14), transparent 55%)',
+          className={
+            minimized
+              ? 'fixed bottom-24 right-3 z-[96] h-44 w-28 overflow-hidden rounded-2xl border border-white/10 bg-slate-950 shadow-2xl'
+              : 'fixed inset-0 z-[95] bg-slate-950'
+          }
+          style={
+            minimized
+              ? undefined
+              : {
+                  backgroundImage:
+                    'radial-gradient(40rem 40rem at 50% 12%, rgba(99,102,241,0.22), transparent 60%), radial-gradient(34rem 34rem at 80% 100%, rgba(56,189,248,0.14), transparent 55%)',
+                }
+          }
+          onClick={() => {
+            if (minimized) { setMinimized(false); return; }
+            if (!compact) { if (controlsVisible) setControlsVisible(false); else bumpControls(); }
           }}
-          onClick={() => { if (!compact) { if (controlsVisible) setControlsVisible(false); else bumpControls(); } }}
         >
           <div className="absolute inset-0 overflow-hidden">
             {oneToOne ? (
@@ -1814,7 +1786,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
                     <div className="font-display text-xl font-bold text-slate-100">{label}</div>
                   </div>
                 )}
-                {localHasVideo && !compact && (
+                {localHasVideo && !compact && !minimized && (
                   <video
                     ref={localVideoRef}
                     autoPlay
@@ -1856,8 +1828,8 @@ export function CallProvider({ children }: { children: ReactNode }) {
               </div>
             )}
 
-            {/* Status (hidden in PiP, fades with the chrome) */}
-            {!compact && (
+            {/* Status (hidden in PiP / when minimized, fades with the chrome) */}
+            {!compact && !minimized && (
               <div
                 className={`pointer-events-none absolute left-0 right-0 top-6 text-center transition-opacity duration-300 ${
                   controlsVisible ? 'opacity-100' : 'opacity-0'
@@ -1868,17 +1840,51 @@ export function CallProvider({ children }: { children: ReactNode }) {
                 {errText && <div className="mt-1 text-xs text-rose-300">{errText}</div>}
               </div>
             )}
+
+            {/* Minimized floating window: a tiny hang-up, and (if sharing) stop.
+                Tapping the window itself expands back to full screen. */}
+            {minimized && (
+              <div className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-2 bg-gradient-to-t from-black/70 to-transparent p-1.5">
+                {screenSharing && (
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); void stopScreenShare(); }}
+                    aria-label={t('call.stopScreenShare')}
+                    className="grid h-8 w-8 place-items-center rounded-full bg-white text-slate-900"
+                  >
+                    <ScreenShareOffIcon size={16} />
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); endCall(); }}
+                  aria-label={t('call.hangUp')}
+                  className="grid h-8 w-8 place-items-center rounded-full bg-rose-600 text-white"
+                >
+                  <PhoneOffIcon size={16} />
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Controls — floating overlay so the video fills the screen; auto-hide
-              in full screen, fully hidden while in the PiP window. */}
-          {!compact && (
+              in full screen, hidden while in the PiP window or minimized. */}
+          {!compact && !minimized && (
           <div
             onClick={(e) => e.stopPropagation()}
             className={`toky-glass absolute inset-x-0 bottom-0 flex flex-wrap items-center justify-center gap-4 border-t border-white/10 py-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] transition-opacity duration-300 ${
               controlsVisible ? 'opacity-100' : 'pointer-events-none opacity-0'
             }`}
           >
+            <button
+              type="button"
+              onClick={() => setMinimized(true)}
+              aria-label={t('call.minimize')}
+              title={t('call.minimize')}
+              className="grid h-12 w-12 place-items-center rounded-full bg-slate-800 text-white hover:bg-slate-700"
+            >
+              <MinimizeGlyph />
+            </button>
             <button
               type="button"
               onClick={toggleMute}
@@ -2021,6 +2027,18 @@ function LinkGlyph() {
     <svg viewBox="0 0 24 24" width={22} height={22} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       <path d="M10 13a5 5 0 0 0 7.07 0l2-2a5 5 0 0 0-7.07-7.07l-1 1" />
       <path d="M14 11a5 5 0 0 0-7.07 0l-2 2a5 5 0 0 0 7.07 7.07l1-1" />
+    </svg>
+  );
+}
+
+function MinimizeGlyph() {
+  // Shrink-to-corner (minimize the call to a floating window).
+  return (
+    <svg viewBox="0 0 24 24" width={22} height={22} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M8 3v3a2 2 0 0 1-2 2H3" />
+      <path d="M21 8h-3a2 2 0 0 1-2-2V3" />
+      <path d="M3 16h3a2 2 0 0 1 2 2v3" />
+      <path d="M16 21v-3a2 2 0 0 1 2-2h3" />
     </svg>
   );
 }

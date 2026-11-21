@@ -788,6 +788,7 @@ const es: Dictionary = {
     screenShareUnsupported: 'Compartir pantalla no está disponible en este dispositivo. Úsalo desde el navegador de escritorio.',
     sharingScreen: 'Compartiendo pantalla',
     expand: 'Ampliar',
+    minimize: 'Minimizar',
     requestControl: 'Solicitar control',
     stopControlling: 'Dejar de controlar',
     beingControlled: 'Alguien está controlando tu Toky',
