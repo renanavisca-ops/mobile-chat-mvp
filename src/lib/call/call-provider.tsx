@@ -241,6 +241,13 @@ export function CallProvider({ children }: { children: ReactNode }) {
   // The call UI collapses to a floating bar while I share, so I can use Toky
   // behind it (and the helper can see/drive the real app, not the call screen).
   const [minimized, setMinimized] = useState(false);
+  // Full-screen call chrome (controls + status) auto-hides after a few seconds
+  // and reappears on a tap, like FaceTime/WhatsApp, so the video fills the view.
+  const [controlsVisible, setControlsVisible] = useState(true);
+  const controlsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // "compact" = the call UI is in a tiny window (Android Picture-in-Picture):
+  // show only the remote video, no chrome and no big self-view tile.
+  const [compact, setCompact] = useState(false);
   // A peer whose Toky *I* am currently driving (I'm the helper).
   const [controllingPeer, setControllingPeer] = useState<string | null>(null);
   // I asked this peer for control and am waiting for their answer.
@@ -524,7 +531,9 @@ export function CallProvider({ children }: { children: ReactNode }) {
     if (localVideoRef.current && localStreamRef.current) {
       localVideoRef.current.srcObject = localStreamRef.current;
     }
-  }, [phase, cameraOff, participants]);
+    // `compact` toggles whether the local self-view is mounted (hidden in PiP),
+    // so re-attach the stream when it remounts on returning to full screen.
+  }, [phase, cameraOff, participants, compact]);
 
   async function getIceServers(): Promise<RTCIceServer[]> {
     try {
@@ -1481,6 +1490,29 @@ export function CallProvider({ children }: { children: ReactNode }) {
     primeRingAudio();
   }, []);
 
+  // Reveal the call chrome and (re)arm the auto-hide timer. Called on tap and
+  // whenever the call (re)starts.
+  const bumpControls = useCallback(() => {
+    setControlsVisible(true);
+    if (controlsTimerRef.current) clearTimeout(controlsTimerRef.current);
+    controlsTimerRef.current = setTimeout(() => setControlsVisible(false), 4000);
+  }, []);
+
+  // Show the chrome when a call becomes active, then let it auto-hide.
+  useEffect(() => {
+    if (phase === 'incall' && !minimized) bumpControls();
+    else if (controlsTimerRef.current) clearTimeout(controlsTimerRef.current);
+  }, [phase, minimized, bumpControls]);
+
+  // Detect the tiny Android Picture-in-Picture window by its size, so the call
+  // UI can strip down to just the remote video while floating.
+  useEffect(() => {
+    const check = () => setCompact(Math.min(window.innerWidth, window.innerHeight) < 260);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
+
   // Single source of truth for call tones (one shared timer, so the two cases
   // never fight over it):
   //   - callee, phase 'ringing'  -> incoming ringtone + vibration
@@ -1732,13 +1764,14 @@ export function CallProvider({ children }: { children: ReactNode }) {
       {/* Active call */}
       {phase === 'incall' && !minimized && (
         <div
-          className="fixed inset-0 z-[95] flex flex-col bg-slate-950"
+          className="fixed inset-0 z-[95] bg-slate-950"
           style={{
             backgroundImage:
               'radial-gradient(40rem 40rem at 50% 12%, rgba(99,102,241,0.22), transparent 60%), radial-gradient(34rem 34rem at 80% 100%, rgba(56,189,248,0.14), transparent 55%)',
           }}
+          onClick={() => { if (!compact) { if (controlsVisible) setControlsVisible(false); else bumpControls(); } }}
         >
-          <div className="relative flex-1 overflow-hidden">
+          <div className="absolute inset-0 overflow-hidden">
             {oneToOne ? (
               <>
                 {remoteList[0] ? (
@@ -1762,15 +1795,15 @@ export function CallProvider({ children }: { children: ReactNode }) {
                     <div className="font-display text-xl font-bold text-slate-100">{label}</div>
                   </div>
                 )}
-                {localHasVideo && (
+                {localHasVideo && !compact && (
                   <video
                     ref={localVideoRef}
                     autoPlay
                     playsInline
                     muted
-                    className={`absolute bottom-4 right-4 h-40 w-28 rounded-xl border border-slate-700 object-cover ${
-                      frontCamera ? '-scale-x-100' : ''
-                    } ${cameraOff ? 'hidden' : ''}`}
+                    className={`absolute right-4 h-40 w-28 rounded-xl border border-slate-700 object-cover shadow-lg transition-all duration-300 ${
+                      controlsVisible ? 'bottom-28' : 'bottom-4'
+                    } ${frontCamera ? '-scale-x-100' : ''} ${cameraOff ? 'hidden' : ''}`}
                   />
                 )}
               </>
@@ -1804,16 +1837,29 @@ export function CallProvider({ children }: { children: ReactNode }) {
               </div>
             )}
 
-            {/* Status */}
-            <div className="absolute left-0 right-0 top-6 text-center">
-              <div className="text-base font-medium text-white drop-shadow">{label}</div>
-              <div className="text-sm text-white/70 drop-shadow">{status}</div>
-              {errText && <div className="mt-1 text-xs text-rose-300">{errText}</div>}
-            </div>
+            {/* Status (hidden in PiP, fades with the chrome) */}
+            {!compact && (
+              <div
+                className={`pointer-events-none absolute left-0 right-0 top-6 text-center transition-opacity duration-300 ${
+                  controlsVisible ? 'opacity-100' : 'opacity-0'
+                }`}
+              >
+                <div className="text-base font-medium text-white drop-shadow">{label}</div>
+                <div className="text-sm text-white/70 drop-shadow">{status}</div>
+                {errText && <div className="mt-1 text-xs text-rose-300">{errText}</div>}
+              </div>
+            )}
           </div>
 
-          {/* Controls */}
-          <div className="toky-glass flex items-center justify-center gap-4 border-t border-white/10 py-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
+          {/* Controls — floating overlay so the video fills the screen; auto-hide
+              in full screen, fully hidden while in the PiP window. */}
+          {!compact && (
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className={`toky-glass absolute inset-x-0 bottom-0 flex flex-wrap items-center justify-center gap-4 border-t border-white/10 py-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] transition-opacity duration-300 ${
+              controlsVisible ? 'opacity-100' : 'pointer-events-none opacity-0'
+            }`}
+          >
             <button
               type="button"
               onClick={toggleMute}
@@ -1932,6 +1978,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
               <PhoneOffIcon size={24} />
             </button>
           </div>
+          )}
         </div>
       )}
     </Ctx.Provider>

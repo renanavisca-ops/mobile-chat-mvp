@@ -47,8 +47,10 @@ public class MainActivity extends BridgeActivity {
         super.onUserLeaveHint();
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && AudioRoutePlugin.activeVideoCall) {
             try {
+                // A less extreme (3:4) portrait ratio makes the floating window a
+                // bit larger than a tall-narrow 9:16, which felt too small.
                 PictureInPictureParams params = new PictureInPictureParams.Builder()
-                    .setAspectRatio(new Rational(9, 16))
+                    .setAspectRatio(new Rational(3, 4))
                     .build();
                 enterPictureInPictureMode(params);
             } catch (Exception ignored) {
