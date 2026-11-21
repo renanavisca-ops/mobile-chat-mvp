@@ -25,6 +25,7 @@ import {
   nativeListOutputs,
   nativeSetOutput,
   nativeStopCallAudio,
+  nativeEnsureCallAudio,
   type CallOutput,
 } from '@/lib/call/native-audio';
 import { useT } from '@/lib/i18n/context';
@@ -1177,6 +1178,9 @@ export function CallProvider({ children }: { children: ReactNode }) {
     }
     try {
       const track = await captureScreenTrack();
+      // Starting MediaProjection can knock the call's audio focus loose and mute
+      // one side — reclaim the voice-call audio session right after.
+      void nativeEnsureCallAudio();
       screenTrackRef.current = track;
       let via: 'replace' | 'add' = 'add';
       let cam: MediaStreamTrack | null = null;
@@ -1238,6 +1242,8 @@ export function CallProvider({ children }: { children: ReactNode }) {
       track.stop();
     } catch {}
     void stopScreenCapture(); // release native MediaProjection (no-op on web)
+    // Stopping MediaProjection can also disturb the audio session — re-assert it.
+    void nativeEnsureCallAudio();
     screenTrackRef.current = null;
     // Tell viewers, and end any control they held over me.
     for (const pid of pcsRef.current.keys()) sendSignal('share', { from: myIdRef.current, to: pid, on: false });

@@ -10,6 +10,7 @@ export type CallOutput = 'earpiece' | 'speaker' | 'wired' | 'bluetooth';
 
 interface AudioRoutePlugin {
   startCallAudio(options?: { video?: boolean }): Promise<void>;
+  ensureCallAudio(): Promise<void>;
   setSpeakerphoneOn(options: { on: boolean }): Promise<{ on: boolean }>;
   listOutputs(): Promise<{ outputs: { type: CallOutput; active?: boolean }[] }>;
   setOutput(options: { type: CallOutput }): Promise<{ ok: boolean }>;
@@ -34,6 +35,17 @@ export async function nativeStartCallAudio(video = false): Promise<void> {
     await AudioRoute.startCallAudio({ video });
   } catch {
     // best effort — never let audio routing break the call
+  }
+}
+
+/** Re-assert the call audio session (mode + focus). Call after starting screen
+ *  share, since MediaProjection can knock the call's audio focus loose. */
+export async function nativeEnsureCallAudio(): Promise<void> {
+  if (!hasNativeAudioRoute()) return;
+  try {
+    await AudioRoute.ensureCallAudio();
+  } catch {
+    // best effort
   }
 }
 
