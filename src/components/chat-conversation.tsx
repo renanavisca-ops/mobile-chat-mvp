@@ -196,7 +196,7 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
 
   const supabase = browserSupabase();
   const { startCall, busy: callBusy } = useCall();
-  const { messages, loading: msgLoading, catchingUp, appendLocal, clearMessages, loadMore, hasMore, loadingMore, typingUsers, erasingUsers, recordingUsers, setMeActivity, reactions, pollVotes, hiddenIds } = useChatRealtime(chatId);
+  const { messages, loading: msgLoading, catchingUp, appendLocal: appendLocalRaw, clearMessages, loadMore, hasMore, loadingMore, typingUsers, erasingUsers, recordingUsers, setMeActivity, reactions, pollVotes, hiddenIds } = useChatRealtime(chatId);
 
   // chat details
   const [chat, setChat] = useState<ChatSummary | null>(null);
@@ -798,6 +798,18 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
   // the user scrolls up; re-pins as media loads so the latest message isn't left
   // cut off at the bottom of the screen after images finish loading.
   const stickBottomRef = useRef(true);
+  // Set when I send a message, so the view jumps to the newest regardless of
+  // where it was scrolled (opening on the unread divider left my own sent
+  // message off-screen). appendLocal (below) only runs for my OWN outgoing
+  // messages, so pinning there is always the right behaviour.
+  const forceBottomRef = useRef(false);
+  const appendLocal = useCallback(
+    (temp: Parameters<typeof appendLocalRaw>[0]) => {
+      forceBottomRef.current = true;
+      appendLocalRaw(temp);
+    },
+    [appendLocalRaw],
+  );
   // The "N new messages" divider row, so opening a chat can land on the first
   // unread message instead of always jumping to the newest.
   const unreadDividerRef = useRef<HTMLLIElement | null>(null);
@@ -1565,6 +1577,17 @@ export function ChatConversation({ chatId, embedded = false, focusMessageId = nu
 
     landTimersRef.current.forEach((t) => window.clearTimeout(t));
     landTimersRef.current = [];
+
+    // I just sent a message — always jump to the newest, whatever the view was
+    // doing (opening on the unread divider, scrolled up, mid-landing).
+    if (forceBottomRef.current) {
+      forceBottomRef.current = false;
+      initialScrollDoneRef.current = true;
+      stickBottomRef.current = true;
+      el.scrollTop = el.scrollHeight;
+      requestAnimationFrame(() => { if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight; });
+      return;
+    }
 
     if (!initialScrollDoneRef.current) {
       reanchorOnOpen();

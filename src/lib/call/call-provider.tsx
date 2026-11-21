@@ -842,14 +842,16 @@ export function CallProvider({ children }: { children: ReactNode }) {
       });
 
       try {
+        // Enter native communication audio mode BEFORE capturing the mic. On
+        // Android, setting MODE_IN_COMMUNICATION *after* getUserMedia leaves the
+        // WebView mic routed to silence, so the peer hears nothing (the call
+        // still works otherwise). Defaults the output to the EARPIECE for a voice
+        // call and the loudspeaker for a video call; the user can toggle it.
+        await nativeStartCallAudio(opts.video);
         const stream = await navigator.mediaDevices.getUserMedia(MEDIA(opts.video));
         localStreamRef.current = stream;
         setLocalHasVideo(opts.video);
         if (localVideoRef.current) localVideoRef.current.srcObject = stream;
-        // Enter native voice mode. Default the output to the EARPIECE for a voice
-        // call (like a normal phone call) and only to the loudspeaker for a video
-        // call; the user can still toggle the speaker during the call.
-        await nativeStartCallAudio(opts.video);
         setSpeakerOn(opts.video);
         await applySpeaker(opts.video);
         iceServersRef.current = await getIceServers();
@@ -950,13 +952,13 @@ export function CallProvider({ children }: { children: ReactNode }) {
     // Mark the call answered in history (callee-side).
     void logCallAnswered(inv.callId);
     try {
+      // Set native communication audio mode BEFORE capturing the mic, or the
+      // WebView mic routes to silence on Android and the peer can't hear us.
+      await nativeStartCallAudio(inv.video);
       const stream = await navigator.mediaDevices.getUserMedia(MEDIA(inv.video));
       localStreamRef.current = stream;
       setLocalHasVideo(inv.video);
       if (localVideoRef.current) localVideoRef.current.srcObject = stream;
-      // Enter native voice mode. Earpiece by default for a voice call, speaker
-      // for a video call; the user can toggle the speaker during the call.
-      await nativeStartCallAudio(inv.video);
       setSpeakerOn(inv.video);
       await applySpeaker(inv.video);
       iceServersRef.current = await getIceServers();
@@ -983,11 +985,12 @@ export function CallProvider({ children }: { children: ReactNode }) {
     wasCallerRef.current = false;
     setPhaseBoth('incall');
     try {
+      // Communication audio mode before the mic capture (see acceptCall).
+      await nativeStartCallAudio(opts.video);
       const stream = await navigator.mediaDevices.getUserMedia(MEDIA(opts.video));
       localStreamRef.current = stream;
       setLocalHasVideo(opts.video);
       if (localVideoRef.current) localVideoRef.current.srcObject = stream;
-      await nativeStartCallAudio(opts.video);
       setSpeakerOn(opts.video);
       await applySpeaker(opts.video);
       iceServersRef.current = await getIceServers();
