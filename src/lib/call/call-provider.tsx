@@ -297,6 +297,10 @@ export function CallProvider({ children }: { children: ReactNode }) {
   const callOutcomeRef = useRef<'no_answer' | 'answered' | 'declined' | 'cancelled'>('no_answer');
   const iceServersRef = useRef<RTCIceServer[]>([{ urls: 'stun:stun.cloudflare.com:3478' }]);
   const incomingCallIdRef = useRef<string | null>(null);
+  // Calls already answered/declined/cancelled in this session. The recovery
+  // effect (which re-reads the still-"ringing" calls row on focus) must skip
+  // these, or a declined call would pop up and ring again on every refocus.
+  const handledCallIdsRef = useRef<Set<string>>(new Set());
   // A native call notification's "Contestar"/"Rechazar" button opens the app via
   // a tokychat://call/… deep link. If the incoming call isn't loaded yet (cold
   // start), remember the intent and run it once the recovery effect finds it.
@@ -932,6 +936,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
   async function acceptCall() {
     const inv = incoming;
     if (!inv) return;
+    handledCallIdsRef.current.add(inv.callId);
     setIncoming(null);
     // Tell our OTHER sessions/devices (same account) the call was taken here, so
     // they stop ringing. Live web/WebView sessions get this broadcast; killed
@@ -997,6 +1002,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
   function declineCall() {
     const inv = incoming;
     if (inv) {
+      handledCallIdsRef.current.add(inv.callId);
       sendToUser(inv.from, 'declined', { callId: inv.callId, from: myIdRef.current });
       // Stop ringing on our other sessions (live) and devices (native push).
       if (myIdRef.current) sendToUser(myIdRef.current, 'handled', { callId: inv.callId });
@@ -1338,6 +1344,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
       setPhaseBoth('ringing');
     });
     ch.on('broadcast', { event: 'cancel' }, ({ payload }) => {
+      if (payload?.callId) handledCallIdsRef.current.add(payload.callId);
       if (phaseRef.current === 'ringing' && incomingCallIdRef.current === payload.callId) {
         setIncoming(null);
         setPhaseBoth('idle');
@@ -1346,6 +1353,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
     // Another of our own sessions/devices answered or declined this call — stop
     // ringing here so the call rings in only one place (like WhatsApp).
     ch.on('broadcast', { event: 'handled' }, ({ payload }) => {
+      if (payload?.callId) handledCallIdsRef.current.add(payload.callId);
       if (phaseRef.current === 'ringing' && incomingCallIdRef.current === payload.callId) {
         setIncoming(null);
         setPhaseBoth('idle');
@@ -1402,6 +1410,8 @@ export function CallProvider({ children }: { children: ReactNode }) {
       const row = rows?.[0];
       if (!alive || !row || phaseRef.current !== 'idle') return;
       if (row.caller_id === myIdRef.current) return;
+      // Already answered/declined/cancelled here — don't resurrect the ring.
+      if (handledCallIdsRef.current.has(row.id)) return;
       if (incomingCallIdRef.current === row.id || callIdRef.current === row.id) return;
       if (await isBlockedWith(row.caller_id).catch(() => false)) return;
       const { data: prof } = await (supabase as any)
@@ -1986,10 +1996,13 @@ export function CallProvider({ children }: { children: ReactNode }) {
 }
 
 function OutputGlyph() {
+  // Headphones — the "audio output" (earpiece / speaker / Bluetooth) picker.
+  // Deliberately NOT a microphone, so it isn't confused with the mute button.
   return (
     <svg viewBox="0 0 24 24" width={22} height={22} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
-      <path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4" />
+      <path d="M4 15v-3a8 8 0 0 1 16 0v3" />
+      <rect x="2.5" y="14.5" width="4.5" height="6.5" rx="2" />
+      <rect x="17" y="14.5" width="4.5" height="6.5" rx="2" />
     </svg>
   );
 }
