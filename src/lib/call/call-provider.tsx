@@ -11,6 +11,7 @@ import {
   type ReactNode,
 } from 'react';
 import type { RealtimeChannel } from '@supabase/supabase-js';
+import { App as CapacitorApp } from '@capacitor/app';
 import { browserSupabase } from '@/lib/supabase/client';
 import { logCallStart, logCallAnswered, logCallEnded } from '@/lib/db/calls';
 import { logCallEvent } from '@/lib/db/chats';
@@ -215,6 +216,10 @@ export function CallProvider({ children }: { children: ReactNode }) {
   const [localHasVideo, setLocalHasVideo] = useState(false);
   const [muted, setMuted] = useState(false);
   const [cameraOff, setCameraOff] = useState(false);
+  // Mirror the local self-view while the FRONT camera is active (like a mirror,
+  // as WhatsApp/FaceTime do). The rear camera is shown un-mirrored. Only the
+  // local preview is flipped — the video sent to peers is never mirrored.
+  const [frontCamera, setFrontCamera] = useState(true);
   const [speakerOn, setSpeakerOn] = useState(true);
   const [incoming, setIncoming] = useState<Invite | null>(null);
   const [participants, setParticipants] = useState<Map<string, Participant>>(new Map());
@@ -285,6 +290,11 @@ export function CallProvider({ children }: { children: ReactNode }) {
   const callOutcomeRef = useRef<'no_answer' | 'answered' | 'declined' | 'cancelled'>('no_answer');
   const iceServersRef = useRef<RTCIceServer[]>([{ urls: 'stun:stun.cloudflare.com:3478' }]);
   const incomingCallIdRef = useRef<string | null>(null);
+  // A native call notification's "Contestar"/"Rechazar" button opens the app via
+  // a tokychat://call/… deep link. If the incoming call isn't loaded yet (cold
+  // start), remember the intent and run it once the recovery effect finds it.
+  const pendingAnswerCallIdRef = useRef<string | null>(null);
+  const pendingDeclineCallIdRef = useRef<string | null>(null);
   const facingRef = useRef<'user' | 'environment'>('user');
   const hadPeersRef = useRef(false);
   const mediaElsRef = useRef<Set<HTMLVideoElement>>(new Set());
@@ -487,6 +497,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
     invitedRef.current = [];
     hadPeersRef.current = false;
     facingRef.current = 'user';
+    setFrontCamera(true);
     mediaElsRef.current.clear();
     setParticipants(new Map());
     setIncoming(null);
@@ -913,6 +924,11 @@ export function CallProvider({ children }: { children: ReactNode }) {
     const inv = incoming;
     if (!inv) return;
     setIncoming(null);
+    // Tell our OTHER sessions/devices (same account) the call was taken here, so
+    // they stop ringing. Live web/WebView sessions get this broadcast; killed
+    // apps get a native-notification cancel via the server push below.
+    if (myIdRef.current) sendToUser(myIdRef.current, 'handled', { callId: inv.callId });
+    void cancelNativeCallPush([myIdRef.current].filter(Boolean) as string[], inv.callId);
     setLabel(inv.label);
     setIsVideo(inv.video);
     callIdRef.current = inv.callId;
@@ -971,7 +987,12 @@ export function CallProvider({ children }: { children: ReactNode }) {
 
   function declineCall() {
     const inv = incoming;
-    if (inv) sendToUser(inv.from, 'declined', { callId: inv.callId, from: myIdRef.current });
+    if (inv) {
+      sendToUser(inv.from, 'declined', { callId: inv.callId, from: myIdRef.current });
+      // Stop ringing on our other sessions (live) and devices (native push).
+      if (myIdRef.current) sendToUser(myIdRef.current, 'handled', { callId: inv.callId });
+      void cancelNativeCallPush([myIdRef.current].filter(Boolean) as string[], inv.callId);
+    }
     setIncoming(null);
     setPhaseBoth('idle');
   }
@@ -980,8 +1001,30 @@ export function CallProvider({ children }: { children: ReactNode }) {
     // If still ringing others in a 1:1, tell them to stop ringing.
     if (invitedRef.current.length > 0) {
       for (const pid of invitedRef.current) sendToUser(pid, 'cancel', { callId: callIdRef.current });
+      // Also clear the native full-screen ring on a callee whose app is closed
+      // (the Realtime 'cancel' above only reaches a live client).
+      if (callIdRef.current) void cancelNativeCallPush(invitedRef.current.slice(), callIdRef.current);
     }
     cleanup();
+  }
+
+  // Ask the server to clear the native incoming-call notification on the given
+  // users' devices for this call (answered/declined/cancelled elsewhere). Web
+  // sessions sync over Realtime; this is only for killed/backgrounded apps.
+  async function cancelNativeCallPush(userIds: string[], callId: string | null) {
+    if (!callId || userIds.length === 0) return;
+    try {
+      const { data: sess } = await supabase.auth.getSession();
+      const token = sess.session?.access_token;
+      if (!token) return;
+      await apiFetch('/api/push/call/cancel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ userIds, callId }),
+      });
+    } catch {
+      // Best-effort: the Realtime path already covers live clients.
+    }
   }
 
   async function openOutputs() {
@@ -1048,6 +1091,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
         if (localVideoRef.current) localVideoRef.current.srcObject = local;
       }
       facingRef.current = next;
+      setFrontCamera(next === 'user');
     } catch (e: any) {
       setErrText(e?.message ?? String(e));
     }
@@ -1088,6 +1132,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
       }
 
       facingRef.current = 'user';
+      setFrontCamera(true);
       setCameraOff(false);
       setLocalHasVideo(true);
       setIsVideo(true);
@@ -1289,6 +1334,14 @@ export function CallProvider({ children }: { children: ReactNode }) {
         setPhaseBoth('idle');
       }
     });
+    // Another of our own sessions/devices answered or declined this call — stop
+    // ringing here so the call rings in only one place (like WhatsApp).
+    ch.on('broadcast', { event: 'handled' }, ({ payload }) => {
+      if (phaseRef.current === 'ringing' && incomingCallIdRef.current === payload.callId) {
+        setIncoming(null);
+        setPhaseBoth('idle');
+      }
+    });
     ch.on('broadcast', { event: 'declined' }, ({ payload }) => {
       // In a 1:1 outgoing call, a decline ends it. In a group call, ignore.
       if (
@@ -1368,6 +1421,58 @@ export function CallProvider({ children }: { children: ReactNode }) {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [myId]);
+
+  // Native "Contestar"/"Rechazar" buttons on the full-screen call notification
+  // open the app with a tokychat://call/answer|decline?callId=… deep link. Act
+  // on it: if the matching incoming call is already loaded, answer/decline now;
+  // otherwise remember it so the recovery effect's result triggers it (below).
+  useEffect(() => {
+    const handleUrl = (url: string | undefined | null) => {
+      if (!url) return;
+      const low = url.toLowerCase();
+      if (!low.startsWith('tokychat://call/')) return;
+      let action = '';
+      let callId = '';
+      try {
+        const u = new URL(url);
+        action = (u.host || '').toLowerCase() === 'call' ? u.pathname.replace(/\//g, '') : u.host.toLowerCase();
+        callId = u.searchParams.get('callId') || '';
+      } catch {
+        return;
+      }
+      if (!callId) return;
+      if (action === 'answer') {
+        if (incomingCallIdRef.current === callId) void acceptCall();
+        else pendingAnswerCallIdRef.current = callId;
+      } else if (action === 'decline') {
+        if (incomingCallIdRef.current === callId) declineCall();
+        else pendingDeclineCallIdRef.current = callId;
+      }
+    };
+    let remove: (() => void) | undefined;
+    // Cold start: the deep link that launched the app.
+    CapacitorApp.getLaunchUrl?.().then((r) => handleUrl(r?.url)).catch(() => {});
+    // Warm: the OS delivers the link to the running app.
+    CapacitorApp.addListener('appUrlOpen', ({ url }) => handleUrl(url))
+      .then((h) => { remove = () => void h.remove(); })
+      .catch(() => {});
+    return () => remove?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Fire a pending deep-link answer/decline once the incoming call it named has
+  // been loaded (by the invite broadcast or the cold-start recovery effect).
+  useEffect(() => {
+    if (!incoming) return;
+    if (pendingAnswerCallIdRef.current === incoming.callId) {
+      pendingAnswerCallIdRef.current = null;
+      void acceptCall();
+    } else if (pendingDeclineCallIdRef.current === incoming.callId) {
+      pendingDeclineCallIdRef.current = null;
+      declineCall();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [incoming]);
 
   // Unlock the ring AudioContext on the first user gesture so an incoming ring
   // (or ringback) is actually audible on mobile, where a fresh AudioContext
@@ -1664,8 +1769,8 @@ export function CallProvider({ children }: { children: ReactNode }) {
                     playsInline
                     muted
                     className={`absolute bottom-4 right-4 h-40 w-28 rounded-xl border border-slate-700 object-cover ${
-                      cameraOff ? 'hidden' : ''
-                    }`}
+                      frontCamera ? '-scale-x-100' : ''
+                    } ${cameraOff ? 'hidden' : ''}`}
                   />
                 )}
               </>
@@ -1683,7 +1788,9 @@ export function CallProvider({ children }: { children: ReactNode }) {
                     autoPlay
                     playsInline
                     muted
-                    className={`h-full w-full object-cover ${localHasVideo && !cameraOff ? '' : 'invisible'}`}
+                    className={`h-full w-full object-cover ${frontCamera ? '-scale-x-100' : ''} ${
+                      localHasVideo && !cameraOff ? '' : 'invisible'
+                    }`}
                   />
                   {(!localHasVideo || cameraOff) && (
                     <div className="absolute inset-0 grid place-items-center">
