@@ -2,7 +2,9 @@ package app.toky.chat;
 
 import android.content.Context;
 import android.content.Intent;
+import android.media.AudioAttributes;
 import android.media.AudioDeviceInfo;
+import android.media.AudioFocusRequest;
 import android.media.AudioManager;
 import android.os.Build;
 
@@ -37,10 +39,65 @@ public class AudioRoutePlugin extends Plugin {
      *  user leaves the app. Cleared when the call ends. */
     public static volatile boolean activeVideoCall = false;
 
+    // Held VOICE_COMMUNICATION audio focus for the duration of the call. Like
+    // every real VoIP app, we must OWN the audio session — otherwise another
+    // audio event (e.g. MediaProjection starting when the user shares their
+    // screen) can steal/reroute the mic and one side goes silent.
+    private AudioFocusRequest focusRequest;
+    private final AudioManager.OnAudioFocusChangeListener focusListener = focusChange -> {
+        // A call manages its own audio via WebRTC; we intentionally keep going
+        // through transient losses rather than ducking/pausing the call.
+    };
+
     private AudioManager audioManager() {
         Context ctx = getContext();
         if (ctx == null) return null;
         return (AudioManager) ctx.getSystemService(Context.AUDIO_SERVICE);
+    }
+
+    /** Take (or re-take) a strong voice-call audio focus so the OS treats this
+     *  as a phone call and keeps the mic/route stable for the whole session. */
+    private void requestCallFocus(AudioManager am) {
+        if (am == null) return;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            AudioAttributes attrs = new AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                .build();
+            focusRequest = new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
+                .setAudioAttributes(attrs)
+                .setOnAudioFocusChangeListener(focusListener)
+                .setWillPauseWhenDucked(false)
+                .build();
+            am.requestAudioFocus(focusRequest);
+        } else {
+            am.requestAudioFocus(focusListener, AudioManager.STREAM_VOICE_CALL, AudioManager.AUDIOFOCUS_GAIN);
+        }
+    }
+
+    private void abandonCallFocus(AudioManager am) {
+        if (am == null) return;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            if (focusRequest != null) {
+                am.abandonAudioFocusRequest(focusRequest);
+                focusRequest = null;
+            }
+        } else {
+            am.abandonAudioFocus(focusListener);
+        }
+    }
+
+    /** Re-assert the call audio session (mode + focus). The web calls this after
+     *  starting screen share, since MediaProjection can knock the call's audio
+     *  focus loose and mute one side. Cheap and idempotent. */
+    @PluginMethod
+    public void ensureCallAudio(PluginCall call) {
+        AudioManager am = audioManager();
+        if (am != null) {
+            am.setMode(AudioManager.MODE_IN_COMMUNICATION);
+            requestCallFocus(am);
+        }
+        call.resolve();
     }
 
     @PluginMethod
@@ -51,6 +108,7 @@ public class AudioRoutePlugin extends Plugin {
             return;
         }
         am.setMode(AudioManager.MODE_IN_COMMUNICATION);
+        requestCallFocus(am);
         boolean video = Boolean.TRUE.equals(call.getBoolean("video", false));
         activeVideoCall = video;
         try {
@@ -173,6 +231,7 @@ public class AudioRoutePlugin extends Plugin {
         activeVideoCall = false;
         AudioManager am = audioManager();
         if (am != null) {
+            abandonCallFocus(am);
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 am.clearCommunicationDevice();
             } else {
