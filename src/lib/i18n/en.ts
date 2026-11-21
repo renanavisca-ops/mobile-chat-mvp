@@ -786,6 +786,7 @@ const en = {
     screenShareUnsupported: 'Screen sharing isn’t available on this device. Use it from a desktop browser.',
     sharingScreen: 'Sharing screen',
     expand: 'Expand',
+    minimize: 'Minimize',
     requestControl: 'Request control',
     stopControlling: 'Stop controlling',
     beingControlled: 'Someone is controlling your Toky',
