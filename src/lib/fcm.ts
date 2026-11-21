@@ -210,3 +210,55 @@ export async function sendCallDataToTokens(
 
   return { staleTokens, sent };
 }
+
+/**
+ * Delivers a DATA-only "cancel this ringing call" message so the native handler
+ * dismisses the full-screen call notification when the call was answered,
+ * declined or cancelled on another device. No user-visible payload.
+ */
+export async function sendCallCancelToTokens(
+  tokens: string[],
+  callId: string
+): Promise<{ staleTokens: string[]; sent: number }> {
+  const sa = getServiceAccount();
+  if (!sa || tokens.length === 0) return { staleTokens: [], sent: 0 };
+
+  const accessToken = await getAccessToken(sa);
+  const endpoint = `https://fcm.googleapis.com/v1/projects/${sa.project_id}/messages:send`;
+
+  const staleTokens: string[] = [];
+  let sent = 0;
+
+  await Promise.all(
+    tokens.map(async (token) => {
+      const message = {
+        message: {
+          token,
+          data: { type: 'call_cancelled', callId },
+          android: { priority: 'HIGH', ttl: '45s' },
+          // content-available wakes iOS briefly; no alert (nothing to show).
+          apns: { headers: { 'apns-priority': '5' }, payload: { aps: { 'content-available': 1 } } },
+        },
+      };
+      try {
+        const res = await fetch(endpoint, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify(message),
+        });
+        if (res.ok) {
+          sent++;
+          return;
+        }
+        const text = await res.text().catch(() => '');
+        if (res.status === 404 || (res.status === 400 && /not.?registered|invalid.*token/i.test(text))) {
+          staleTokens.push(token);
+        }
+      } catch {
+        // transient — ignore
+      }
+    })
+  );
+
+  return { staleTokens, sent };
+}

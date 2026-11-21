@@ -20,24 +20,38 @@ import io.capawesome.capacitorjs.plugins.firebase.messaging.MessagingService;
 
 /**
  * Extends the Firebase messaging plugin's service. For an "incoming_call" DATA
- * message we build a full-screen, ringing notification (WhatsApp-style) so the
- * phone rings and the call shows over the lock screen even when the app is
- * killed. Everything else falls through to the plugin (normal notifications +
- * JS delivery via super).
+ * message we build a full-screen, ringing notification (WhatsApp-style) with
+ * Answer/Decline actions, so the phone rings and the call shows over the lock
+ * screen even when the app is killed. A "call_cancelled" DATA message clears it
+ * (answered/declined/cancelled on another device). Everything else falls through
+ * to the plugin (normal notifications + JS delivery via super).
  */
 public class TokyMessagingService extends MessagingService {
     private static final String CALL_CHANNEL = "incoming_calls";
-    // Keep in sync with IncomingCallActivity.CALL_NOTIF_ID.
-    private static final int CALL_NOTIF_ID = 7411;
+    // Keep in sync with IncomingCallActivity.CALL_NOTIF_ID / CallActionReceiver.
+    static final int CALL_NOTIF_ID = 7411;
+    // Extra keys shared with IncomingCallActivity / CallActionReceiver.
+    static final String EXTRA_ACTION = "toky_action";
+    static final String EXTRA_CALL_ID = "toky_callId";
+    static final String EXTRA_VIDEO = "toky_video";
 
     @Override
     public void onMessageReceived(RemoteMessage remoteMessage) {
         Map<String, String> data = remoteMessage.getData();
-        // Ring natively only when the app is NOT already foreground; otherwise the
-        // in-app web UI handles the ring via realtime, so we avoid double-ringing.
-        if (data != null && "incoming_call".equals(data.get("type")) && !MainActivity.isForeground) {
-            showIncomingCall(data);
-            return;
+        if (data != null) {
+            String type = data.get("type");
+            // Call answered/declined/cancelled elsewhere — clear the ring here.
+            if ("call_cancelled".equals(type)) {
+                NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+                if (nm != null) nm.cancel(CALL_NOTIF_ID);
+                return;
+            }
+            // Ring natively only when the app is NOT already foreground; otherwise
+            // the in-app web UI rings via realtime, so we avoid double-ringing.
+            if ("incoming_call".equals(type) && !MainActivity.isForeground) {
+                showIncomingCall(data);
+                return;
+            }
         }
         super.onMessageReceived(remoteMessage);
     }
@@ -46,15 +60,36 @@ public class TokyMessagingService extends MessagingService {
         String callerName = data.get("callerName");
         if (callerName == null || callerName.isEmpty()) callerName = "Llamada entrante";
         boolean video = "1".equals(data.get("video"));
+        String callId = data.get("callId");
+        if (callId == null) callId = "";
         String text = video ? "📹 Videollamada entrante" : "📞 Llamada entrante";
 
         createChannel();
 
-        Intent fsIntent = new Intent(this, IncomingCallActivity.class);
-        fsIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         int piFlags = PendingIntent.FLAG_UPDATE_CURRENT;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) piFlags |= PendingIntent.FLAG_IMMUTABLE;
-        PendingIntent fsPi = PendingIntent.getActivity(this, 0, fsIntent, piFlags);
+
+        // Body tap / full-screen: open the app on the incoming-call screen.
+        Intent openIntent = new Intent(this, IncomingCallActivity.class)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            .putExtra(EXTRA_ACTION, "open")
+            .putExtra(EXTRA_CALL_ID, callId)
+            .putExtra(EXTRA_VIDEO, video);
+        PendingIntent openPi = PendingIntent.getActivity(this, 0, openIntent, piFlags);
+
+        // Answer: open the app and auto-accept this call (via a deep link).
+        Intent answerIntent = new Intent(this, IncomingCallActivity.class)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            .putExtra(EXTRA_ACTION, "answer")
+            .putExtra(EXTRA_CALL_ID, callId)
+            .putExtra(EXTRA_VIDEO, video);
+        PendingIntent answerPi = PendingIntent.getActivity(this, 1, answerIntent, piFlags);
+
+        // Decline: clear the ring locally (handled by a lightweight receiver).
+        Intent declineIntent = new Intent(this, CallActionReceiver.class)
+            .setAction("app.toky.chat.DECLINE")
+            .putExtra(EXTRA_CALL_ID, callId);
+        PendingIntent declinePi = PendingIntent.getBroadcast(this, 2, declineIntent, piFlags);
 
         NotificationCompat.Builder b = new NotificationCompat.Builder(this, CALL_CHANNEL)
             .setSmallIcon(R.mipmap.ic_launcher)
@@ -65,8 +100,10 @@ public class TokyMessagingService extends MessagingService {
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setOngoing(true)
             .setAutoCancel(true)
-            .setContentIntent(fsPi)
-            .setFullScreenIntent(fsPi, true);
+            .setContentIntent(openPi)
+            .setFullScreenIntent(openPi, true)
+            .addAction(0, "Rechazar", declinePi)
+            .addAction(0, "Contestar", answerPi);
 
         // Pre-Oreo devices have no channels, so set the ringtone on the builder.
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
